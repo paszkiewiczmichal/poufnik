@@ -1,0 +1,14 @@
+id: contract-risk-review
+title: Analiza ryzyk umowy
+category: analiza_umowy
+description: Wskazuje kluczowe ryzyka prawne w zanonimizowanej umowie.
+body: |
+  Przeanalizuj ponizszy zanonimizowany dokument pod katem ryzyk prawnych.
+  Wskaz zapisy wymagajace uwagi i zaproponuj pytania kontrolne.
+
+  {{DOKUMENT}}
+tags:
+  - umowa
+  - ryzyka
+  - analiza
+version: "0.1.0"

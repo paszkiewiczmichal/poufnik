@@ -1,0 +1,321 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "24"
+
+jobs:
+  release-metadata:
+    name: release-metadata
+    runs-on: ubuntu-latest
+    outputs:
+      body: ${{ steps.changelog.outputs.body }}
+      prerelease: ${{ steps.tag.outputs.prerelease }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Tag metadata
+        id: tag
+        run: |
+          if [[ "${GITHUB_REF_NAME}" == *-* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          uv run --no-project --python "${PYTHON_VERSION}" python .github/scripts/generate_changelog.py --tag "${GITHUB_REF_NAME}" --output release-changelog.md
+          {
+            echo "body<<EOF"
+            cat release-changelog.md
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+  test-engine:
+    name: test-engine (windows-x64)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Install Tesseract
+        run: |
+          $tessHome = "C:\Program Files\Tesseract-OCR"
+          if (-not (Test-Path "$tessHome\tesseract.exe")) {
+            choco install tesseract --yes --no-progress
+          }
+          if (-not (Test-Path "$tessHome\tesseract.exe")) {
+            throw "Tesseract not found at $tessHome and Chocolatey install did not provide it."
+          }
+          $tessData = "$tessHome\tessdata"
+          foreach ($lang in @("pol", "eng")) {
+            $target = Join-Path $tessData "$lang.traineddata"
+            if (-not (Test-Path $target)) {
+              Invoke-WebRequest -Uri "https://github.com/tesseract-ocr/tessdata_fast/raw/main/$lang.traineddata" -OutFile $target
+            }
+          }
+          echo $tessHome | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Install engine dependencies
+        working-directory: engine
+        run: uv sync --group dev --group models
+
+      - name: Pytest
+        working-directory: engine
+        run: uv run pytest
+
+  test-desktop:
+    name: test-desktop
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Install desktop dependencies
+        working-directory: desktop
+        run: npm ci
+
+      - name: Vitest
+        working-directory: desktop
+        run: npm run test
+
+  build-windows-installer:
+    name: build-windows-installer
+    needs:
+      - release-metadata
+      - test-engine
+      - test-desktop
+    runs-on: windows-latest
+    env:
+      RELEASE_TARGET: x86_64-pc-windows-msvc
+      CHECKSUM_NAME: SHA256SUMS-windows-x64.txt
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      TAURI_SIGNING_PUBLIC_KEY: ${{ secrets.TAURI_SIGNING_PUBLIC_KEY }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      AZURE_ARTIFACT_SIGNING_ENDPOINT: ${{ secrets.AZURE_ARTIFACT_SIGNING_ENDPOINT }}
+      AZURE_ARTIFACT_SIGNING_ACCOUNT: ${{ secrets.AZURE_ARTIFACT_SIGNING_ACCOUNT }}
+      AZURE_ARTIFACT_SIGNING_CERTIFICATE_PROFILE: ${{ secrets.AZURE_ARTIFACT_SIGNING_CERTIFICATE_PROFILE }}
+      AZURE_ARTIFACT_SIGNING_AVAILABLE: ${{ secrets.AZURE_TENANT_ID != '' && secrets.AZURE_CLIENT_ID != '' && secrets.AZURE_CLIENT_SECRET != '' && secrets.AZURE_ARTIFACT_SIGNING_ENDPOINT != '' && secrets.AZURE_ARTIFACT_SIGNING_ACCOUNT != '' && secrets.AZURE_ARTIFACT_SIGNING_CERTIFICATE_PROFILE != '' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Prepare release version
+        run: uv run --python ${{ env.PYTHON_VERSION }} --no-project python .github/scripts/prepare_release_version.py "${{ github.ref_name }}"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ env.RELEASE_TARGET }}
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri -> target
+
+      - name: Set up .NET 8 for Azure Artifact Signing
+        if: env.AZURE_ARTIFACT_SIGNING_AVAILABLE == 'true'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Install Tesseract
+        run: |
+          $tessHome = "C:\Program Files\Tesseract-OCR"
+          if (-not (Test-Path "$tessHome\tesseract.exe")) {
+            choco install tesseract --yes --no-progress
+          }
+          if (-not (Test-Path "$tessHome\tesseract.exe")) {
+            throw "Tesseract not found at $tessHome and Chocolatey install did not provide it."
+          }
+          $tessData = "$tessHome\tessdata"
+          foreach ($lang in @("pol", "eng")) {
+            $target = Join-Path $tessData "$lang.traineddata"
+            if (-not (Test-Path $target)) {
+              Invoke-WebRequest -Uri "https://github.com/tesseract-ocr/tessdata_fast/raw/main/$lang.traineddata" -OutFile $target
+            }
+          }
+          echo $tessHome | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Install engine dependencies
+        working-directory: engine
+        run: uv sync --group dev --group models --group build
+
+      - name: Install desktop dependencies
+        working-directory: desktop
+        run: npm ci
+
+      - name: Configure updater signing key
+        run: uv run --python ${{ env.PYTHON_VERSION }} --no-project python .github/scripts/configure_updater_key.py
+
+      - name: Warn about missing Azure Artifact Signing
+        if: env.AZURE_ARTIFACT_SIGNING_AVAILABLE != 'true'
+        run: echo "::warning::Azure Artifact Signing secrets are missing. Building an unsigned Windows NSIS installer so the workflow can complete."
+
+      - name: Install Azure Artifact Signing CLI
+        if: env.AZURE_ARTIFACT_SIGNING_AVAILABLE == 'true'
+        run: cargo install artifact-signing-cli --locked
+
+      - name: Configure Azure Artifact Signing
+        if: env.AZURE_ARTIFACT_SIGNING_AVAILABLE == 'true'
+        run: |
+          uv run --python ${{ env.PYTHON_VERSION }} --no-project python .github/scripts/configure_azure_artifact_signing.py `
+            --endpoint "$env:AZURE_ARTIFACT_SIGNING_ENDPOINT" `
+            --account "$env:AZURE_ARTIFACT_SIGNING_ACCOUNT" `
+            --profile "$env:AZURE_ARTIFACT_SIGNING_CERTIFICATE_PROFILE" `
+            --description "Poufnik"
+
+      - name: Build engine sidecar
+        working-directory: engine
+        run: uv run python build/build_sidecar.py --target-triple "$env:RELEASE_TARGET" --clean
+
+      - name: Sign engine sidecar
+        if: env.AZURE_ARTIFACT_SIGNING_AVAILABLE == 'true'
+        run: |
+          $sidecar = "desktop/src-tauri/binaries/anonymizer-engine-$env:RELEASE_TARGET.exe"
+          if (-not (Test-Path $sidecar)) {
+            throw "Sidecar executable not found: $sidecar"
+          }
+          artifact-signing-cli `
+            -e "$env:AZURE_ARTIFACT_SIGNING_ENDPOINT" `
+            -a "$env:AZURE_ARTIFACT_SIGNING_ACCOUNT" `
+            -c "$env:AZURE_ARTIFACT_SIGNING_CERTIFICATE_PROFILE" `
+            -d "Poufnik" `
+            "$sidecar"
+          signtool verify /pa "$sidecar"
+
+      - name: Build Tauri installer
+        id: tauri
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: desktop
+          tagName: ${{ github.ref_name }}
+          releaseName: Poufnik ${{ github.ref_name }}
+          releaseBody: ${{ needs.release-metadata.outputs.body }}
+          releaseDraft: true
+          prerelease: ${{ needs.release-metadata.outputs.prerelease }}
+          args: --target ${{ env.RELEASE_TARGET }} --bundles nsis
+          retryAttempts: 2
+          uploadUpdaterJson: true
+          updaterJsonPreferNsis: true
+          uploadUpdaterSignatures: true
+          releaseAssetNamePattern: "[name]_[version]_[platform]_[arch][setup][ext]"
+
+      - name: Verify Windows signatures
+        if: env.AZURE_ARTIFACT_SIGNING_AVAILABLE == 'true'
+        run: |
+          $paths = @()
+          $paths += Get-Item "desktop/src-tauri/binaries/anonymizer-engine-$env:RELEASE_TARGET.exe"
+          $paths += Get-ChildItem -Path "desktop/src-tauri/target/$env:RELEASE_TARGET/release" -File -Filter "*.exe" -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -match "poufnik|anonymizer" }
+          $paths += Get-ChildItem -Path "desktop/src-tauri/target/$env:RELEASE_TARGET/release/bundle/nsis" -File -Filter "*.exe" -ErrorAction SilentlyContinue
+          $uniquePaths = $paths | Where-Object { $_ -and (Test-Path $_.FullName) } | Sort-Object FullName -Unique
+          if (-not $uniquePaths) {
+            throw "No Windows executables found for signature verification."
+          }
+          foreach ($path in $uniquePaths) {
+            signtool verify /pa "$($path.FullName)"
+          }
+
+      - name: Generate SHA256 checksums
+        run: uv run --python ${{ env.PYTHON_VERSION }} --no-project python .github/scripts/sha256_artifacts.py --output "$env:CHECKSUM_NAME"
+
+      - name: Artifact size summary
+        run: |
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "| Artifact | Size |"
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "| --- | ---: |"
+          $installers = Get-ChildItem -Path "desktop/src-tauri/target/$env:RELEASE_TARGET/release/bundle/nsis" -File -Filter "*.exe" -ErrorAction SilentlyContinue
+          if (-not $installers) {
+            Write-Host "::warning::No NSIS installer artifacts were found for size reporting."
+          }
+          foreach ($path in $installers) {
+            $sizeMb = $path.Length / 1MB
+            Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ("| {0} | {1:N1} MB |" -f $path.Name, $sizeMb)
+            if ($sizeMb -gt 900) {
+              Write-Host "::warning::$($path.Name) is larger than 900 MB; inspect PyInstaller _internal, spaCy model and bundled Tesseract resources before release."
+            }
+          }
+
+      - name: Upload checksum workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: checksums-windows-x64
+          path: ${{ env.CHECKSUM_NAME }}
+
+  publish-checksums:
+    name: publish-checksums
+    runs-on: ubuntu-latest
+    needs:
+      - build-windows-installer
+    steps:
+      - name: Download checksum artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: checksums-*
+          path: checksums
+          merge-multiple: true
+
+      - name: Combine checksums
+        run: |
+          sort checksums/*.txt > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Upload SHA256SUMS to draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${GITHUB_REF_NAME}" SHA256SUMS.txt --clobber
