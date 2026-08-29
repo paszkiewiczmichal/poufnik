@@ -57,6 +57,7 @@ def main() -> None:
     binaries_dir = args.out_dir.resolve()
 
     run_pyinstaller(clean=args.clean)
+    prune_unused_pyinstaller_data()
     staged_exe = stage_pyinstaller_output(binaries_dir, target_triple, suffix)
     tesseract_exe = stage_tesseract(
         binaries_dir=binaries_dir,
@@ -184,6 +185,28 @@ def run_pyinstaller(*, clean: bool) -> None:
         command.insert(3, "--clean")
 
     subprocess.run(command, check=True, cwd=ENGINE_ROOT)
+
+
+UNUSED_PYINSTALLER_DATA_PATHS = (
+    # python-docx's own PyPI package ships a dead, pre-exploded copy of its default
+    # template (the un-zipped source used to build templates/default.docx at python-docx's
+    # own package-build time) alongside the real one, docx/templates/default.docx, that
+    # docx/api.py actually opens at runtime - confirmed by grepping the whole docx package
+    # source: "templates" appears in exactly that one os.path.join() call, nowhere else.
+    # PyInstaller bundles this dead directory anyway since it's just sitting in site-packages.
+    # Its contents - [Content_Types].xml, _rels/.rels - are reserved OPC (Open Packaging
+    # Conventions) names that collide with the MSIX package's own structure (MSIX is itself
+    # an OPC package) and make MakeAppx fail with 0x8007007b when building the Store channel.
+    Path("docx") / "templates" / "default-docx-template",
+)
+
+
+def prune_unused_pyinstaller_data() -> None:
+    support_dir = DIST_ROOT / SIDECAR_NAME / "_internal"
+    for relative in UNUSED_PYINSTALLER_DATA_PATHS:
+        target = support_dir / relative
+        if target.exists():
+            shutil.rmtree(target)
 
 
 def packaged_resource_args() -> list[str]:

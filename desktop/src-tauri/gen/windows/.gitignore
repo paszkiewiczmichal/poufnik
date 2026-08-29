@@ -1,0 +1,9 @@
+# Generated files
+# Keep bundle.config.json and templates in git
+
+# Local signing material - never commit certificates or keys
+*.pfx
+*.pem
+*.cer
+*.p12
+*password*

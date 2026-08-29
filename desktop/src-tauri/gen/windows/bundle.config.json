@@ -1,0 +1,22 @@
+{
+  "publisher": "CN=DA192AF2-ED9D-47F6-9CB9-D8092DFCCF4A",
+  "publisherDisplayName": "Kancelaria Radcy Prawnego Michał Paszkiewicz",
+  "capabilities": {
+    "general": [
+      "internetClient"
+    ]
+  },
+  "extensions": {
+    "shareTarget": false,
+    "fileAssociations": [],
+    "protocolHandlers": []
+  },
+  "signing": {
+    "pfx": null,
+    "pfxPassword": null
+  },
+  "resourceIndex": {
+    "enabled": false,
+    "keepConfig": false
+  }
+}

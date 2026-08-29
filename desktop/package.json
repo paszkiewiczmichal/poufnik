@@ -11,7 +11,8 @@
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "lint": "eslint .",
     "generate:api": "openapi-typescript ../docs/api/openapi.json -o src/api/openapi.ts",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "tauri:windows:build": "tauri-windows-bundle build"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.6.0",
@@ -41,6 +42,7 @@
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.35.1",
     "vite": "^7.0.0",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "@choochmeque/tauri-windows-bundle": "^0.1.28"
   }
 }
