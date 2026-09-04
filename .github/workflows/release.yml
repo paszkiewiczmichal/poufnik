@@ -318,7 +318,7 @@ jobs:
       - name: Upload SHA256SUMS to draft release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${GITHUB_REF_NAME}" SHA256SUMS.txt --clobber
+        run: gh release upload "${GITHUB_REF_NAME}" SHA256SUMS.txt --clobber --repo "${{ github.repository }}"
 
   build-windows-msix:
     name: build-windows-msix
@@ -401,7 +401,7 @@ jobs:
       # never committed, passed via --pfx/--pfx-password on the CLI.
       - name: Build MSIX package
         working-directory: desktop
-        run: npm run tauri:windows:build -- --runner npm
+        run: npm run tauri:windows:build -- --runner npm --verbose
 
       - name: Upload MSIX artifact
         uses: actions/upload-artifact@v4
