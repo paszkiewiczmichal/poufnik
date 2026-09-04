@@ -222,6 +222,18 @@ jobs:
         working-directory: engine
         run: uv run python build/build_sidecar.py --target-triple "$env:RELEASE_TARGET" --clean
 
+      - name: Locate signtool.exe
+        if: env.AZURE_ARTIFACT_SIGNING_AVAILABLE == 'true'
+        run: |
+          $signtool = Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter "signtool.exe" -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match "\\x64\\" } |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1
+          if (-not $signtool) {
+            throw "signtool.exe not found under Windows Kits on this runner."
+          }
+          Add-Content -Path $env:GITHUB_PATH -Value $signtool.DirectoryName
+
       - name: Sign engine sidecar
         if: env.AZURE_ARTIFACT_SIGNING_AVAILABLE == 'true'
         run: |
