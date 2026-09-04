@@ -20,6 +20,8 @@ This repository contains the public, open-source parts of Poufnik:
 - `desktop/` - Tauri 2 + React + TypeScript desktop application.
 - `engine/` - Python package `anonymizer-engine`, the detection and anonymization
   engine (FastAPI surface, bundled into the desktop app as a local sidecar process).
+- `corpus/` - small, entirely synthetic Polish-language evaluation corpus used by the
+  engine's test suite (fictional data only, no real documents or client data).
 
 The desktop app talks only to this local engine process on `127.0.0.1`; an automated
 test (`desktop/src/security/offlineGuard.test.ts`) enforces that no other network
