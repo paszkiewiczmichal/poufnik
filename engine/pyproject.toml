@@ -2,7 +2,7 @@
 name = "anonymizer-engine"
 version = "0.1.0"
 description = "Offline document anonymization engine for Anonymizer."
-readme = "../README.md"
+readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
   "fastapi>=0.116",
