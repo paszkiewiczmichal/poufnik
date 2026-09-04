@@ -273,8 +273,6 @@ jobs:
         run: |
           $paths = @()
           $paths += Get-Item "desktop/src-tauri/binaries/anonymizer-engine-$env:RELEASE_TARGET.exe"
-          $paths += Get-ChildItem -Path "desktop/src-tauri/target/$env:RELEASE_TARGET/release" -File -Filter "*.exe" -ErrorAction SilentlyContinue |
-            Where-Object { $_.Name -match "poufnik|anonymizer" }
           $paths += Get-ChildItem -Path "desktop/src-tauri/target/$env:RELEASE_TARGET/release/bundle/nsis" -File -Filter "*.exe" -ErrorAction SilentlyContinue
           $uniquePaths = $paths | Where-Object { $_ -and (Test-Path $_.FullName) } | Sort-Object FullName -Unique
           if (-not $uniquePaths) {
