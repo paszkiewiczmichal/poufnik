@@ -5,6 +5,7 @@ import path from "node:path";
 const DESKTOP_ROOT = process.cwd();
 const UPDATE_MANIFEST_URL =
   "https://github.com/paszkiewiczmichal/poufnik/releases/latest/download/latest.json";
+const ACCOUNTS_BASE_URL = "https://account.lawtern.com";
 
 describe("desktop offline guard", () => {
   const allowedFetchFiles = new Set(["src/api/client.ts", "src/auth/client.ts"]);
@@ -24,6 +25,7 @@ describe("desktop offline guard", () => {
         "ipc:",
         "http://ipc.localhost",
         "http://127.0.0.1:*",
+        ACCOUNTS_BASE_URL,
         UPDATE_MANIFEST_URL,
       ].join(" "),
     });
@@ -31,12 +33,16 @@ describe("desktop offline guard", () => {
 
   it("does not use browser network APIs outside the local engine client", () => {
     // Jedyne dopuszczone zewnętrzne URL-e: dwa linki informacyjne w stopce (kancelaria,
-    // lawtern.com - decyzja Michała 2026-08-09). Otwierane wyłącznie świadomym kliknięciem
+    // lawtern.com - decyzja Michała 2026-08-09), otwierane wyłącznie świadomym kliknięciem
     // przez tauri/external.ts (przeglądarka systemowa, nie fetch w aplikacji) - decyzja
-    // Michała, prompt domknięcia layoutu Gabinet 2026-07-11, pkt 1. Każdy inny URL nadal
-    // jest naruszeniem.
+    // Michała, prompt domknięcia layoutu Gabinet 2026-07-11, pkt 1; oraz serwis kont
+    // (account.lawtern.com) w src/auth/client.ts - jedyny dozwolony fetch-owy backend
+    // logowania, potwierdzony 2026-09-04 (CORS naprawiony po stronie account.lawtern.com
+    // dla originów tauri://localhost / http://tauri.localhost). Każdy inny URL nadal jest
+    // naruszeniem.
     const allowedExternalUrls = new Map([
       ["src/i18n.ts", new Set(["https://www.kancelariapaszkiewicz.pl", "https://www.lawtern.com"])],
+      ["src/auth/client.ts", new Set([ACCOUNTS_BASE_URL])],
     ]);
 
     const offenders: string[] = [];

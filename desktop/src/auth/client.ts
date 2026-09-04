@@ -1,6 +1,6 @@
 import type { LoginCredentials } from "./types";
 
-const DEFAULT_ACCOUNTS_BASE_URL = "http://127.0.0.1:8000";
+const DEFAULT_ACCOUNTS_BASE_URL = "https://account.lawtern.com";
 
 export interface AccountTokenResponse {
   access_token: string;
