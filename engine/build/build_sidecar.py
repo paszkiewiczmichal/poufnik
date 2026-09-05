@@ -221,11 +221,12 @@ def packaged_resource_args() -> list[str]:
 
 
 def presidio_analyzer_conf_args() -> list[str]:
-    # --collect-data presidio_analyzer bundles this package's conf/ directory (recognizer
-    # definitions the library loads by relative path at runtime, e.g. default_recognizers.yaml)
-    # on Windows, but reproducibly does not on macOS - confirmed by inspecting the built
-    # bundle, the file is simply absent from _internal/presidio_analyzer/conf/ there. Bundling
-    # it explicitly sidesteps whatever PyInstaller/platform interaction causes that gap.
+    # Explicit belt-and-suspenders alongside --collect-data presidio_analyzer for this
+    # package's conf/ directory (recognizer definitions loaded by relative path at runtime,
+    # e.g. default_recognizers.yaml). Confirmed via a CI debug step that both mechanisms
+    # correctly stage this directory on macOS - the sidecar startup failure traced back to a
+    # different bug (see stage_pyinstaller_output's recognizer_registry placeholder dir), not
+    # a missing conf file, but there's no reason to remove the redundancy now that it's here.
     spec = importlib.util.find_spec("presidio_analyzer")
     if spec is None or not spec.submodule_search_locations:
         raise RuntimeError("presidio_analyzer is not installed in this environment.")
@@ -257,6 +258,18 @@ def stage_pyinstaller_output(binaries_dir: Path, target_triple: str, suffix: str
     if target_support.exists():
         shutil.rmtree(target_support)
     shutil.copytree(source_support, target_support)
+
+    # presidio_analyzer's recognizer_registry_provider.py resolves its bundled config via a
+    # "../conf/<name>.yaml" path relative to its own __file__. PyInstaller freezes that pure
+    # -Python module into the PYZ archive rather than staging it as a loose file, so
+    # _internal/presidio_analyzer/recognizer_registry/ never physically exists on disk - and
+    # the OS can't resolve ".." through a directory that isn't there, even though the final,
+    # normalized target (presidio_analyzer/conf/...) is staged correctly right next to it
+    # (confirmed present via a CI debug step; this was the actual bug, not a missing conf
+    # file). An empty placeholder directory is enough for that traversal to succeed.
+    (target_support / "presidio_analyzer" / "recognizer_registry").mkdir(
+        parents=True, exist_ok=True
+    )
     return target_exe
 
 
