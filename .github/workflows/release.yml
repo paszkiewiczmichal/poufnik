@@ -519,6 +519,20 @@ jobs:
         working-directory: engine
         run: uv run python build/build_sidecar.py --target-triple "$RELEASE_TARGET" --clean
 
+      # Diagnostic only, never fails the job: the last two attempts to fix the missing
+      # presidio_analyzer/conf/default_recognizers.yaml (UV_LINK_MODE=copy, then an explicit
+      # --add-data) both left the exact same file missing from the staged bundle, so this
+      # inspects the PyInstaller dist output directly (before staging) and the staged bundle,
+      # to find out whether --add-data ever wrote anything there at all.
+      - name: Debug presidio_analyzer bundle contents
+        if: always()
+        working-directory: engine
+        run: |
+          echo "--- PyInstaller dist output ---"
+          find build/dist/anonymizer-engine/_internal/presidio_analyzer -maxdepth 3 2>&1 || echo "not found in dist output"
+          echo "--- Staged Tauri bundle ---"
+          find ../desktop/src-tauri/binaries/_internal/presidio_analyzer -maxdepth 3 2>&1 || echo "not found in staged bundle"
+
       # Unsigned build (Michal's decision for v1): no Apple Developer Program (99 USD/yr)
       # certificate, so Gatekeeper shows the "unknown developer" prompt and users open the
       # app via Ustawienia -> Prywatnosc i bezpieczenstwo -> "Otworz mimo to". Tauri's
