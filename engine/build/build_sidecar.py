@@ -527,7 +527,7 @@ def smoke_test_process(sidecar_exe: Path, tesseract_exe: Path, *, cwd: Path) -> 
         startup = read_startup_json(process, stdout_queue, stderr_queue)
         port = int(startup["port"])
         token = str(startup["token"])
-        request_json("GET", port, token, "/v1/health")
+        wait_for_health(port, token)
         analyze = request_json(
             "POST",
             port,
@@ -594,6 +594,32 @@ def read_startup_json(
                 f"Sidecar exited before startup JSON with code {process.returncode}.\n{stderr}"
             )
     raise TimeoutError("Timed out waiting for sidecar startup JSON.")
+
+
+def wait_for_health(
+    port: int,
+    token: str,
+    *,
+    attempts: int = 20,
+    delay_seconds: float = 0.5,
+) -> None:
+    # cli.py prints the sidecar's {"port": ..., "token": ...} startup line as soon as it has
+    # picked a port, before uvicorn.run() actually starts listening on it - a real gap, not
+    # macOS-specific, that this build just never lost the race against before. Retrying here
+    # (rather than fixing the app's startup signal, which production code paths also use) is
+    # the smaller, safer change: up to ~10s of tolerance, negligible when the server is
+    # already up.
+    last_error: OSError | None = None
+    for _ in range(attempts):
+        try:
+            request_json("GET", port, token, "/v1/health", timeout=5)
+            return
+        except OSError as error:
+            last_error = error
+            time.sleep(delay_seconds)
+    raise TimeoutError(
+        f"Sidecar never answered /v1/health after {attempts * delay_seconds:.1f}s: {last_error}"
+    )
 
 
 def request_json(
