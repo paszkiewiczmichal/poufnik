@@ -7,6 +7,8 @@ from pathlib import Path
 DISTRIBUTABLE_SUFFIXES = (
     ".exe",
     ".msi",
+    ".dmg",
+    ".tar.gz",
     ".sig",
 )
 
