@@ -486,9 +486,27 @@ jobs:
       - name: Install Tesseract
         run: brew install tesseract
 
+      # UV_LINK_MODE=copy: uv's default cache-linking (hardlinks/symlinks on macOS) leaves
+      # site-packages data files that PyInstaller's --collect-data can't always see when
+      # walking the tree, which is why the arm64/x86_64 build failed its post-build smoke
+      # test with presidio_analyzer's conf/default_recognizers.yaml missing from the bundle.
+      # Forcing real copies makes .venv identical to a normal (non-uv-cached) install.
       - name: Install engine dependencies
         working-directory: engine
+        env:
+          UV_LINK_MODE: copy
         run: uv sync --group dev --group models --group build
+
+      # Informational only (never fails the build): confirms whether uv's default cache
+      # linking was in fact the cause of the previous run's missing
+      # presidio_analyzer/conf/default_recognizers.yaml, in case UV_LINK_MODE=copy above
+      # isn't the whole story and this needs a second look.
+      - name: Debug presidio_analyzer conf file
+        working-directory: engine
+        run: |
+          f=".venv/lib/python${{ env.PYTHON_VERSION }}/site-packages/presidio_analyzer/conf/default_recognizers.yaml"
+          ls -la "$f" || echo "::warning::$f not found"
+          file "$f" || true
 
       - name: Install desktop dependencies
         working-directory: desktop
