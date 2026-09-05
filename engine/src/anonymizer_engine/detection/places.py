@@ -50,7 +50,7 @@ def detect_places(text: str) -> list[DetectedEntity]:
         value = match.group()
         if not _is_capitalized(value) or not is_place_name(value):
             continue
-        if not _has_address_context(text, match.start(), match.end()):
+        if not has_address_context(text, match.start(), match.end()):
             continue
         entities.append(
             DetectedEntity(
@@ -77,7 +77,7 @@ def is_place_name(value: str) -> bool:
     return normalized in place_db.forms
 
 
-def _has_address_context(text: str, start: int, end: int) -> bool:
+def has_address_context(text: str, start: int, end: int) -> bool:
     before = text[max(0, start - 35) : start]
     after = text[end : min(len(text), end + 20)]
     return bool(

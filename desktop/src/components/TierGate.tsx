@@ -11,6 +11,9 @@ interface TierGateProps {
   /** "card" - pełnoekranowa karta bramki (ekrany narzędzi), "row" - kompaktowy wiersz. */
   variant?: "row" | "card";
   description?: string;
+  /** Gdy podane, karta pokazuje drugi przycisk wracający do miejsca skąd użytkownik przyszedł. */
+  onBack?: () => void;
+  backLabel?: string;
 }
 
 export function TierGate({
@@ -20,6 +23,8 @@ export function TierGate({
   onRegister,
   variant = "row",
   description,
+  onBack,
+  backLabel,
 }: TierGateProps) {
   if (tier === "early_bird") {
     return children;
@@ -36,6 +41,11 @@ export function TierGate({
           <button className="primary-button" type="button" onClick={onRegister}>
             {texts.auth.registerShort}
           </button>
+          {onBack ? (
+            <button className="secondary-button" type="button" onClick={onBack}>
+              {backLabel ?? texts.tiers.backToResult}
+            </button>
+          ) : null}
         </div>
       </div>
     );

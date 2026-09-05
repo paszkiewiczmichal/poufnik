@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { segmentBlock, splitTextIntoBlocks } from "./documentSegments";
+import { blocksForExport, segmentBlock, splitTextIntoBlocks } from "./documentSegments";
 import type { DetectedEntity } from "../types";
 
 describe("document segmenting", () => {
@@ -57,6 +57,48 @@ describe("document segmenting", () => {
       expect.objectContaining({ type: "entity", text: "Zażółć\n\n" }),
     ]);
     expect(second).toEqual([expect.objectContaining({ type: "entity", text: "gęślą" })]);
+  });
+
+  it("increments the page number across form-feed separators", () => {
+    const blocks = splitTextIntoBlocks("Strona 1\fStrona 2\fStrona 3");
+
+    expect(blocks.map((block) => block.page)).toEqual([1, 2, 3]);
+  });
+
+  it("returns no blocks for empty text", () => {
+    expect(splitTextIntoBlocks("")).toEqual([]);
+  });
+
+  it("splits an oversized paragraph into multiple chunked blocks", () => {
+    const longText = "a".repeat(12_000);
+
+    const blocks = splitTextIntoBlocks(longText);
+
+    expect(blocks.length).toBe(3);
+    expect(blocks[0].end - blocks[0].start).toBe(5000);
+    expect(blocks[2].end - blocks[2].start).toBe(2000);
+    expect(blocks.map((block) => block.text).join("")).toBe(longText);
+  });
+
+  it("hides entities whose category is not in the visible set", () => {
+    const text = "Jan ma PESEL 44051401359.";
+    const [block] = splitTextIntoBlocks(text);
+    const entities: DetectedEntity[] = [entity("PERSON", 0, 3, "Jan")];
+
+    const segments = segmentBlock(block, entities, visible(["PESEL"]));
+
+    expect(segments).toEqual([expect.objectContaining({ type: "text", text })]);
+  });
+});
+
+describe("blocksForExport", () => {
+  it("maps document blocks to paragraph export blocks with page numbers", () => {
+    const blocks = blocksForExport("Strona 1\fStrona 2");
+
+    expect(blocks).toEqual([
+      { start: 0, end: 9, kind: "paragraph", page: 1 },
+      { start: 9, end: 17, kind: "paragraph", page: 2 },
+    ]);
   });
 });
 

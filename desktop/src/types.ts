@@ -112,6 +112,7 @@ export interface DeanonymizationState {
   result: string | null;
   warnings: string[];
   replacementMap: ReplacementMap | null;
+  mapSource: "session" | "file" | null;
 }
 
 export interface DocumentBlock {

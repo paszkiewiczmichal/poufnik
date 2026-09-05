@@ -317,7 +317,7 @@ fn bundled_binaries_dir(app: &AppHandle) -> Result<PathBuf, String> {
     }
     app.path()
         .resource_dir()
-        .map(|path| path.join("binaries"))
+        .map(|path| dunce::simplified(&path).join("binaries"))
         .map_err(|error| format!("Nie mozna odczytac katalogu zasobow aplikacji: {error}"))
 }
 
@@ -405,6 +405,11 @@ pub fn run() {
     tauri::Builder::default()
         .manage(engine_state.clone())
         .manage(browser_login::BrowserLoginState::default())
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())

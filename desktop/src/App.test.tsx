@@ -155,6 +155,10 @@ vi.mock("./tauri/external", () => ({
   openExternalUrl: mocks.openExternalUrl,
 }));
 
+vi.mock("./tauri/app", () => ({
+  getAppVersion: vi.fn(async () => "9.9.9"),
+}));
+
 const endpoint: EngineEndpoint = {
   baseUrl: "http://127.0.0.1:8710",
   port: 8710,
@@ -312,6 +316,62 @@ describe("App engine health", () => {
 
     expect(screen.getByTestId("tier-gate")).toHaveTextContent(texts.batch.title);
     expect(screen.queryByRole("heading", { name: texts.batch.title })).not.toBeInTheDocument();
+  });
+
+  it("switches the Early Bird gate content when navigating between locked tools", async () => {
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: texts.start.title })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: texts.nav.history }));
+    expect(screen.getByTestId("tier-gate")).toHaveTextContent(texts.history.title);
+
+    fireEvent.click(screen.getByRole("button", { name: texts.nav.batch }));
+    expect(screen.getByTestId("tier-gate")).toHaveTextContent(texts.batch.title);
+    expect(screen.queryByText(texts.history.title)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: texts.nav.history }));
+    expect(screen.getByTestId("tier-gate")).toHaveTextContent(texts.history.title);
+    expect(screen.queryByText(texts.batch.title)).not.toBeInTheDocument();
+  });
+
+  it("offers a way back to the result from a locked tool's gate when a result exists", async () => {
+    useAppStore.setState((state) => ({
+      anonymization: { ...state.anonymization, replacementMap: {} as never },
+    }));
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: texts.start.title })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: texts.nav.history }));
+
+    const backButton = await screen.findByRole("button", { name: texts.tiers.backToResult });
+    fireEvent.click(backButton);
+
+    expect(screen.queryByTestId("tier-gate")).not.toBeInTheDocument();
+  });
+
+  it("shows the real error message on a failed update check, not the generic document error", async () => {
+    mocks.getUpdateConsent.mockReturnValue(true);
+    mocks.checkForUpdate.mockRejectedValue(new Error("network down"));
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: texts.start.title })).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: texts.updates.settings }));
+    fireEvent.click(await screen.findByRole("button", { name: texts.updates.checkNow }));
+
+    expect(await screen.findByText("network down")).toBeInTheDocument();
+    expect(screen.queryByText(texts.errors.generic)).not.toBeInTheDocument();
+  });
+
+  it("shows the real app version fetched from Tauri, not a hardcoded one", async () => {
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: texts.start.title })).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: texts.updates.settings }));
+
+    expect(await screen.findByText(/9\.9\.9/)).toBeInTheDocument();
   });
 
   it("does not apply saved custom rules while in Basic", async () => {

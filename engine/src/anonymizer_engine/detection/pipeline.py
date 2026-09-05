@@ -15,7 +15,7 @@ from anonymizer_engine.detection.deterministic import detect_custom_rules, detec
 from anonymizer_engine.detection.dictionary import detect_dictionary, is_negative_person_text
 from anonymizer_engine.detection.models import DetectedEntity, DetectionResult, EntityCategory
 from anonymizer_engine.detection.ner import NerEngine, SpacyPresidioEngine
-from anonymizer_engine.detection.places import detect_places, is_place_name
+from anonymizer_engine.detection.places import detect_places, has_address_context, is_place_name
 from anonymizer_engine.detection.public_institutions import detect_public_institutions
 
 _POSTAL_CODE_RE = r"\d{2}-\d{3}"
@@ -144,15 +144,7 @@ def _filter_ner_person_false_positives(
 def _person_entity_has_place_context(text: str, entity: DetectedEntity) -> bool:
     if not is_place_name(entity.text):
         return False
-    before = text[max(0, entity.start - 45) : entity.start]
-    return bool(
-        re.search(
-            r"(?:^|[\s,(;:-])(?:w|we|miasta|miejscowości)\s+$"
-            r"|(?:^|[\s,(;:-])dla\s+miasta(?:\s+[\wąćęłńóśźżĄĆĘŁŃÓŚŹŻ-]+)?\s+$",
-            before,
-            re.IGNORECASE,
-        )
-    )
+    return has_address_context(text, entity.start, entity.end)
 
 
 def _merge_postal_address_clusters(

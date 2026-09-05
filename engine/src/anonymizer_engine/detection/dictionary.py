@@ -45,8 +45,25 @@ _TITLE_WORDS = {
     "radca",
     "prawny",
 }
+_COMMON_FUNCTION_WORDS = {
+    "do",
+    "z",
+    "w",
+    "u",
+    "o",
+    "a",
+    "i",
+    "na",
+    "od",
+    "za",
+    "po",
+    "dla",
+    "we",
+    "ze",
+}
 _NEGATIVE_PERSON_WORDS = {
     *_TITLE_WORDS,
+    *_COMMON_FUNCTION_WORDS,
     "powód",
     "powoda",
     "powodem",

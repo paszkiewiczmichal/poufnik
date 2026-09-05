@@ -176,6 +176,7 @@ export function DocumentWorkspace({
       {view === "compare" ? (
         anonymization.replacementMap && anonymization.anonymizedText ? (
           <TierGate
+            key="compare"
             tier={tier}
             featureName={texts.compare.title}
             onRegister={onRegister}

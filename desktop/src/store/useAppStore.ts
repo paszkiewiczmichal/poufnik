@@ -70,7 +70,10 @@ interface AppStore {
   setDeanonymizationLoading: () => void;
   setDeanonymizationError: (message: string) => void;
   setDeanonymizationResult: (result: string, warnings: string[]) => void;
-  setDeanonymizationMap: (replacementMap: ReplacementMap | null) => void;
+  setDeanonymizationMap: (
+    replacementMap: ReplacementMap | null,
+    mapSource: "session" | "file",
+  ) => void;
   resetDocument: () => void;
 }
 
@@ -111,6 +114,7 @@ const initialDeanonymization: DeanonymizationState = {
   result: null,
   warnings: [],
   replacementMap: null,
+  mapSource: null,
 };
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -220,6 +224,7 @@ export const useAppStore = create<AppStore>((set) => ({
       deanonymization: {
         ...initialDeanonymization,
         replacementMap: session.replacementMap,
+        mapSource: "session",
       },
       uiState: {
         ...state.uiState,
@@ -353,6 +358,7 @@ export const useAppStore = create<AppStore>((set) => ({
       deanonymization: {
         ...state.deanonymization,
         replacementMap,
+        mapSource: "session",
       },
     })),
   setPromptsLoading: () =>
@@ -403,9 +409,9 @@ export const useAppStore = create<AppStore>((set) => ({
         warnings,
       },
     })),
-  setDeanonymizationMap: (replacementMap) =>
+  setDeanonymizationMap: (replacementMap, mapSource) =>
     set((state) => ({
-      deanonymization: { ...state.deanonymization, replacementMap },
+      deanonymization: { ...state.deanonymization, replacementMap, mapSource },
     })),
   resetDocument: () =>
     set((state) => ({

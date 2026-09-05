@@ -202,7 +202,6 @@ export function ResultView({
       {activeTab === "restore" && (
         <DeanonymizePanel
           deanonymization={deanonymization}
-          hasCurrentMap={Boolean(deanonymization.replacementMap)}
           onInputChange={onDeanonymizationInput}
           onLoadMap={onLoadReplacementMap}
           onRestore={onDeanonymize}

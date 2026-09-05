@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const invoke = vi.fn();
+
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: (...args: unknown[]) => invoke(...args),
+}));
+
 import type { DetectedEntity, ProcessedDocument, ReplacementMap } from "../types";
 import {
   type DocumentHistoryBackend,
@@ -8,6 +14,7 @@ import {
   getDocumentHistoryEnabled,
   saveDocumentHistoryEntryIfEnabled,
   setDocumentHistoryEnabled,
+  tauriDocumentHistoryBackend,
 } from "./history";
 
 describe("document history preferences and persistence facade", () => {
@@ -64,6 +71,58 @@ describe("document history preferences and persistence facade", () => {
     await backend.clear();
 
     expect(await backend.list()).toEqual([]);
+  });
+});
+
+describe("tauriDocumentHistoryBackend", () => {
+  beforeEach(() => {
+    invoke.mockReset();
+  });
+
+  it("save sends the session with a default offsetMap and unwraps the invoke result", async () => {
+    const session = sampleSession();
+    const entry: DocumentHistoryEntry = { id: 1, createdAt: "2026-01-01T00:00:00.000Z", session };
+    invoke.mockResolvedValue(entry);
+
+    const saved = await tauriDocumentHistoryBackend.save(session);
+
+    expect(invoke).toHaveBeenCalledWith("save_document_history_entry", {
+      session: { ...session, offsetMap: [] },
+    });
+    expect(saved).toEqual({ ...entry, session: { ...session, offsetMap: [] } });
+  });
+
+  it("list forwards directly to invoke", async () => {
+    invoke.mockResolvedValue([]);
+
+    await expect(tauriDocumentHistoryBackend.list()).resolves.toEqual([]);
+    expect(invoke).toHaveBeenCalledWith("list_document_history");
+  });
+
+  it("get unwraps a found entry and defaults its offsetMap", async () => {
+    const session = sampleSession();
+    invoke.mockResolvedValue({ id: 5, createdAt: "2026-01-01T00:00:00.000Z", session });
+
+    const entry = await tauriDocumentHistoryBackend.get(5);
+
+    expect(invoke).toHaveBeenCalledWith("get_document_history_entry", { entryId: 5 });
+    expect(entry?.session.offsetMap).toEqual([]);
+  });
+
+  it("get returns null when no entry is found", async () => {
+    invoke.mockResolvedValue(null);
+
+    await expect(tauriDocumentHistoryBackend.get(99)).resolves.toBeNull();
+  });
+
+  it("delete and clear forward to invoke with the expected arguments", async () => {
+    invoke.mockResolvedValue(undefined);
+
+    await tauriDocumentHistoryBackend.delete(7);
+    await tauriDocumentHistoryBackend.clear();
+
+    expect(invoke).toHaveBeenCalledWith("delete_document_history_entry", { entryId: 7 });
+    expect(invoke).toHaveBeenCalledWith("clear_document_history");
   });
 });
 

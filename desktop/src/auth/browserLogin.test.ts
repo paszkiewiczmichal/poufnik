@@ -99,6 +99,26 @@ describe("loginViaBrowser", () => {
       message: "Upłynął czas oczekiwania na logowanie w przeglądarce.",
     });
   });
+
+  it("falls back to a generic message for a non-string, non-AccountsClientError failure", async () => {
+    const { deps, invokeImpl } = makeDeps();
+    invokeImpl.mockImplementation(async (command: string) => {
+      if (command === "start_browser_login_listener") {
+        return 43210;
+      }
+      if (command === "await_browser_login") {
+        throw new Error("network reset");
+      }
+      return undefined;
+    });
+
+    await expect(loginViaBrowser(deps)).rejects.toMatchObject({
+      name: "AccountsClientError",
+      code: "network",
+      message: "Logowanie w przeglądarce nie powiodło się.",
+    });
+    expect(invokeImpl).toHaveBeenCalledWith("cancel_browser_login", { port: 43210 });
+  });
 });
 
 describe("exchangeDesktopLoginCode", () => {

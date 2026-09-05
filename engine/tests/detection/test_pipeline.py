@@ -89,6 +89,50 @@ class PostalNerEngine:
         ]
 
 
+class CityAfterPostalCodeNerEngine:
+    """Simulates the spaCy model misclassifying a locality right after a postal code as PERSON -
+    the exact false positive found live: "00-902 Warszawa" -> "Warszawa" tagged PERSON."""
+
+    last_tokens: list[Token] = []
+
+    def analyze(self, text: str, language: str) -> list[DetectedEntity]:
+        assert language == "pl"
+        city_start = text.index("Warszawa")
+        return [
+            DetectedEntity(
+                category=EntityCategory.PERSON,
+                start=city_start,
+                end=city_start + len("Warszawa"),
+                text="Warszawa",
+                confidence=0.55,
+                source="ner",
+                validation=ValidationStatus.NOT_APPLICABLE,
+            ),
+        ]
+
+
+class SentenceInitialFunctionWordNerEngine:
+    """Simulates the spaCy model tagging a common short function word as PERSON when it's
+    the sentence-initial, all-caps token in a heading (e.g. "WEZWANIE DO ZAPLATY")."""
+
+    last_tokens: list[Token] = []
+
+    def analyze(self, text: str, language: str) -> list[DetectedEntity]:
+        assert language == "pl"
+        word_start = text.index("Do")
+        return [
+            DetectedEntity(
+                category=EntityCategory.PERSON,
+                start=word_start,
+                end=word_start + len("Do"),
+                text="Do",
+                confidence=0.4,
+                source="ner",
+                validation=ValidationStatus.NOT_APPLICABLE,
+            ),
+        ]
+
+
 class EmptyNerEngine:
     last_tokens: list[Token] = []
 
@@ -122,6 +166,22 @@ def test_detect_all_merges_postal_code_with_adjacent_address_spans() -> None:
     assert [(entity.text, entity.category) for entity in result.entities] == [
         ("Gdyni (81-300), ul. Portowa 12", EntityCategory.ADDRESS)
     ]
+
+
+def test_city_after_postal_code_is_not_detected_as_person() -> None:
+    text = "zamieszkały ul. Wiejska 3/1, 00-902 Warszawa,"
+
+    result = detect_all(text, ner_engine=CityAfterPostalCodeNerEngine())
+
+    assert EntityCategory.PERSON not in {entity.category for entity in result.entities}
+
+
+def test_sentence_initial_function_word_is_not_detected_as_person() -> None:
+    text = "Do pozwu załączono kopię umowy."
+
+    result = detect_all(text, ner_engine=SentenceInitialFunctionWordNerEngine())
+
+    assert EntityCategory.PERSON not in {entity.category for entity in result.entities}
 
 
 def test_new_deterministic_categories_survive_full_pipeline() -> None:

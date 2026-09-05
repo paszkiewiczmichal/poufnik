@@ -72,6 +72,11 @@ interface RenderWorkspaceOptions {
   documentText?: string;
   entities?: DetectedEntity[];
   view?: WorkspaceView;
+  processingStatus?: "idle" | "loading" | "error";
+  processingError?: string | null;
+  onViewChange?: (view: WorkspaceView) => void;
+  onNewDocument?: () => void;
+  onAnonymize?: () => void;
 }
 
 function renderWorkspace(tier: "basic" | "early_bird", options: RenderWorkspaceOptions = {}) {
@@ -117,15 +122,15 @@ function renderWorkspace(tier: "basic" | "early_bird", options: RenderWorkspaceO
       anonymization={anonymization}
       prompts={promptState()}
       deanonymization={deanonymizationState()}
-      processingStatus="idle"
-      processingError={null}
+      processingStatus={options.processingStatus ?? "idle"}
+      processingError={options.processingError ?? null}
       tier={tier}
       view={options.view ?? "document"}
-      onViewChange={vi.fn()}
+      onViewChange={options.onViewChange ?? vi.fn()}
       onToggleCategory={vi.fn()}
       onRedetect={vi.fn()}
-      onNewDocument={vi.fn()}
-      onAnonymize={vi.fn()}
+      onNewDocument={options.onNewDocument ?? vi.fn()}
+      onAnonymize={options.onAnonymize ?? vi.fn()}
       onCopyDocument={vi.fn()}
       onSaveMap={vi.fn()}
       onExport={vi.fn()}
@@ -238,5 +243,109 @@ function deanonymizationState(): DeanonymizationState {
     result: null,
     warnings: [],
     replacementMap: null,
+    mapSource: null,
   };
 }
+
+describe("DocumentWorkspace document view", () => {
+  afterEach(() => {
+    cleanup();
+    useAppStore.setState(useAppStore.getInitialState(), true);
+  });
+
+  it("shows the filename, marked count, and category legend in the default document view", () => {
+    renderWorkspace("early_bird");
+
+    expect(screen.getByText("umowa.txt")).toBeInTheDocument();
+    expect(screen.getByText(texts.review.toReplace)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Osoba: Jan Kowalski" })).toBeInTheDocument();
+  });
+
+  it("calls onNewDocument from the toolbar button", () => {
+    const onNewDocument = vi.fn();
+    renderWorkspace("early_bird", { onNewDocument });
+
+    fireEvent.click(screen.getByRole("button", { name: texts.document.newDocument }));
+
+    expect(onNewDocument).toHaveBeenCalledTimes(1);
+  });
+
+  it("calls onAnonymize and shows the loading label while anonymization runs", () => {
+    const onAnonymize = vi.fn();
+    renderWorkspace("early_bird", {
+      onAnonymize,
+      anonymization: { status: "loading", error: null, anonymizedText: null, replacementMap: null, offsetMap: [] },
+    });
+
+    const button = screen.getByRole("button", { name: texts.generation.anonymizing });
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+
+    expect(onAnonymize).not.toHaveBeenCalled();
+  });
+
+  it("opens the entity popover when an entity is clicked and closes it again", () => {
+    renderWorkspace("early_bird");
+
+    fireEvent.click(screen.getByRole("button", { name: "Osoba: Jan Kowalski" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: texts.corrections.close }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("shows the processing error alert", () => {
+    renderWorkspace("early_bird", { processingStatus: "error", processingError: "Tesseract OCR failed" });
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Tesseract OCR failed");
+  });
+
+  it("shows the anonymization error alert outside of the result view", () => {
+    renderWorkspace("early_bird", {
+      anonymization: {
+        status: "error",
+        error: "silnik padl",
+        anonymizedText: null,
+        replacementMap: null,
+        offsetMap: [],
+      },
+    });
+
+    expect(screen.getByRole("alert")).toHaveTextContent("silnik padl");
+  });
+});
+
+describe("DocumentWorkspace compare view without a result", () => {
+  afterEach(() => {
+    cleanup();
+    useAppStore.setState(useAppStore.getInitialState(), true);
+  });
+
+  it("shows a fallback card with a way back to the document", () => {
+    const onViewChange = vi.fn();
+    renderWorkspace("early_bird", {
+      view: "compare",
+      onViewChange,
+      anonymization: idleAnonymization(),
+    });
+
+    expect(screen.getByText(texts.compare.needsResult)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: texts.compare.backToDocument }));
+
+    expect(onViewChange).toHaveBeenCalledWith("document");
+  });
+});
+
+describe("DocumentWorkspace result view", () => {
+  afterEach(() => {
+    cleanup();
+    useAppStore.setState(useAppStore.getInitialState(), true);
+  });
+
+  it("renders ResultView once a replacement map exists", () => {
+    renderWorkspace("early_bird", { view: "result" });
+
+    expect(screen.getByText(texts.generation.title)).toBeInTheDocument();
+  });
+});

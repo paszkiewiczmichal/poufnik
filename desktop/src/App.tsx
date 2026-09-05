@@ -40,6 +40,7 @@ import { enabledCustomRulePayloads } from "./domain/customRules";
 import { blocksForExport } from "./domain/documentSegments";
 import { texts } from "./i18n";
 import { useAppStore } from "./store/useAppStore";
+import { getAppVersion } from "./tauri/app";
 import { copyText, readClipboardText } from "./tauri/clipboard";
 import { loadCustomRegexRules, saveCustomRegexRules } from "./tauri/customRules";
 import { getEngineEndpoint, listenToEngineStatus } from "./tauri/engine";
@@ -159,6 +160,7 @@ function App() {
     setDeanonymizationMap,
     resetDocument,
   } = useAppStore();
+  const [appVersion, setAppVersion] = useState("");
   const [screen, setScreen] = useState<AppScreen>("flow");
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("document");
   const [updateConsent, setUpdateConsentState] = useState<UpdateConsent>(null);
@@ -239,7 +241,9 @@ function App() {
         setUpdateMessage(texts.updates.upToDate);
       }
     } catch (error) {
-      setUpdateError(toUserMessage(error) || texts.updates.checkFailed);
+      setUpdateError(
+        error instanceof Error ? error.message || texts.updates.checkFailed : texts.updates.checkFailed,
+      );
     } finally {
       setUpdateChecking(false);
     }
@@ -292,6 +296,10 @@ function App() {
 
   useEffect(() => {
     setHistoryEnabledState(getDocumentHistoryEnabled());
+  }, []);
+
+  useEffect(() => {
+    void getAppVersion().then(setAppVersion);
   }, []);
 
   useEffect(() => {
@@ -917,7 +925,7 @@ function App() {
       if (!json) {
         return;
       }
-      setDeanonymizationMap(JSON.parse(json) as ReplacementMap);
+      setDeanonymizationMap(JSON.parse(json) as ReplacementMap, "file");
     } catch (error) {
       setDeanonymizationError(toUserMessage(error));
     }
@@ -1341,13 +1349,21 @@ function App() {
             ) : null}
 
             {screen === "history" ? (
-              <section className="screen screen--history">
+              <section className="screen screen--history" key="history">
                 <TierGate
                   tier={productTier}
                   featureName={texts.history.title}
                   onRegister={openRegistration}
                   variant="card"
                   description={texts.history.gateDescription}
+                  onBack={
+                    hasResult
+                      ? () => {
+                          setScreen("flow");
+                          setWorkspaceView("result");
+                        }
+                      : undefined
+                  }
                 >
                   {!historyEnabled ? (
                     <div className="gate-card">
@@ -1426,13 +1442,21 @@ function App() {
             ) : null}
 
             {screen === "batch" ? (
-              <section className="screen screen--batch">
+              <section className="screen screen--batch" key="batch">
                 <TierGate
                   tier={productTier}
                   featureName={texts.batch.title}
                   onRegister={openRegistration}
                   variant="card"
                   description={texts.batch.gateDescription}
+                  onBack={
+                    hasResult
+                      ? () => {
+                          setScreen("flow");
+                          setWorkspaceView("result");
+                        }
+                      : undefined
+                  }
                 >
                   <BatchPanel
                     items={batchItems}
@@ -1555,7 +1579,10 @@ function App() {
                     </span>
                   </label>
                 </section>
-                <p className="settings-version">{texts.account.version}</p>
+                <p className="settings-version">
+                  {texts.account.version}
+                  {appVersion ? ` ${appVersion}` : ""}
+                </p>
               </section>
             ) : null}
           </div>

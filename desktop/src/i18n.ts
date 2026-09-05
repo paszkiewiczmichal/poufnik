@@ -104,7 +104,7 @@ export const texts = {
     tier: "Warstwa",
     logout: "Wyloguj się",
     note: "Konto obsługuje wyłącznie funkcje dodatkowe. Treść dokumentów jest przetwarzana lokalnie i nie jest przesyłana na serwery.",
-    version: "Wersja aplikacji 0.1.0",
+    version: "Wersja aplikacji",
   },
   auth: {
     startTitle: "Anonimizacja dokumentów przed użyciem AI. W całości na Twoim komputerze.",
@@ -147,6 +147,7 @@ export const texts = {
     earlyBirdFeature: (featureName: string) =>
       `${featureName} - funkcja dostępna z darmowym kontem Early Bird.`,
     earlyBirdHint: "Konto jest darmowe - dokumenty nadal są przetwarzane lokalnie.",
+    backToResult: "Wróć do wyniku",
     earlyBirdActive: "Warstwa Early Bird jest aktywna.",
     earlyBirdActiveHint: "Funkcje tej warstwy są widoczne w obszarze pracy i ustawieniach.",
     plans: [
@@ -411,6 +412,7 @@ export const texts = {
     inputLabel: "Odpowiedź z tokenami",
     inputPlaceholder: "Wklej odpowiedź zawierającą tokeny, np. [OSOBA_1].",
     useCurrentMap: "Używana jest mapa z bieżącej sesji.",
+    useLoadedMap: "Używana jest mapa wczytana z pliku.",
     loadMap: "Wczytaj mapę JSON",
     restore: "Przywróć dane",
     restoring: "Przywracam...",

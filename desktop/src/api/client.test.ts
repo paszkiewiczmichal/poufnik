@@ -145,6 +145,94 @@ describe("createAnonymizerApiClient", () => {
       }),
     );
   });
+  it("posts anonymizeApiEntities with raw API entities untouched", async () => {
+    const fetcher = vi.fn(async () =>
+      jsonResponse({
+        anonymized_text: "[OSOBA_1]",
+        replacement_map: { entries: [], document_fingerprint: "abc" },
+      }),
+    );
+    const client = createAnonymizerApiClient(endpoint, fetcher as unknown as typeof fetch);
+
+    await client.anonymizeApiEntities("Jan Kowalski", [
+      { start: 0, end: 12, text: "Jan Kowalski", category: "PERSON", confidence: 0.9, validation: "not_applicable" },
+    ]);
+
+    const calls = fetcher.mock.calls as unknown as [string, RequestInit][];
+    expect(JSON.parse(calls[0][1].body as string)).toEqual({
+      text: "Jan Kowalski",
+      language: "pl",
+      entities: [
+        { start: 0, end: 12, text: "Jan Kowalski", category: "PERSON", confidence: 0.9, validation: "not_applicable" },
+      ],
+    });
+  });
+
+  it("posts deanonymize with the replacement map", async () => {
+    const fetcher = vi.fn(async () => jsonResponse({ restored_text: "Jan Kowalski", warnings: [] }));
+    const client = createAnonymizerApiClient(endpoint, fetcher as unknown as typeof fetch);
+    const replacementMap = { entries: [], document_fingerprint: "abc" };
+
+    await client.deanonymize("[OSOBA_1]", replacementMap);
+
+    const calls = fetcher.mock.calls as unknown as [string, RequestInit][];
+    expect(calls[0][0]).toBe("http://127.0.0.1:8710/v1/deanonymize");
+    expect(JSON.parse(calls[0][1].body as string)).toEqual({
+      text: "[OSOBA_1]",
+      replacement_map: replacementMap,
+    });
+  });
+
+  it("lists prompts via a plain GET", async () => {
+    const fetcher = vi.fn(async () => jsonResponse([{ id: "p1" }]));
+    const client = createAnonymizerApiClient(endpoint, fetcher as unknown as typeof fetch);
+
+    await expect(client.listPrompts()).resolves.toEqual([{ id: "p1" }]);
+    expect(fetcher).toHaveBeenCalledWith(
+      "http://127.0.0.1:8710/v1/prompts",
+      expect.objectContaining({ headers: expect.objectContaining({ "X-Api-Key": "test-token" }) }),
+    );
+  });
+
+  it("throws ApiError for a failed export request", async () => {
+    const fetcher = vi.fn(async () => new Response("", { status: 500, statusText: "Server Error" }));
+    const client = createAnonymizerApiClient(endpoint, fetcher as unknown as typeof fetch);
+
+    await expect(
+      client.exportDocument({ anonymizedText: "text", format: "pdf" }),
+    ).rejects.toMatchObject({ status: 500, title: "Server Error" });
+  });
+
+  it("falls back to a null problem when the error response is not JSON", async () => {
+    const fetcher = vi.fn(
+      async () => new Response("plain text error", { status: 502, statusText: "Bad Gateway" }),
+    );
+    const client = createAnonymizerApiClient(endpoint, fetcher as unknown as typeof fetch);
+
+    await expect(client.health()).rejects.toMatchObject({
+      status: 502,
+      title: "Bad Gateway",
+      detail: "Request failed.",
+    });
+  });
+
+  it("falls back to a null problem when the JSON error body cannot be parsed", async () => {
+    const fetcher = vi.fn(
+      async () =>
+        new Response("not actually json", {
+          status: 500,
+          statusText: "Server Error",
+          headers: { "content-type": "application/json" },
+        }),
+    );
+    const client = createAnonymizerApiClient(endpoint, fetcher as unknown as typeof fetch);
+
+    await expect(client.health()).rejects.toMatchObject({
+      status: 500,
+      title: "Server Error",
+      detail: "Request failed.",
+    });
+  });
 });
 
 function jsonResponse(payload: unknown, status = 200): Response {

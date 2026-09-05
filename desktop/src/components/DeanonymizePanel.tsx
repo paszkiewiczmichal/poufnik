@@ -4,7 +4,6 @@ import type { DeanonymizationState } from "../types";
 
 interface DeanonymizePanelProps {
   deanonymization: DeanonymizationState;
-  hasCurrentMap: boolean;
   onInputChange: (input: string) => void;
   onLoadMap: () => void;
   onRestore: () => void;
@@ -13,7 +12,6 @@ interface DeanonymizePanelProps {
 
 export function DeanonymizePanel({
   deanonymization,
-  hasCurrentMap,
   onInputChange,
   onLoadMap,
   onRestore,
@@ -32,7 +30,11 @@ export function DeanonymizePanel({
       </h3>
       <p className="deanon-panel__lead">{texts.deanonymization.lead}</p>
       <p className="muted">
-        {hasCurrentMap ? texts.deanonymization.useCurrentMap : texts.errors.noReplacementMap}
+        {deanonymization.mapSource === "file"
+          ? texts.deanonymization.useLoadedMap
+          : deanonymization.mapSource === "session"
+            ? texts.deanonymization.useCurrentMap
+            : texts.errors.noReplacementMap}
       </p>
 
       <label className="field">
