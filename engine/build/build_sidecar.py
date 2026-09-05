@@ -8,6 +8,7 @@ Tauri bundle resources next to the sidecar binary.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import os
 import platform
@@ -161,6 +162,7 @@ def run_pyinstaller(*, clean: bool) -> None:
         "spacy",
         "--collect-data",
         "presidio_analyzer",
+        *presidio_analyzer_conf_args(),
         "--collect-data",
         "pypdfium2",
         "--collect-binaries",
@@ -216,6 +218,21 @@ def packaged_resource_args() -> list[str]:
             raise FileNotFoundError(f"Required engine resource not found: {source}")
         args.extend(["--add-data", f"{source}{os.pathsep}{destination.as_posix()}"])
     return args
+
+
+def presidio_analyzer_conf_args() -> list[str]:
+    # --collect-data presidio_analyzer bundles this package's conf/ directory (recognizer
+    # definitions the library loads by relative path at runtime, e.g. default_recognizers.yaml)
+    # on Windows, but reproducibly does not on macOS - confirmed by inspecting the built
+    # bundle, the file is simply absent from _internal/presidio_analyzer/conf/ there. Bundling
+    # it explicitly sidesteps whatever PyInstaller/platform interaction causes that gap.
+    spec = importlib.util.find_spec("presidio_analyzer")
+    if spec is None or not spec.submodule_search_locations:
+        raise RuntimeError("presidio_analyzer is not installed in this environment.")
+    conf_dir = Path(next(iter(spec.submodule_search_locations))) / "conf"
+    if not conf_dir.is_dir():
+        raise FileNotFoundError(f"presidio_analyzer conf directory not found: {conf_dir}")
+    return ["--add-data", f"{conf_dir}{os.pathsep}presidio_analyzer/conf"]
 
 
 def stage_pyinstaller_output(binaries_dir: Path, target_triple: str, suffix: str) -> Path:
