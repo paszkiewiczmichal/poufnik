@@ -1501,7 +1501,9 @@ function App() {
                   {updateConsent === false ? (
                     <p className="muted">{texts.updates.disabledNote}</p>
                   ) : null}
-                  {updateMessage ? <p className="status-note">{updateMessage}</p> : null}
+                  {updateMessage ? (
+                    <p className="status-note status-note--success">{updateMessage}</p>
+                  ) : null}
                   {updateError ? <p className="error-note">{updateError}</p> : null}
                   <div className="settings-actions">
                     <button

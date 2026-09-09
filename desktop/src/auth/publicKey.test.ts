@@ -7,10 +7,13 @@ afterEach(() => {
 });
 
 describe("getAccountsPublicKeyPem", () => {
-  it("returns an empty string when no key is configured", () => {
+  it("falls back to the built-in production key when none is configured at build time", () => {
     vi.stubEnv("VITE_POUFNIK_ACCOUNTS_PUBLIC_KEY_PEM", "");
 
-    expect(getAccountsPublicKeyPem()).toBe("");
+    const pem = getAccountsPublicKeyPem();
+
+    expect(pem).toContain("-----BEGIN PUBLIC KEY-----");
+    expect(pem).toContain("-----END PUBLIC KEY-----");
   });
 
   it("unescapes literal \\n sequences into real newlines", () => {

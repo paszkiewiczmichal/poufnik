@@ -839,6 +839,12 @@ button:disabled {
   background: var(--surface-raised);
 }
 
+.status-note--success {
+  border-color: var(--success-line);
+  color: var(--success);
+  background: var(--success-bg);
+}
+
 .error-note {
   border-color: var(--danger-line);
   color: var(--danger);
@@ -884,7 +890,10 @@ button:disabled {
 .auth-content {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  /* flex-start, nie center: przy center i overflow:auto (np. gdy komunikat bledu
+     zrobi kolumne wyzsza niz okno) domyslna pozycja przewijania zostawia gore
+     tresci (logo) poza widokiem, bo przepelnienie dzieli sie po rowno gora/dol. */
+  justify-content: flex-start;
   padding: 56px 72px;
   overflow: auto;
 }

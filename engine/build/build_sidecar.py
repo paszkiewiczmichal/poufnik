@@ -435,6 +435,19 @@ def rewrite_macos_dependencies(binary: Path, prefix: str) -> None:
             ["install_name_tool", "-change", str(dep), f"{prefix}/{dep.name}", str(binary)],
             check=True,
         )
+    # install_name_tool invalidates whatever signature the binary had (its own message
+    # says so - "changes being made to the file will invalidate the code signature").
+    # A binary with an invalidated/broken signature fails to launch under macOS's
+    # arm64 code-signing enforcement, which is stricter than "no signature at all" -
+    # nothing downstream ever re-signed these, so the bundled Tesseract silently stopped
+    # working (or, if the engine eagerly touches Tesseract at startup, could take the
+    # whole sidecar down with it) on real end-user Macs. The CI smoke test never caught
+    # this because it only exercises /v1/health and /v1/analyze on plain text, never OCR.
+    codesign_adhoc(binary)
+
+
+def codesign_adhoc(binary: Path) -> None:
+    subprocess.run(["codesign", "--force", "--sign", "-", str(binary)], check=True)
 
 
 def is_macos_system_library(path: Path) -> bool:
