@@ -19,6 +19,11 @@ from anonymizer_engine.detection.places import detect_places, has_address_contex
 from anonymizer_engine.detection.public_institutions import detect_public_institutions
 
 _POSTAL_CODE_RE = r"\d{2}-\d{3}"
+# PKD (Polska Klasyfikacja Działalności) business-activity codes are written like
+# "73.20.Z" and commonly wrapped in slashes in statutes/articles of association, e.g.
+# "/73.20.Z/, 9) pozostałe [...]". The NER model sometimes tags just the leading
+# "/73" as ADDRESS because it resembles a street-number suffix.
+_PKD_CODE_SUFFIX_RE = re.compile(r"^\.\d{2}\.[A-Z]\b")
 
 
 def detect_all(
@@ -34,6 +39,7 @@ def detect_all(
     ner_entities = engine.analyze(text, language)
     tokens = getattr(engine, "last_tokens", None)
     ner_entities = _filter_ner_person_false_positives(text, ner_entities)
+    ner_entities = _filter_ner_address_false_positives(text, ner_entities)
     public_entities = detect_public_institutions(text, tokens)
     ner_entities = downrank_unsupported_company_entities(
         text,
@@ -139,6 +145,26 @@ def _filter_ner_person_false_positives(
             )
         )
     ]
+
+
+def _filter_ner_address_false_positives(
+    text: str,
+    entities: list[DetectedEntity],
+) -> list[DetectedEntity]:
+    return [
+        entity
+        for entity in entities
+        if not (
+            entity.category is EntityCategory.ADDRESS
+            and _address_entity_is_pkd_code_fragment(text, entity)
+        )
+    ]
+
+
+def _address_entity_is_pkd_code_fragment(text: str, entity: DetectedEntity) -> bool:
+    if not re.fullmatch(r"/\d{1,3}", entity.text):
+        return False
+    return bool(_PKD_CODE_SUFFIX_RE.match(text[entity.end : entity.end + 6]))
 
 
 def _person_entity_has_place_context(text: str, entity: DetectedEntity) -> bool:

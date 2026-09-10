@@ -17,7 +17,7 @@ from anonymizer_engine.detection.models import (
     EntityCategory,
     ValidationStatus,
 )
-from anonymizer_engine.detection.places import is_place_name
+from anonymizer_engine.detection.places import has_address_context, is_place_name
 
 _WORD_RE = re.compile(r"[\wąćęłńóśźżĄĆĘŁŃÓŚŹŻ-]+", re.UNICODE)
 _TITLE_BEFORE_RE = re.compile(
@@ -84,6 +84,14 @@ _NEGATIVE_PERSON_WORDS = {
     "zarząd",
     "zarządu",
     "skarbnik",
+    "rada",
+    "rady",
+    "miejski",
+    "miejska",
+    "data",
+    "ul",
+    "ulicy",
+    "rodo",
 }
 _POLISH_GERMAN_ADJECTIVES = {
     "polski",
@@ -117,6 +125,10 @@ _COMPANY_AFTER_RE = re.compile(
 _INITIAL_RE = re.compile(r"^[A-ZĄĆĘŁŃÓŚŹŻ]\.$")
 _INITIAL_LETTER_RE = re.compile(r"^[A-ZĄĆĘŁŃÓŚŹŻ]$")
 _SENTENCE_ENDING = ".!?"
+# Court divisions and case-law citations are routinely numbered with bare uppercase Roman
+# numerals ("VI Wydział Pracy", "VI ACa 1521/12") that the surname dictionary otherwise has
+# no way to distinguish from a genuine all-caps surname/initial-like token.
+_ROMAN_NUMERAL_RE = re.compile(r"^M{0,4}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$")
 
 _SURNAME_SUFFIX_REPLACEMENTS = (
     ("skiego", "ski"),
@@ -255,13 +267,15 @@ def _lookup_surname(token: _Token, name_db: _NameDb) -> str | None:
 
 def is_negative_person_text(value: str) -> bool:
     """Return True for titles and party roles that must not be PERSON."""
-    normalized_words = [_normalize_lookup(match.group()) for match in _WORD_RE.finditer(value)]
-    normalized_words = [word for word in normalized_words if word]
-    if not normalized_words:
+    raw_words = [match.group() for match in _WORD_RE.finditer(value)]
+    normalized_words = [_normalize_lookup(word) for word in raw_words]
+    if not normalized_words or not normalized_words[0]:
         return False
     if len(normalized_words) == 1:
         word = normalized_words[0]
-        return word in _NEGATIVE_PERSON_WORDS or word in _POLISH_GERMAN_ADJECTIVES
+        if word in _NEGATIVE_PERSON_WORDS or word in _POLISH_GERMAN_ADJECTIVES:
+            return True
+        return bool(_ROMAN_NUMERAL_RE.fullmatch(raw_words[0]))
     return all(word in _TITLE_WORDS for word in normalized_words)
 
 
@@ -314,8 +328,9 @@ def _looks_like_address_context(text: str, tokens: list[_TokenMatch], index: int
         return True
     if previous and _normalize_lookup(previous.text) in _LOCATION_PREPOSITIONS:
         return True
-    if is_place_name(token.text) and _PLACE_CONTEXT_BEFORE_RE.search(
-        text[max(0, token.idx - 45) : token.idx]
+    if is_place_name(token.text) and (
+        _PLACE_CONTEXT_BEFORE_RE.search(text[max(0, token.idx - 45) : token.idx])
+        or has_address_context(text, token.idx, token.end)
     ):
         return True
     return False

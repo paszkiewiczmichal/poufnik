@@ -133,6 +133,19 @@ _COMPANY_STOPWORDS = {
     "instytutu",
     "spółdzielnia",
     "spółdzielni",
+    # Judge-title abbreviations ("SSR/SSO/SSA Jan Kowalski" = Sędzia Sądu
+    # Rejonowego/Okręgowego/Apelacyjnego + name) and other bare institutional/registry
+    # abbreviations the NER model occasionally guesses as COMPANY on their own - the judge's
+    # actual name is still caught separately as PERSON, this only strips the noise around it.
+    "ssr",
+    "sso",
+    "ssa",
+    "ssp",
+    "swz",
+    "chf",
+    "ue",
+    "nbp",
+    "rep",
 }
 _ALIAS_DEFINITION_RE = re.compile(
     r"(?:zwan(?:y|a|ym|ą)\s+dalej|dalej\s+jako|dalej\s*:)\s*[\"„]([^\"”]{2,40})[\"”]",
