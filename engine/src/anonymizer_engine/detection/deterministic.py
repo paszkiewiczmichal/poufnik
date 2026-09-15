@@ -64,7 +64,9 @@ _API_KEY_RE = re.compile(
 _POSTAL_CODE_RE = re.compile(r"\b\d{2}-\d{3}\b")
 _VIN_RE = re.compile(r"\b[A-HJ-NPR-Z0-9]{17}\b", re.IGNORECASE)
 _PLATE_RE = re.compile(r"\b[A-ZĄĆĘŁŃÓŚŹŻ]{2,3}[A-Z0-9]{4,5}\b")
-_CASE_NUMBER_RE = re.compile(r"\b[IVXLCDM]{1,8}\s+[A-Z]{1,4}\s+\d+/\d{2,4}\b")
+_CASE_NUMBER_RE = re.compile(
+    r"\b[IVXLCDM]{1,8}\s+[A-Z]{1,4}\s+\d+/\d{2,4}\b", re.IGNORECASE
+)
 _ADMIN_CASE_RE = re.compile(
     r"\b[A-ZĄĆĘŁŃÓŚŹŻ]{2,}(?:-[A-Z0-9]+)?(?:[./][A-Z0-9-]+){2,}\b",
     re.IGNORECASE,

@@ -231,6 +231,8 @@ def detect_dictionary(
         if match.first_name:
             if token.is_sent_start and not _has_person_context(text, tokens, index):
                 continue
+            if _looks_like_address_context(text, tokens, index):
+                continue
             entities.append(_entity(text, token.idx, token.end, 0.5))
 
     return _dedupe_dictionary_overlaps(entities)

@@ -78,6 +78,7 @@ def _only(text: str, category: EntityCategory) -> list:
         ("nr rej. GD4521K", EntityCategory.VEHICLE, "GD4521K"),
         ("adres 81-300 Gdynia", EntityCategory.ADDRESS, "81-300"),
         ("sygn. II PSKP 11/21", EntityCategory.CASE_NUMBER, "II PSKP 11/21"),
+        ("Sygn. akt I ACa 419/25", EntityCategory.CASE_NUMBER, "I ACa 419/25"),
         (
             "znak sprawy DOP-1.4131.15.2026",
             EntityCategory.ADMIN_CASE,

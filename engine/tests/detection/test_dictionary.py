@@ -204,6 +204,14 @@ def test_does_not_detect_standalone_first_name_at_sentence_start() -> None:
     assert entities == []
 
 
+def test_street_name_matching_a_first_name_is_not_detected_as_person() -> None:
+    text = "ul. Grażyny nr 5A lok. 12, 80-438 Gdańsk"
+
+    entities = detect_dictionary(text, _doc(text, {"Grażyny": "grażyna"}))
+
+    assert _person_texts(entities) == []
+
+
 def test_ner_confirmation_allows_homograph_and_merge_keeps_ner_source() -> None:
     text = "Maj podpisał protokół."
     start = text.index("Maj")

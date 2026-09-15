@@ -4,12 +4,7 @@ import type { Update } from "@tauri-apps/plugin-updater";
 import "./App.css";
 import { createAnonymizerApiClient } from "./api/client";
 import { toUserMessage } from "./api/errors";
-import {
-  AccountsClientError,
-  loginToAccounts,
-  refreshAccountsToken,
-  getRegistrationUrl,
-} from "./auth/client";
+import { AccountsClientError, loginToAccounts, refreshAccountsToken } from "./auth/client";
 import { getAccountsPublicKeyPem } from "./auth/publicKey";
 import {
   clearStoredAuthToken,
@@ -961,19 +956,22 @@ function App() {
     [rememberAuthenticatedSession, verifyAccountToken],
   );
 
-  const loginWithBrowser = useCallback(async () => {
-    setBrowserLoginLoading(true);
-    setAuthError(null);
-    try {
-      const response = await loginViaBrowser();
-      const session = await verifyAccountToken(response.access_token);
-      await rememberAuthenticatedSession(session);
-    } catch (error) {
-      setAuthError(authErrorMessage(error));
-    } finally {
-      setBrowserLoginLoading(false);
-    }
-  }, [rememberAuthenticatedSession, verifyAccountToken]);
+  const loginWithBrowser = useCallback(
+    async (intent: "login" | "register" = "login") => {
+      setBrowserLoginLoading(true);
+      setAuthError(null);
+      try {
+        const response = await loginViaBrowser({ intent });
+        const session = await verifyAccountToken(response.access_token);
+        await rememberAuthenticatedSession(session);
+      } catch (error) {
+        setAuthError(authErrorMessage(error));
+      } finally {
+        setBrowserLoginLoading(false);
+      }
+    },
+    [rememberAuthenticatedSession, verifyAccountToken],
+  );
 
   const logout = useCallback(async () => {
     await clearStoredAuthToken();
@@ -982,11 +980,12 @@ function App() {
     setAuthState({ status: "basic", message: null });
   }, []);
 
+  // Rejestracja idzie tym samym flow co logowanie przez przeglądarkę (loopback + PKCE),
+  // tylko lądując na /register zamiast /login - serwer i tak koncowo odsyla ten sam kod
+  // po zweryfikowaniu e-maila, wiec appka konczy zalogowana bez dodatkowego kroku.
   const openRegistration = useCallback(() => {
-    void openExternalUrl(getRegistrationUrl()).catch((error) => {
-      setAuthError(toUserMessage(error) || String(error));
-    });
-  }, []);
+    void loginWithBrowser("register");
+  }, [loginWithBrowser]);
 
   const openKancelariaSite = useCallback(() => {
     void openExternalUrl(texts.footer.kancelariaHref).catch(() => {

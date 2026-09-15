@@ -22,6 +22,32 @@ _COURT_DEPARTMENT = (
     rf"(?:,\s*[IVXLCDM]{{1,8}}\s+Wydział(?:\s+{_PLACE_WORD}){{1,5}}(?:\s+KRS)?)?"
 )
 
+# Sąd Najwyższy/NSA (bez lokalizacji, wyłącznie cytowanie orzecznictwa) zostają
+# publiczne (patrz _CURATED_PUBLIC_INSTITUTIONS). Konkretny sąd rozpoznający sprawę
+# (Rejonowy/Okręgowy/Apelacyjny/WSA + miejscowość) razem z sygnaturą akt wystarczy
+# jednak do odnalezienia sprawy w publicznym rejestrze i identyfikacji stron, więc
+# ma trafić do maskowania - stąd osobna lista, oddzielona od _PUBLIC_PATTERNS,
+# której trafienia detect_named_courts() zwraca jako sensytywne, a nie publiczne.
+_COURT_PATTERNS = [
+    re.compile(
+        rf"\bSąd(?:u|em|zie)?\s+"
+        rf"(?:Rejonow(?:y|ego|ym)|Okręgow(?:y|ego|ym)|Apelacyjn(?:y|ego|ym))"
+        rf"\s+(?:w|we|dla)\s+{_PLACE}",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        rf"\bSąd(?:u|em|zie)?\s+"
+        rf"(?:Rejonow(?:y|ego|ym)|Okręgow(?:y|ego|ym)|Apelacyjn(?:y|ego|ym))"
+        rf"\s+{_PLACE}{_COURT_DEPARTMENT}",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        rf"\bWojewódzk(?:i|iego|im)\s+Sąd(?:u|em|zie)?\s+Administracyjn(?:y|ego|ym)"
+        rf"\s+w\s+{_PLACE}",
+        re.IGNORECASE,
+    ),
+]
+
 _CURATED_PUBLIC_INSTITUTIONS = [
     "Agencja Bezpieczeństwa Wewnętrznego",
     "Agencja Mienia Wojskowego",
@@ -169,7 +195,6 @@ _CURATED_PUBLIC_INSTITUTIONS = [
     "Urząd Zamówień Publicznych",
     "Wody Polskie",
     "Wojewódzki Inspektorat Ochrony Środowiska",
-    "Wojewódzki Sąd Administracyjny",
     "Zakład Ubezpieczeń Społecznych",
     "ZUS",
     "KRUS",
@@ -217,23 +242,6 @@ _PUBLIC_PATTERNS = [
     re.compile(
         rf"\bMinisterstw(?:o|a|u|ie|em)\s+{_MINISTRY_TAIL_WORD}"
         rf"(?:\s+{_MINISTRY_TAIL_WORD}){{0,8}}",
-    ),
-    re.compile(
-        rf"\bSąd(?:u|em|zie)?\s+"
-        rf"(?:Rejonow(?:y|ego|ym)|Okręgow(?:y|ego|ym)|Apelacyjn(?:y|ego|ym))"
-        rf"\s+(?:w|we|dla)\s+{_PLACE}",
-        re.IGNORECASE,
-    ),
-    re.compile(
-        rf"\bSąd(?:u|em|zie)?\s+"
-        rf"(?:Rejonow(?:y|ego|ym)|Okręgow(?:y|ego|ym)|Apelacyjn(?:y|ego|ym))"
-        rf"\s+{_PLACE}{_COURT_DEPARTMENT}",
-        re.IGNORECASE,
-    ),
-    re.compile(
-        rf"\bWojewódzk(?:i|iego|im)\s+Sąd(?:u|em|zie)?\s+Administracyjn(?:y|ego|ym)"
-        rf"\s+w\s+{_PLACE}",
-        re.IGNORECASE,
     ),
     re.compile(
         rf"\bProkuratur(?:a|y|ze|ą)\s+"
@@ -321,6 +329,36 @@ def detect_public_institutions(
 
 def curated_public_institution_count() -> int:
     return len(_CURATED_PUBLIC_INSTITUTIONS)
+
+
+def detect_named_courts(text: str) -> list[DetectedEntity]:
+    """Detect specific, location-identifying courts (sensitive - to be masked).
+
+    Unlike detect_public_institutions(), matches here are real, ACCEPTED COMPANY
+    entities with source="regex" so they win the same-span priority race against a
+    shorter dictionary/NER match for just the city name inside them (e.g. "Szczecinie"
+    within "Sąd Apelacyjny w Szczecinie") - the whole court name must be masked as one
+    span, not just the trailing location.
+    """
+    entities: list[DetectedEntity] = []
+    for pattern in _COURT_PATTERNS:
+        for match in pattern.finditer(text):
+            start, end = _trim_span(text, match.start(), match.end())
+            value = text[start:end]
+            entities.append(
+                DetectedEntity(
+                    category=EntityCategory.COMPANY,
+                    start=start,
+                    end=end,
+                    text=value,
+                    confidence=0.85,
+                    source="regex",
+                    validation=ValidationStatus.NOT_APPLICABLE,
+                    entity_group_id=f"court:{_normalize(value)}",
+                    canonical_text=value.strip(),
+                )
+            )
+    return _dedupe(entities)
 
 
 def _detect_lemma_phrases(

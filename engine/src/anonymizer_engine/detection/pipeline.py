@@ -16,7 +16,10 @@ from anonymizer_engine.detection.dictionary import detect_dictionary, is_negativ
 from anonymizer_engine.detection.models import DetectedEntity, DetectionResult, EntityCategory
 from anonymizer_engine.detection.ner import NerEngine, SpacyPresidioEngine
 from anonymizer_engine.detection.places import detect_places, has_address_context, is_place_name
-from anonymizer_engine.detection.public_institutions import detect_public_institutions
+from anonymizer_engine.detection.public_institutions import (
+    detect_named_courts,
+    detect_public_institutions,
+)
 
 _POSTAL_CODE_RE = r"\d{2}-\d{3}"
 # PKD (Polska Klasyfikacja Działalności) business-activity codes are written like
@@ -41,6 +44,7 @@ def detect_all(
     ner_entities = _filter_ner_person_false_positives(text, ner_entities)
     ner_entities = _filter_ner_address_false_positives(text, ner_entities)
     public_entities = detect_public_institutions(text, tokens)
+    court_entities = detect_named_courts(text)
     ner_entities = downrank_unsupported_company_entities(
         text,
         ner_entities,
@@ -52,7 +56,12 @@ def detect_all(
         *detect_places(text),
     ]
 
-    regex_entities = [*deterministic_entities, *company_entities, *public_entities]
+    regex_entities = [
+        *deterministic_entities,
+        *company_entities,
+        *public_entities,
+        *court_entities,
+    ]
     entities = _merge_entities(regex_entities, dictionary_entities, ner_entities)
     entities = _merge_postal_address_clusters(text, entities)
     entities, groups = consolidate_entity_groups(entities, text, tokens)

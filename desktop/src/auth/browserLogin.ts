@@ -23,6 +23,11 @@ export interface BrowserLoginDeps {
   openUrl?: (url: string) => Promise<void>;
   exchange?: typeof exchangeDesktopLoginCode;
   baseUrl?: string;
+  // "register" wysyła przeglądarkę na formularz zakładania konta zamiast logowania -
+  // serwer wciąż wraca tym samym loopbackiem po zweryfikowaniu e-maila i zalogowaniu,
+  // więc appka i tak kończy z tokenem. Bez tego "Załóż darmowe konto" był ślepą uliczką:
+  // użytkownik rejestrował się i logował na stronie, ale appka nigdy się o tym nie dowiadywała.
+  intent?: "login" | "register";
 }
 
 export async function loginViaBrowser(
@@ -32,6 +37,7 @@ export async function loginViaBrowser(
   const openUrl = deps.openUrl ?? openExternalUrl;
   const exchange = deps.exchange ?? exchangeDesktopLoginCode;
   const baseUrl = deps.baseUrl ?? getAccountsBaseUrl();
+  const intent = deps.intent ?? "login";
 
   const state = randomUrlSafeToken(32);
   const codeVerifier = randomUrlSafeToken(48);
@@ -43,7 +49,8 @@ export async function loginViaBrowser(
     `${baseUrl}/v1/desktop-auth/start` +
     `?code_challenge=${encodeURIComponent(codeChallenge)}` +
     `&state=${encodeURIComponent(state)}` +
-    `&redirect_uri=${encodeURIComponent(redirectUri)}`;
+    `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+    `&intent=${encodeURIComponent(intent)}`;
 
   try {
     await openUrl(startUrl);

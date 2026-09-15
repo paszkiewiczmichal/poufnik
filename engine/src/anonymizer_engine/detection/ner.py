@@ -34,10 +34,13 @@ _PRESIDIO_ENTITIES = sorted(_PRESIDIO_TO_CATEGORY)
 DEFAULT_SPACY_MODEL = "pl_core_news_lg"
 
 _STREET_ADDRESS_RE = re.compile(
-    r"\b(?:ul\.|ulicy|al\.|alei|pl\.|placu)\s+"
+    r"\b(?i:ul\.|ulicy|al\.|alei|aleja|aleje|pl\.|placu|plac)\s+"
     r"[A-ZĄĆĘŁŃÓŚŹŻ][\wąćęłńóśźżĄĆĘŁŃÓŚŹŻ.-]*"
     r"(?:\s+[A-ZĄĆĘŁŃÓŚŹŻ][\wąćęłńóśźżĄĆĘŁŃÓŚŹŻ.-]*){0,2}"
-    r"\s+\d+[A-Za-z]?(?:/\d+)?",
+    # Numer budynku bywa poprzedzony słowem "nr" i uzupełniony numerem lokalu
+    # ("ul. Grażyny nr 5A lok. 12") - bez tego cały ten fragment zostawał w tekście.
+    r"\s+(?:nr\.?\s+)?\d+[A-Za-z]?(?:/\d+[A-Za-z]?)?"
+    r"(?:[\s,]+(?i:lok\.?)\s*\d+[A-Za-z]?)?",
 )
 _POLISH_DATE_RE = re.compile(
     r"\b\d{1,2}\s+"

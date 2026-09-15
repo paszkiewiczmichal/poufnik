@@ -55,6 +55,7 @@ describe("loginViaBrowser", () => {
     expect(startUrl.searchParams.get("redirect_uri")).toBe("http://127.0.0.1:43210/callback");
     expect(startUrl.searchParams.get("code_challenge")).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(startUrl.searchParams.get("state")).toMatch(/^[A-Za-z0-9_-]{40,}$/);
+    expect(startUrl.searchParams.get("intent")).toBe("login");
     expect(invokeImpl).toHaveBeenCalledWith("await_browser_login", {
       port: 43210,
       successUrl: `${BASE_URL}/desktop/success`,
@@ -62,6 +63,15 @@ describe("loginViaBrowser", () => {
     const [code, verifier] = exchange.mock.calls[0] as unknown as [string, string];
     expect(code).toBe("jednorazowy-kod");
     expect(verifier).toMatch(/^[A-Za-z0-9_-]{43,128}$/);
+  });
+
+  it("sends intent=register on the start URL when registering", async () => {
+    const { deps, openUrl } = makeDeps();
+
+    await loginViaBrowser({ ...deps, intent: "register" });
+
+    const startUrl = new URL(openUrl.mock.calls[0][0]);
+    expect(startUrl.searchParams.get("intent")).toBe("register");
   });
 
   it("rejects a callback whose state does not match and abandons the listener", async () => {
