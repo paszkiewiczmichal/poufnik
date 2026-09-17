@@ -16,6 +16,32 @@ use tauri_plugin_shell::{
 
 mod browser_login;
 mod history;
+#[cfg(target_os = "windows")]
+mod win_job;
+
+// Ties the engine sidecar's lifetime to this process (see win_job.rs) so it can never
+// outlive an abnormal exit (crash, "End task", an installer overwriting the running exe).
+// A no-op stub on macOS, where sidecar processes are reliably reaped by the OS anyway.
+#[cfg(target_os = "windows")]
+type EngineJob = win_job::JobHandle;
+#[cfg(not(target_os = "windows"))]
+type EngineJob = ();
+
+#[cfg(target_os = "windows")]
+fn create_engine_job() -> Option<EngineJob> {
+    win_job::create_kill_on_close_job()
+}
+#[cfg(not(target_os = "windows"))]
+fn create_engine_job() -> Option<EngineJob> {
+    None
+}
+
+#[cfg(target_os = "windows")]
+fn assign_to_job(job: &EngineJob, pid: u32) {
+    win_job::assign_process(job, pid);
+}
+#[cfg(not(target_os = "windows"))]
+fn assign_to_job(_job: &EngineJob, _pid: u32) {}
 
 const ENGINE_STATUS_EVENT: &str = "engine://status";
 const MAX_RESTARTS: u8 = 3;
@@ -102,9 +128,13 @@ fn emit_status(app: &AppHandle, payload: EngineStatusPayload) {
 
 fn spawn_engine_supervisor(app: AppHandle, state: SharedEngineState) {
     tauri::async_runtime::spawn(async move {
+        // One job for the whole supervisor lifetime: every sidecar spawn (including
+        // restarts after a crash) gets assigned to it, and it lives exactly as long as
+        // this process does.
+        let job = create_engine_job();
         let mut attempt = 0;
         loop {
-            match run_engine_once(app.clone(), state.clone(), attempt).await {
+            match run_engine_once(app.clone(), state.clone(), attempt, job.as_ref()).await {
                 EngineRunResult::ExitedAfterReady { code } if attempt < MAX_RESTARTS => {
                     attempt = attempt.saturating_add(1);
                     emit_status(&app, EngineStatusPayload::Restarting { attempt });
@@ -147,16 +177,25 @@ enum EngineRunResult {
     Shutdown,
 }
 
-async fn run_engine_once(app: AppHandle, state: SharedEngineState, attempt: u8) -> EngineRunResult {
+async fn run_engine_once(
+    app: AppHandle,
+    state: SharedEngineState,
+    attempt: u8,
+    job: Option<&EngineJob>,
+) -> EngineRunResult {
     emit_status(&app, EngineStatusPayload::Starting { attempt });
 
     match spawn_engine_process(&app).await {
         Ok((mut rx, child)) => {
+            let pid = child.pid();
             {
                 let mut guard = state.lock().expect("engine state poisoned");
                 guard.child = Some(child);
                 guard.endpoint = None;
                 guard.failed_message = None;
+            }
+            if let Some(job) = job {
+                assign_to_job(job, pid);
             }
 
             let mut endpoint: Option<EngineEndpoint> = None;
