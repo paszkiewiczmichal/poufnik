@@ -1,0 +1,43 @@
+UMOWA O ŚWIADCZENIE USŁUG
+WERSJA DEMONSTRACYJNA - WSZYSTKIE DANE SĄ FIKCYJNE
+
+zawarta w Warszawie dnia 15 maja 2026 r. pomiędzy:
+
+1. Janem Kowalskim, zamieszkałym przy ul. Słonecznej 12/7, 00-123 Warszawa,
+   PESEL: 44051401359, legitymującym się dowodem osobistym ABA123456,
+   e-mail: jan.kowalski@example.test, tel. +48 501 234 567,
+   zwanym dalej „Zamawiającym”,
+
+a
+
+2. „Kancelarią Przykład sp. z o.o.” z siedzibą przy ul. Lipowej 8,
+   31-001 Kraków, wpisaną do rejestru przedsiębiorców KRS pod numerem
+   0000123456, NIP: 5251000000, REGON: 012345678,
+   reprezentowaną przez Annę Nowak, Prezes Zarządu,
+   e-mail: biuro@kancelaria-przyklad.example, tel. +48 512 345 678,
+   zwaną dalej „Wykonawcą”.
+
+§ 1. Przedmiot umowy
+
+1. Zamawiający zleca, a Wykonawca zobowiązuje się do przygotowania opinii
+   dotyczącej nieruchomości objętej księgą wieczystą WA1M/00012345/6.
+2. Dokumentacja sprawy jest prowadzona pod sygnaturą akt I C 123/26 oraz
+   znakiem sprawy KP/2026/0515/01.
+
+§ 2. Wynagrodzenie i rozliczenie
+
+1. Wynagrodzenie Wykonawcy wynosi 12 300,00 zł brutto.
+2. Zapłata nastąpi przelewem na rachunek: 12 1140 2004 0000 3002 0135 5387,
+   w terminie 14 dni od wystawienia faktury.
+3. Dla potrzeb kontaktu technicznego Zamawiający wskazuje adres IP
+   192.0.2.42 oraz identyfikator API: sk_demo_4f9d1a2b3c4d5e6f7a8b9c0d.
+
+§ 3. Postanowienia końcowe
+
+1. Strony uzgadniają, że spotkanie odbędzie się dnia 20 maja 2026 r.
+   w lokalizacji 52.2297, 21.0122.
+2. Wszelka korespondencja dotycząca umowy będzie kierowana na adresy wskazane
+   w komparycji.
+
+ZAMAWIAJĄCY                                      WYKONAWCA
+Jan Kowalski                                     Anna Nowak
