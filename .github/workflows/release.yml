@@ -405,6 +405,12 @@ jobs:
         working-directory: desktop
         run: npm ci
 
+      # tauri-windows-bundle copies only the main exe, assets and bundle.resources - it ignores
+      # bundle.externalBin, so the engine sidecar would be missing from the MSIX and the app
+      # could never start its engine.
+      - name: Add engine sidecar to MSIX resources
+        run: uv run --python ${{ env.PYTHON_VERSION }} --no-project python .github/scripts/add_msix_sidecar_resource.py --target-triple "${{ env.RELEASE_TARGET }}"
+
       # No signing here: Microsoft Store re-signs MSIX/MSIXbundle packages with its own
       # certificate after certification, so an unsigned build is the correct artifact to
       # hand to Partner Center. bundle.config.json's signing.pfx stays null in CI - local
@@ -413,6 +419,19 @@ jobs:
       - name: Build MSIX package
         working-directory: desktop
         run: npm run tauri:windows:build -- --runner npm --verbose
+
+      - name: Verify MSIX contains the engine sidecar
+        run: |
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $msix = Get-ChildItem desktop/src-tauri/target/msix -Filter "*_x64.msix" | Select-Object -First 1
+          if (-not $msix) { throw "No x64 .msix was produced." }
+          $zip = [IO.Compression.ZipFile]::OpenRead($msix.FullName)
+          try { $names = @($zip.Entries | ForEach-Object { $_.FullName }) } finally { $zip.Dispose() }
+          foreach ($required in @("Poufnik.exe", "anonymizer-engine.exe")) {
+            if ($names -notcontains $required) { throw "MSIX is missing $required - the app cannot start its engine." }
+          }
+          if (-not ($names | Where-Object { $_ -like "_internal/*" })) { throw "MSIX is missing the _internal runtime folder." }
+          Write-Host "MSIX layout OK: $($msix.Name) contains Poufnik.exe, anonymizer-engine.exe and _internal/."
 
       - name: Upload MSIX artifact
         uses: actions/upload-artifact@v4
