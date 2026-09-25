@@ -122,6 +122,7 @@ _COMPANY_AFTER_RE = re.compile(
     r"(?:sp\.\s*z\s*o\.o\.|sp\.k\.|s\.a\.))",
     re.IGNORECASE,
 )
+_NAME_GAP_RE = re.compile(r"[ \xa0]{0,2}")
 _INITIAL_RE = re.compile(r"^[A-ZĄĆĘŁŃÓŚŹŻ]\.$")
 _INITIAL_LETTER_RE = re.compile(r"^[A-ZĄĆĘŁŃÓŚŹŻ]$")
 _SENTENCE_ENDING = ".!?"
@@ -421,7 +422,10 @@ def _is_sentence_start(text: str, start: int) -> bool:
 
 
 def _is_adjacent(text: str, left: _Token, right: _Token) -> bool:
-    return left.end <= right.idx and text[left.end : right.idx].strip() == ""
+    # A name is written on one line with at most a couple of spaces; a wider gap, a tab or a
+    # line break means neighbouring columns/lines (e.g. a two-column signature block).
+    gap = text[left.end : right.idx]
+    return left.end <= right.idx and _NAME_GAP_RE.fullmatch(gap) is not None
 
 
 def _contains_letter(value: str) -> bool:

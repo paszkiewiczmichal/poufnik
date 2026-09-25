@@ -187,6 +187,22 @@ def test_detects_uppercase_first_name_and_surname() -> None:
     assert _person_texts(entities) == ["JAN KOWALSKI"]
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Jan Kowalski                                     Anna Nowak",
+        "Jan Kowalski\tAnna Nowak",
+        "Jan Kowalski\nAnna Nowak",
+    ],
+)
+def test_names_in_separate_columns_or_lines_are_not_glued_into_one_person(text: str) -> None:
+    lemmas = {"Jan": "jan", "Anna": "anna", "Kowalski": "kowalski", "Nowak": "nowak"}
+
+    entities = detect_dictionary(text, _doc(text, lemmas))
+
+    assert _person_texts(entities) == ["Jan Kowalski", "Anna Nowak"]
+
+
 def test_detects_standalone_first_name_outside_sentence_start() -> None:
     text = "Spotkałem Annę przed sądem."
 
