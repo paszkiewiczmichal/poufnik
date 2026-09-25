@@ -198,7 +198,7 @@ describe("saveBinaryFile", () => {
 });
 
 describe("exportBatchResultsToDirectory", () => {
-  it("writes an .anon.txt and .map.json pair per item and returns the file count", async () => {
+  it("writes a _poufnik.txt and _poufnik_mapa.json pair per item and returns the file count", async () => {
     const count = await exportBatchResultsToDirectory("C:\\eksport", [
       {
         filename: "pismo.txt",
@@ -209,11 +209,11 @@ describe("exportBatchResultsToDirectory", () => {
 
     expect(count).toBe(2);
     expect(writeTextFile).toHaveBeenCalledWith(
-      "C:\\eksport\\pismo.anon.txt",
+      "C:\\eksport\\pismo_poufnik.txt",
       "[OSOBA_1] zlozyl pozew.",
     );
     expect(writeTextFile).toHaveBeenCalledWith(
-      "C:\\eksport\\pismo.map.json",
+      "C:\\eksport\\pismo_poufnik_mapa.json",
       expect.stringContaining("document_fingerprint"),
     );
   });

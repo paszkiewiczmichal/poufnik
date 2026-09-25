@@ -386,6 +386,32 @@ describe("App engine health", () => {
     expect(mocks.checkForUpdate).not.toHaveBeenCalled();
   });
 
+  it("proposes the original file name with a _poufnik suffix when exporting", async () => {
+    useAppStore.setState((state) => ({
+      uiState: { ...state.uiState, selectedFileName: "umowa najmu.txt" },
+      document: {
+        filename: "umowa najmu.txt",
+        format: "txt",
+        source: "parsed",
+        page_count: 1,
+        text: "Umowa z Janem Kowalskim",
+      },
+      anonymization: {
+        ...state.anonymization,
+        anonymizedText: "Umowa z [OSOBA_1]",
+        replacementMap: { entries: [], document_fingerprint: "x" } as never,
+      },
+    }));
+    mocks.apiClient.exportDocument.mockResolvedValue(new Blob(["x"]));
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: /Wynik/ }));
+    fireEvent.click(await screen.findByRole("button", { name: texts.generation.exportDocx }));
+
+    await waitFor(() => expect(mocks.saveBinaryFile).toHaveBeenCalled());
+    expect(mocks.saveBinaryFile.mock.calls[0][0]).toBe("umowa najmu_poufnik.docx");
+  });
+
   it("shows the real app version fetched from Tauri, not a hardcoded one", async () => {
     render(<App />);
 

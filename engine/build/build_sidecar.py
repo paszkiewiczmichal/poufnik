@@ -35,6 +35,9 @@ SPEC_ROOT = ENGINE_ROOT / "build" / "spec"
 SIDECAR_NAME = "anonymizer-engine"
 TESSDATA_FAST_BASE = "https://github.com/tesseract-ocr/tessdata_fast/raw/main"
 REQUIRED_TESSDATA = ("pol.traineddata", "eng.traineddata")
+PROMPT_LIBRARY_SOURCE = (
+    ENGINE_ROOT / "src" / "anonymizer_engine" / "prompts" / "resources" / "prompts-library"
+)
 REQUIRED_PACKAGED_RESOURCES = (
     (
         ENGINE_ROOT / "src" / "anonymizer_engine" / "detection" / "resources" / "names.db",
@@ -485,6 +488,13 @@ def verify_packaged_resources(binaries_dir: Path) -> None:
         target = support_dir / destination / source.name
         if not target.exists():
             raise FileNotFoundError(f"Required packaged engine resource missing: {target}")
+
+    packaged_prompts = (
+        support_dir / "anonymizer_engine" / "prompts" / "resources" / "prompts-library"
+    )
+    for source in sorted(PROMPT_LIBRARY_SOURCE.glob("*.yaml")):
+        if not (packaged_prompts / source.name).exists():
+            raise FileNotFoundError(f"Prompt template missing from the bundle: {source.name}")
 
     model_dir = support_dir / "pl_core_news_lg"
     if not model_dir.exists():

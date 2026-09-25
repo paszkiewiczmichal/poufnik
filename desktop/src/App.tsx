@@ -32,6 +32,7 @@ import {
   type BatchItemPatch,
 } from "./domain/batchProcessing";
 import { enabledCustomRulePayloads } from "./domain/customRules";
+import { poufnikFileName } from "./domain/batchExport";
 import { blocksForExport } from "./domain/documentSegments";
 import { texts } from "./i18n";
 import { useAppStore } from "./store/useAppStore";
@@ -841,10 +842,10 @@ function App() {
       return;
     }
     await saveJsonFile(
-      "mapa-zastapien.json",
+      poufnikFileName(uiState.selectedFileName, "json", "map"),
       JSON.stringify(anonymization.replacementMap, null, 2),
     );
-  }, [anonymization.replacementMap]);
+  }, [anonymization.replacementMap, uiState.selectedFileName]);
 
   const exportDocument = useCallback(
     async (format: ExportFormat) => {
@@ -863,12 +864,12 @@ function App() {
           format,
           blocks: blocksForExport(anonymization.anonymizedText),
         });
-        await saveBinaryFile(`anonimizowany.${format}`, blob, format);
+        await saveBinaryFile(poufnikFileName(uiState.selectedFileName, format), blob, format);
       } catch (error) {
         setAnonymizationError(toUserMessage(error));
       }
     },
-    [anonymization.anonymizedText, resolveEndpoint, setAnonymizationError],
+    [anonymization.anonymizedText, resolveEndpoint, setAnonymizationError, uiState.selectedFileName],
   );
 
   const loadPrompts = useCallback(async () => {

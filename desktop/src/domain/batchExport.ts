@@ -11,17 +11,31 @@ export interface BatchExportFile {
   contents: string;
 }
 
+// Nazwa pliku wynikowego: nazwa oryginału (bez rozszerzenia) + "_poufnik", np.
+// umowa.docx -> umowa_poufnik.docx, a mapa zastąpień -> umowa_poufnik_mapa.json.
+export function poufnikFileName(
+  sourceName: string | null | undefined,
+  extension: string,
+  kind: "result" | "map" = "result",
+): string {
+  return withPoufnikSuffix(safeBaseName(sourceName ?? ""), extension, kind);
+}
+
+function withPoufnikSuffix(base: string, extension: string, kind: "result" | "map"): string {
+  return `${base}${kind === "map" ? "_poufnik_mapa" : "_poufnik"}.${extension}`;
+}
+
 export function batchExportFiles(items: BatchExportInput[]): BatchExportFile[] {
   const used = new Map<string, number>();
   return items.flatMap((item) => {
     const base = uniqueBaseName(safeBaseName(item.filename), used);
     return [
       {
-        filename: `${base}.anon.txt`,
+        filename: withPoufnikSuffix(base, "txt", "result"),
         contents: item.anonymizedText,
       },
       {
-        filename: `${base}.map.json`,
+        filename: withPoufnikSuffix(base, "json", "map"),
         contents: JSON.stringify(item.replacementMap, null, 2),
       },
     ];
