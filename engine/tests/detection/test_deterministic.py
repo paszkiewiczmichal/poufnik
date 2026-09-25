@@ -79,6 +79,9 @@ def _only(text: str, category: EntityCategory) -> list:
         ("adres 81-300 Gdynia", EntityCategory.ADDRESS, "81-300"),
         ("sygn. II PSKP 11/21", EntityCategory.CASE_NUMBER, "II PSKP 11/21"),
         ("Sygn. akt I ACa 419/25", EntityCategory.CASE_NUMBER, "I ACa 419/25"),
+        ("prowadzona pod sygnaturą akt I C 123/26 oraz", EntityCategory.CASE_NUMBER, "I C 123/26"),
+        ("w sygnaturze II K 12/23", EntityCategory.CASE_NUMBER, "II K 12/23"),
+        ("w sprawie o zapłatę I C 55/24", EntityCategory.CASE_NUMBER, "I C 55/24"),
         (
             "znak sprawy DOP-1.4131.15.2026",
             EntityCategory.ADMIN_CASE,
@@ -159,6 +162,7 @@ def test_invalid_checksums_are_returned_as_failed(
         ("identyfikator GD4521K bez pojazdu", EntityCategory.VEHICLE, 0),
         ("SALLBBB29BB123456 bez kontekstu", EntityCategory.VEHICLE, 0),
         ("II PSKP 11/21 bez sygnatury", EntityCategory.CASE_NUMBER, 0),
+        ("sprawdzić III K 12/23 w rejestrze", EntityCategory.CASE_NUMBER, 0),
         ("DOP-1.4131.15.2026 bez etykiety", EntityCategory.ADMIN_CASE, 0),
         ("Kwota 1234,56 bez waluty", EntityCategory.MONEY, 0),
         ("999.0.2.15", EntityCategory.IP_ADDRESS, 0),

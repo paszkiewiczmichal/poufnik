@@ -96,7 +96,9 @@ _VEHICLE_CONTEXT_RE = re.compile(
     r"samochód|samochodu|auto|marki|nadwozia)\b",
     re.IGNORECASE,
 )
-_CASE_NUMBER_CONTEXT_RE = re.compile(r"\b(?:sygn\.?|sygnatura|sprawa)\b", re.IGNORECASE)
+_CASE_NUMBER_CONTEXT_RE = re.compile(
+    r"\b(?:sygn\.?|sygnatur\w*|spraw(?:a|y|ie|ę|ą|om|ach|ami))\b", re.IGNORECASE
+)
 _PASSPORT_CONTEXT_RE = re.compile(r"\b(?:paszport|passport)\b", re.IGNORECASE)
 _ADMIN_CASE_CONTEXT_RE = re.compile(
     r"(?:znak\s+sprawy|sygn\.?|nr\s+decyzji|decyzja\s+nr|"
