@@ -426,8 +426,9 @@ jobs:
       - name: Verify the frontend was built for the Store channel
         shell: bash
         run: |
-          store=$(grep -l "poufnik-channel-store" desktop/dist/assets/*.js | wc -l)
-          direct=$(grep -l "poufnik-channel-direct" desktop/dist/assets/*.js | wc -l)
+          # grep -l exits 1 when nothing matches, which -e/pipefail would turn into a script abort.
+          store=$( (grep -l "poufnik-channel-store" desktop/dist/assets/*.js || true) | wc -l )
+          direct=$( (grep -l "poufnik-channel-direct" desktop/dist/assets/*.js || true) | wc -l )
           if [ "$store" -lt 1 ] || [ "$direct" -gt 0 ]; then
             echo "Frontend bundle is not a Store-channel build (store=$store direct=$direct)."
             exit 1
