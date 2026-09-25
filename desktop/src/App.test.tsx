@@ -403,6 +403,7 @@ describe("App engine health", () => {
       },
     }));
     mocks.apiClient.exportDocument.mockResolvedValue(new Blob(["x"]));
+    mocks.apiClient.listPrompts.mockResolvedValue([]);
 
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: /Wynik/ }));
