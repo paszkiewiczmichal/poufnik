@@ -446,6 +446,9 @@ jobs:
             if ($names -notcontains $required) { throw "MSIX is missing $required - the app cannot start its engine." }
           }
           if (-not ($names | Where-Object { $_ -like "_internal/*" })) { throw "MSIX is missing the _internal runtime folder." }
+          # Without resources.pri Windows ignores the targetsize/unplated variants and draws the
+          # accent-colour plate behind the taskbar icon.
+          if ($names -notcontains "resources.pri") { throw "MSIX is missing resources.pri (bundle.config.json resourceIndex.enabled)." }
           foreach ($icon in @("Assets/Square44x44Logo.targetsize-24_altform-unplated.png", "Assets/Square44x44Logo.targetsize-48_altform-unplated.png", "Assets/Square150x150Logo.png", "Assets/StoreLogo.png")) {
             if ($names -notcontains $icon) { throw "MSIX is missing tile asset $icon." }
           }
