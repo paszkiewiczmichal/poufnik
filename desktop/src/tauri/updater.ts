@@ -9,6 +9,15 @@ export type UpdateCheckResult =
 
 export const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
+// Kanal dystrybucji zapisany w buildzie (main.tsx wystawia go jako data-channel, a CI sprawdza
+// ten literal w bundlu). W wersji ze Sklepu Microsoft aktualizacje dostarcza Sklep - wlasny
+// updater z GitHuba nie moze pobierac i instalowac plikow poza Sklepem.
+export const DISTRIBUTION_CHANNEL =
+  import.meta.env.VITE_POUFNIK_DISTRIBUTION === "store"
+    ? "poufnik-channel-store"
+    : "poufnik-channel-direct";
+export const UPDATES_MANAGED_BY_STORE = DISTRIBUTION_CHANNEL === "poufnik-channel-store";
+
 const CONSENT_KEY = "anonymizer.updates.consent";
 const LAST_CHECK_KEY = "anonymizer.updates.lastCheckAt";
 
@@ -17,6 +26,7 @@ type LocalStorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
 interface CheckForUpdateOptions {
   force?: boolean;
+  managedByStore?: boolean;
   now?: number;
   storage?: LocalStorageLike;
   checkImpl?: UpdateCheck;
@@ -53,10 +63,14 @@ export function shouldCheckForUpdates(
 
 export async function checkForUpdate({
   force = false,
+  managedByStore = UPDATES_MANAGED_BY_STORE,
   now = Date.now(),
   storage = window.localStorage,
   checkImpl = check,
 }: CheckForUpdateOptions = {}): Promise<UpdateCheckResult> {
+  if (managedByStore) {
+    return { status: "skipped" };
+  }
   const consent = getUpdateConsent(storage);
   const lastCheckAt = parseLastCheckAt(storage);
   if (consent !== true) {

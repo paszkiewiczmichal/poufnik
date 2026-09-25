@@ -74,6 +74,7 @@ export const texts = {
   updates: {
     settings: "Ustawienia",
     sectionTitle: "Aktualizacje.",
+    managedByStore: "Aktualizacje tej wersji dostarcza Microsoft Store.",
     consentTitle: "Sprawdzanie aktualizacji.",
     consentBody:
       "Poufnik może raz dziennie sprawdzać, czy dostępna jest nowsza wersja. Wymaga to połączenia z internetem, ale dotyczy wyłącznie numeru wersji aplikacji.",

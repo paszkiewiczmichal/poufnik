@@ -38,6 +38,7 @@ const mocks = vi.hoisted(() => {
     getRegistrationUrl: vi.fn(),
     getStoredBasicChoice: vi.fn(),
     getUpdateConsent: vi.fn(),
+    storeChannel: { managed: false },
     installUpdate: vi.fn(),
     isSupportedDocumentName: vi.fn(),
     listenToDroppedFiles: vi.fn(),
@@ -149,6 +150,9 @@ vi.mock("./tauri/updater", () => ({
   getUpdateConsent: mocks.getUpdateConsent,
   installUpdate: mocks.installUpdate,
   saveUpdateConsent: mocks.saveUpdateConsent,
+  get UPDATES_MANAGED_BY_STORE() {
+    return mocks.storeChannel.managed;
+  },
 }));
 
 vi.mock("./tauri/external", () => ({
@@ -183,6 +187,7 @@ describe("App engine health", () => {
     mocks.getRegistrationUrl.mockReturnValue("http://127.0.0.1:8000/register");
     mocks.getStoredBasicChoice.mockReturnValue(true);
     mocks.getUpdateConsent.mockReturnValue(false);
+    mocks.storeChannel.managed = false;
     mocks.health.mockResolvedValue({
       models_loaded: false,
       status: "degraded",
@@ -363,6 +368,22 @@ describe("App engine health", () => {
 
     expect(await screen.findByText("network down")).toBeInTheDocument();
     expect(screen.queryByText(texts.errors.generic)).not.toBeInTheDocument();
+  });
+
+  it("in the Microsoft Store build shows no update consent, no checks and no update controls", async () => {
+    mocks.storeChannel.managed = true;
+    mocks.getUpdateConsent.mockReturnValue(null);
+    mocks.checkForUpdate.mockClear();
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: texts.start.title })).toBeInTheDocument();
+    expect(screen.queryByText(texts.updates.consentTitle)).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: texts.updates.settings }));
+
+    expect(await screen.findByText(texts.updates.managedByStore)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: texts.updates.checkNow })).not.toBeInTheDocument();
+    expect(mocks.checkForUpdate).not.toHaveBeenCalled();
   });
 
   it("shows the real app version fetched from Tauri, not a hardcoded one", async () => {

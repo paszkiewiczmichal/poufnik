@@ -31,6 +31,18 @@ describe("desktop updater consent gate", () => {
     expect(checkImpl).not.toHaveBeenCalled();
   });
 
+  it("never calls the updater in the Microsoft Store build, even with consent and force", async () => {
+    const storage = new MemoryStorage();
+    saveUpdateConsent(true, storage);
+    const checkImpl = vi.fn();
+
+    const result = await checkForUpdate({ storage, checkImpl, force: true, managedByStore: true });
+
+    expect(result).toEqual({ status: "skipped" });
+    expect(checkImpl).not.toHaveBeenCalled();
+    expect(storage.getItem("anonymizer.updates.lastCheckAt")).toBeNull();
+  });
+
   it("limits scheduled checks to once per 24 hours", () => {
     const now = 1_700_000_000_000;
 

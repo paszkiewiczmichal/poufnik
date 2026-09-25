@@ -416,9 +416,23 @@ jobs:
       # hand to Partner Center. bundle.config.json's signing.pfx stays null in CI - local
       # sideload testing (which does need a trusted signature) uses a throwaway dev cert,
       # never committed, passed via --pfx/--pfx-password on the CLI.
+      # The Store build must not ship the GitHub self-updater flow: the Store updates the app.
       - name: Build MSIX package
         working-directory: desktop
+        env:
+          VITE_POUFNIK_DISTRIBUTION: store
         run: npm run tauri:windows:build -- --runner npm --verbose
+
+      - name: Verify the frontend was built for the Store channel
+        shell: bash
+        run: |
+          store=$(grep -l "poufnik-channel-store" desktop/dist/assets/*.js | wc -l)
+          direct=$(grep -l "poufnik-channel-direct" desktop/dist/assets/*.js | wc -l)
+          if [ "$store" -lt 1 ] || [ "$direct" -gt 0 ]; then
+            echo "Frontend bundle is not a Store-channel build (store=$store direct=$direct)."
+            exit 1
+          fi
+          echo "Frontend bundle is a Store-channel build."
 
       - name: Verify MSIX contains the engine sidecar
         run: |
@@ -431,7 +445,10 @@ jobs:
             if ($names -notcontains $required) { throw "MSIX is missing $required - the app cannot start its engine." }
           }
           if (-not ($names | Where-Object { $_ -like "_internal/*" })) { throw "MSIX is missing the _internal runtime folder." }
-          Write-Host "MSIX layout OK: $($msix.Name) contains Poufnik.exe, anonymizer-engine.exe and _internal/."
+          foreach ($icon in @("Assets/Square44x44Logo.targetsize-24_altform-unplated.png", "Assets/Square44x44Logo.targetsize-48_altform-unplated.png", "Assets/Square150x150Logo.png", "Assets/StoreLogo.png")) {
+            if ($names -notcontains $icon) { throw "MSIX is missing tile asset $icon." }
+          }
+          Write-Host "MSIX layout OK: $($msix.Name) contains Poufnik.exe, anonymizer-engine.exe, _internal/ and tile assets."
 
       - name: Upload MSIX artifact
         uses: actions/upload-artifact@v4

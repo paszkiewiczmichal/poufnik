@@ -51,6 +51,7 @@ import {
   getUpdateConsent,
   installUpdate,
   saveUpdateConsent,
+  UPDATES_MANAGED_BY_STORE,
   type UpdateConsent,
 } from "./tauri/updater";
 import {
@@ -280,6 +281,9 @@ function App() {
   }, [availableUpdate]);
 
   useEffect(() => {
+    if (UPDATES_MANAGED_BY_STORE) {
+      return;
+    }
     const consent = getUpdateConsent();
     setUpdateConsentState(consent);
     if (consent === null) {
@@ -1486,34 +1490,40 @@ function App() {
                 />
                 <section className="settings-section">
                   <h3>{texts.updates.sectionTitle}</h3>
-                  <label className="checkbox-row">
-                    <input
-                      type="checkbox"
-                      checked={updateConsent === true}
-                      onChange={(event) => setUpdatePreference(event.currentTarget.checked)}
-                    />
-                    <span>
-                      {texts.updates.enabledLabel}
-                      <span className="checkbox-row__note">{texts.updates.enabledNote}</span>
-                    </span>
-                  </label>
-                  {updateConsent === false ? (
-                    <p className="muted">{texts.updates.disabledNote}</p>
-                  ) : null}
-                  {updateMessage ? (
-                    <p className="status-note status-note--success">{updateMessage}</p>
-                  ) : null}
-                  {updateError ? <p className="error-note">{updateError}</p> : null}
-                  <div className="settings-actions">
-                    <button
-                      className="secondary-button secondary-button--compact"
-                      type="button"
-                      disabled={updateConsent !== true || updateChecking}
-                      onClick={() => void runUpdateCheck(true)}
-                    >
-                      {updateChecking ? texts.updates.checking : texts.updates.checkNow}
-                    </button>
-                  </div>
+                  {UPDATES_MANAGED_BY_STORE ? (
+                    <p className="muted">{texts.updates.managedByStore}</p>
+                  ) : (
+                    <>
+                      <label className="checkbox-row">
+                        <input
+                          type="checkbox"
+                          checked={updateConsent === true}
+                          onChange={(event) => setUpdatePreference(event.currentTarget.checked)}
+                        />
+                        <span>
+                          {texts.updates.enabledLabel}
+                          <span className="checkbox-row__note">{texts.updates.enabledNote}</span>
+                        </span>
+                      </label>
+                      {updateConsent === false ? (
+                        <p className="muted">{texts.updates.disabledNote}</p>
+                      ) : null}
+                      {updateMessage ? (
+                        <p className="status-note status-note--success">{updateMessage}</p>
+                      ) : null}
+                      {updateError ? <p className="error-note">{updateError}</p> : null}
+                      <div className="settings-actions">
+                        <button
+                          className="secondary-button secondary-button--compact"
+                          type="button"
+                          disabled={updateConsent !== true || updateChecking}
+                          onClick={() => void runUpdateCheck(true)}
+                        >
+                          {updateChecking ? texts.updates.checking : texts.updates.checkNow}
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </section>
                 <TierGate
                   tier={productTier}
