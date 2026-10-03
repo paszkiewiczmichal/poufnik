@@ -203,6 +203,7 @@ _CURATED_PUBLIC_INSTITUTIONS = [
     "Rzecznik Małych i Średnich Przedsiębiorców",
     "Rzecznik Praw Dziecka",
     "Rzecznik Praw Obywatelskich",
+    "Rzeczpospolita Polska",
     "Rządowe Centrum Bezpieczeństwa",
     "Rządowe Centrum Legislacji",
     "Samorządowe Kolegium Odwoławcze",
@@ -267,6 +268,10 @@ _INFLECTED_PUBLIC_INSTITUTIONS = [
     "Urzędem Ochrony Danych Osobowych",
     "Prezesem Urzędu Ochrony Danych Osobowych",
     "Prezesa Urzędu Ochrony Danych Osobowych",
+    # Formuła "W imieniu Rzeczypospolitej Polskiej" w nagłówku każdego wyroku - NER
+    # oznaczał ją jako adres.
+    "Rzeczypospolitej Polskiej",
+    "Rzeczpospolitą Polską",
 ]
 
 _PUBLIC_PATTERNS = [

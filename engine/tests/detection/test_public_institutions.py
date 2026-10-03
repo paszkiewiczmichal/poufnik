@@ -294,6 +294,32 @@ def test_real_ner_does_not_mask_generic_court_mentions(
     assert sensitive == expected
 
 
+@pytest.mark.parametrize(
+    "text, wrong_address",
+    [
+        ("SĄD REJONOWY\nWYROK\nW IMIENIU RZECZYPOSPOLITEJ POLSKIEJ", "IMIENIU RZECZYPOSPOLITEJ"),
+        ("Wyrok w imieniu Rzeczypospolitej Polskiej", "Rzeczypospolitej Polskiej"),
+    ],
+)
+def test_judgment_formula_in_the_name_of_the_republic_is_not_masked(
+    text: str,
+    wrong_address: str,
+) -> None:
+    # Prawdziwy NER oznaczał te fragmenty formuły wyroku jako ADDRESS.
+    class Ner:
+        last_tokens = []
+
+        def analyze(self, _text: str, _language: str) -> list[DetectedEntity]:
+            return [_entity_at(text, wrong_address, EntityCategory.ADDRESS)]
+
+    result = detect_all(text, ner_engine=Ner())
+
+    assert [(entity.category, entity.text.casefold()) for entity in result.entities] == [
+        (EntityCategory.PUBLIC_INSTITUTION, "rzeczypospolitej polskiej")
+    ]
+    assert result.entities[0].status is EntityStatus.REJECTED
+
+
 def test_curated_public_institution_list_has_required_size() -> None:
     assert curated_public_institution_count() >= 150
 
