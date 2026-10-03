@@ -137,6 +137,10 @@ def anonymize_pdf_in_place(
         # those over the scan image - must be painted over.
         page_map = text_map.pages[page_index]
         _replace_scan_with_redacted_raster(pdf, loaded.data, page_map, areas[page_index])
+    for page_map in text_map.pages:
+        if page_map.rotation != page_map.declared_rotation:
+            # The page was read in another quarter turn to get upright text: show it so.
+            pdf.pages[page_map.index].obj.Rotate = page_map.rotation
     pdf.remove_unreferenced_resources()
 
     output = io.BytesIO()

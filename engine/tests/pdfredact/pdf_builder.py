@@ -97,12 +97,12 @@ def glyph_positions(
     exclude_font: str = "Helvetica",
     blanks: bool = False,
 ) -> Counter:
-    """(page, text, x0, top) of every glyph not drawn in ``exclude_font`` (the labels),
+    """(page, text, x0, y0) of every glyph not drawn in ``exclude_font`` (the labels),
     read with Poufnik's own interpreter (pdfminer misplaces the " operator). Space glyphs
     are included only with ``blanks``."""
     pages = load(data).text_map.pages
     return Counter(
-        (page.index, char["text"], round(char["x0"], 2), round(char["top"], 2))
+        (page.index, char["text"], round(char["x0"], 2), round(char["y0"], 2))
         for page in pages
         for char in page.chars
         if (blanks or char["text"].strip()) and not char["fontname"].endswith(exclude_font)

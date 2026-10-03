@@ -83,6 +83,11 @@ def anonymize_scanned_pdf(
             draw_labels(pdf, page_index, _IDENTITY, labels.get(page_index, []))
     finally:
         document.close()
+    for ocr_page in ocr_map.pages:
+        if ocr_page.rotation:
+            # OCR turned the page upright; let viewers show it upright as well.
+            page = pdf.pages[ocr_page.index]
+            page.obj.Rotate = (int(page.obj.get(Name.Rotate, 0)) + ocr_page.rotation) % 360
     pdf.remove_unreferenced_resources()
 
     output = io.BytesIO()
@@ -116,7 +121,8 @@ def _to_user(page: object, ocr_page: OcrPage, x: float, y: float) -> tuple[float
         0,
         ocr_page.width_px,
         ocr_page.height_px,
-        0,
+        # The OCR image may have been turned upright (clockwise quarter turns).
+        (ocr_page.rotation // 90) % 4,
         int(round(x)),
         int(round(y)),
         ctypes.byref(user_x),

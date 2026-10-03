@@ -26,6 +26,11 @@ from anonymizer_engine.parsers.exceptions import CorruptedFile
 from anonymizer_engine.parsers.models import Block
 
 _PARAGRAPH_SEPARATOR_RE = re.compile(r"\n\s*\n+")
+# Orientation: a page whose text is at least half upright is read as declared; otherwise
+# another quarter turn wins if it makes clearly more of the text upright.
+_UPRIGHT_ENOUGH = 0.5
+_MIN_GLYPHS_FOR_ORIENTATION = 8
+_ORIENTATION_MARGIN = 0.2
 
 try:  # pdfplumber's aggregator also records marked content; fall back to pdfminer's.
     from pdfplumber.page import PDFPageAggregatorWithMarkedContent as _BaseAggregator
@@ -62,6 +67,9 @@ class PageMap:
     images: list[dict[str, Any]]
     width: float = 0.0
     height: float = 0.0
+    # Rotation the page was read with (text upright) and the one the file declares.
+    rotation: int = 0
+    declared_rotation: int = 0
 
 
 @dataclass
@@ -97,6 +105,22 @@ class _RecordingInterpreter(PDFPageInterpreter):
         self.stream = stream
         self.text_ops = 0
         self._next_xobject: int | None = None
+
+    def process_page(self, page: Any, rotate: int | None = None) -> None:
+        """pdfminer's process_page, but the page may be read in another rotation."""
+        rotate = int(page.rotate if rotate is None else rotate) % 360
+        (x0, y0, x1, y1) = page.mediabox
+        if rotate == 90:
+            ctm = (0, -1, 1, 0, -y0, x1)
+        elif rotate == 180:
+            ctm = (-1, 0, 0, -1, x1, y1)
+        elif rotate == 270:
+            ctm = (0, 1, -1, 0, y1, -x0)
+        else:
+            ctm = (1, 0, 0, 1, -x0, -y0)
+        self.device.begin_page(page, ctm)
+        self.render_contents(page.resources, page.contents, ctm=ctm)
+        self.device.end_page(page)
 
     def subinterp(self) -> _RecordingInterpreter:
         key: StreamKey = ("xobject", self._next_xobject if self._next_xobject is not None else -1)
@@ -202,12 +226,9 @@ def build_text_map(data: bytes) -> PdfTextMap:
     try:
         with pdfplumber.open(io.BytesIO(data)) as pdf:
             for index, page in enumerate(pdf.pages):
-                device = _RecordingDevice(pdf.rsrcmgr, page.page_number)
-                interpreter = _RecordingInterpreter(
-                    pdf.rsrcmgr, device, ("page", page.page_obj.pageid)
-                )
-                interpreter.process_page(page.page_obj)
-                page._layout = device.get_result()  # pdfplumber reads chars from this layout
+                device, rotation = _read_upright(pdf, page)
+                layout = device.get_result()
+                page._layout = layout  # pdfplumber reads chars from this layout
                 chars = page.chars
                 _check_alignment(chars, device.glyphs, index, float(page.mediabox[0]))
                 pages.append(
@@ -218,8 +239,10 @@ def build_text_map(data: bytes) -> PdfTextMap:
                         chars=chars,
                         glyphs=device.glyphs,
                         images=device.images,
-                        width=float(page.width),
-                        height=float(page.height),
+                        width=float(layout.width),
+                        height=float(layout.height),
+                        rotation=rotation,
+                        declared_rotation=int(page.page_obj.rotate or 0) % 360,
                     )
                 )
                 if index > 0:
@@ -241,6 +264,53 @@ def build_text_map(data: bytes) -> PdfTextMap:
         pages=pages,
         extracted_chars=extracted,
     )
+
+
+def _read_upright(pdf: Any, page: Any) -> tuple[_RecordingDevice, int]:
+    """Interpret a page so its text reads left to right.
+
+    Pages are read in the rotation the file declares. When most of their text then runs
+    vertically or upside down (a portrait page rotated in a viewer and saved, a sideways
+    scan with an OCR layer), the other quarter turns are tried and the best one is used.
+    """
+    declared = int(page.page_obj.rotate or 0) % 360
+    best = _interpret(pdf, page, declared)
+    best_rotation, best_share = declared, _upright_share(best)
+    if best_share >= _UPRIGHT_ENOUGH or len(best.glyphs) < _MIN_GLYPHS_FOR_ORIENTATION:
+        return best, declared
+    for rotation in (0, 90, 180, 270):
+        if rotation == declared:
+            continue
+        candidate = _interpret(pdf, page, rotation)
+        share = _upright_share(candidate)
+        if share > best_share + _ORIENTATION_MARGIN:
+            best, best_rotation, best_share = candidate, rotation, share
+    return best, best_rotation
+
+
+def _interpret(pdf: Any, page: Any, rotation: int) -> _RecordingDevice:
+    device = _RecordingDevice(pdf.rsrcmgr, page.page_number)
+    interpreter = _RecordingInterpreter(pdf.rsrcmgr, device, ("page", page.page_obj.pageid))
+    interpreter.process_page(page.page_obj, rotation)
+    return device
+
+
+def _upright_share(device: _RecordingDevice) -> float:
+    """Share of visible characters drawn horizontally, left to right."""
+    upright = total = 0
+    stack = list(device.get_result())
+    while stack:
+        item = stack.pop()
+        if isinstance(item, LTChar):
+            if not item.get_text().strip():
+                continue
+            a, b = item.matrix[0], item.matrix[1]
+            total += 1
+            if a > 0 and abs(b) <= 0.1 * a:
+                upright += 1
+        elif hasattr(item, "_objs"):
+            stack.extend(item._objs)
+    return upright / total if total else 1.0
 
 
 def _check_alignment(

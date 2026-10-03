@@ -34,7 +34,8 @@ WORK_ROOT = ENGINE_ROOT / "build" / "pyinstaller"
 SPEC_ROOT = ENGINE_ROOT / "build" / "spec"
 SIDECAR_NAME = "anonymizer-engine"
 TESSDATA_FAST_BASE = "https://github.com/tesseract-ocr/tessdata_fast/raw/main"
-REQUIRED_TESSDATA = ("pol.traineddata", "eng.traineddata")
+# osd: page orientation detection, so sideways or upside-down scans are read upright.
+REQUIRED_TESSDATA = ("pol.traineddata", "eng.traineddata", "osd.traineddata")
 PROMPT_LIBRARY_SOURCE = (
     ENGINE_ROOT / "src" / "anonymizer_engine" / "prompts" / "resources" / "prompts-library"
 )
@@ -105,7 +106,9 @@ def parse_args() -> argparse.Namespace:
         help="Tauri binaries/resources staging directory.",
     )
     parser.add_argument("--tesseract-bin", type=Path, help="Path to the Tesseract executable.")
-    parser.add_argument("--tessdata-dir", type=Path, help="Directory with pol/eng traineddata.")
+    parser.add_argument(
+        "--tessdata-dir", type=Path, help="Directory with pol/eng/osd traineddata."
+    )
     parser.add_argument("--no-smoke", action="store_true", help="Skip built sidecar smoke test.")
     parser.add_argument("--clean", action="store_true", help="Clean PyInstaller cache first.")
     return parser.parse_args()

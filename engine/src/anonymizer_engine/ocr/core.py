@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import os
+import re
 import shutil
 import subprocess
 import warnings
@@ -20,6 +21,8 @@ if TYPE_CHECKING:
 
 _TESSERACT_PATH_ENV = "ANONYMIZER_TESSERACT_PATH"
 _DEFAULT_LANGUAGES = "pol+eng"
+# Tesseract's own guidance: orientation confidence below ~2 is not reliable.
+_MIN_ORIENTATION_CONFIDENCE = 2.0
 _PDF_DPI = 300
 # Upper bound on the rasterized bitmap size per PDF page. A hostile PDF can declare a huge
 # MediaBox; at 300 DPI that would allocate multi-gigabyte bitmaps and OOM the process. We
@@ -87,6 +90,11 @@ class OcrResult:
     text: str
     words: list[OcrWord]
     owners: list[int]
+    # Word boxes refer to the image turned clockwise by ``rotation`` degrees (upright text),
+    # which is ``width`` x ``height`` pixels.
+    rotation: int = 0
+    width: int = 0
+    height: int = 0
 
 
 def ocr_image_words(image: bytes | Image, languages: str = _DEFAULT_LANGUAGES) -> OcrResult:
@@ -125,6 +133,10 @@ def ocr_image_words(image: bytes | Image, languages: str = _DEFAULT_LANGUAGES) -
         _ensure_image_within_limits(pil_image)
 
     grayscale = pil_image.convert("L")
+    # A page scanned sideways or upside down is turned upright before recognition.
+    rotation = _detect_rotation(grayscale, tesseract_cmd)
+    if rotation:
+        grayscale = grayscale.rotate(-rotation, expand=True)
     png_buffer = io.BytesIO()
     grayscale.save(png_buffer, format="PNG")
     command = [
@@ -155,7 +167,39 @@ def ocr_image_words(image: bytes | Image, languages: str = _DEFAULT_LANGUAGES) -
         detail = f": {error}" if error else "."
         raise OcrExecutionError(f"Tesseract OCR failed{detail}")
 
-    return _words_to_text(result.stdout.decode("utf-8", errors="replace"))
+    recognized = _words_to_text(result.stdout.decode("utf-8", errors="replace"))
+    recognized.rotation = rotation
+    recognized.width = grayscale.width
+    recognized.height = grayscale.height
+    return recognized
+
+
+def _detect_rotation(image: Image, tesseract_cmd: str) -> int:
+    """Clockwise rotation (0/90/180/270) that makes the page upright, from Tesseract's
+    orientation detection; 0 when it is unsure or the ``osd`` model is not installed."""
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    try:
+        result = subprocess.run(
+            [tesseract_cmd, "stdin", "stdout", "--psm", "0", "-l", "osd"],
+            input=buffer.getvalue(),
+            capture_output=True,
+            check=False,
+            timeout=60,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return 0
+    if result.returncode != 0:
+        return 0  # no osd model, or too little text to tell
+    output = result.stdout.decode("utf-8", errors="replace")
+    rotate = re.search(r"^Rotate:\s*(\d+)", output, re.MULTILINE)
+    confidence = re.search(r"^Orientation confidence:\s*([\d.]+)", output, re.MULTILINE)
+    if rotate is None or confidence is None:
+        return 0
+    degrees = int(rotate.group(1)) % 360
+    if degrees not in (90, 180, 270) or float(confidence.group(1)) < _MIN_ORIENTATION_CONFIDENCE:
+        return 0
+    return degrees
 
 
 def _words_to_text(tsv: str) -> OcrResult:
@@ -206,13 +250,15 @@ def ocr_pdf(pdf_bytes: bytes, languages: str = _DEFAULT_LANGUAGES) -> ParsedDocu
 @dataclass
 class OcrPage:
     """OCR of one PDF page; word boxes are in pixels of a render at ``scale`` (with the
-    page's own rotation applied, as displayed)."""
+    page's own rotation applied, as displayed) turned clockwise by ``rotation`` degrees so
+    that the text is upright; that image is ``width_px`` x ``height_px``."""
 
     index: int
     scale: float
     width_px: int
     height_px: int
     words: list[OcrWord]
+    rotation: int = 0
 
 
 @dataclass
@@ -271,9 +317,10 @@ def ocr_pdf_mapped(
                 OcrPage(
                     index=page_index,
                     scale=render_scale,
-                    width_px=page_image.width,
-                    height_px=page_image.height,
+                    width_px=result.width,
+                    height_px=result.height,
                     words=result.words,
+                    rotation=result.rotation,
                 )
             )
             builder.append_page_text(result, page=page_index + 1)

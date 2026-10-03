@@ -364,3 +364,57 @@ def test_space_glyphs_of_a_value_broken_over_two_lines_are_removed() -> None:
     blanks_removed = sum(n for (_p, text, _x, _t), n in removed.items() if not text.strip())
     assert blanks_removed == 2  # "Joanna Maria" and the space opening the second line
     assert not glyph_positions(out, blanks=True) - glyph_positions(data, blanks=True)
+
+
+@pytest.mark.parametrize("rotate", [90, 180, 270])
+def test_rotated_page_is_read_upright_and_shown_upright(rotate: int) -> None:
+    content = b"BT /F1 12 Tf 150 700 Td (Powod: Anna Nowak, zamieszkala w Gdansku.) Tj ET"
+    data = raw_pdf(content, rotate=rotate)
+    # The text runs horizontally in the file; /Rotate made viewers show it sideways.
+    assert text_of(data) == "Powod: Anna Nowak, zamieszkala w Gdansku."
+
+    out, _ = _export(data, ("Anna Nowak", "[OSOBA_1]"))
+
+    assert text_of(out) == "Powod: [OSOBA_1], zamieszkala w Gdansku."
+    exported = pikepdf.open(io.BytesIO(out))
+    assert int(exported.pages[0].obj.get(Name.Rotate, 0)) == 0
+    _assert_only_values_removed(data, out, "Anna Nowak")
+
+
+def test_page_rotated_on_purpose_keeps_its_rotation() -> None:
+    # Text drawn a quarter turn left in the content and /Rotate 90 turning it back:
+    # upright as declared, so the declared rotation stays.
+    content = (
+        b"q 0 1 -1 0 595 0 cm BT /F1 12 Tf 150 300 Td "
+        b"(Powod: Anna Nowak, zamieszkala w Gdansku.) Tj ET Q"
+    )
+    data = raw_pdf(content, rotate=90)
+
+    out, _ = _export(data, ("Anna Nowak", "[OSOBA_1]"))
+
+    assert text_of(out) == "Powod: [OSOBA_1], zamieszkala w Gdansku."
+    exported = pikepdf.open(io.BytesIO(out))
+    assert int(exported.pages[0].obj.Rotate) == 90
+
+
+@pytest.mark.ocr
+@_REQUIRES_TESSERACT
+@pytest.mark.parametrize("turn", [90, 180])
+def test_sideways_or_upside_down_scan_is_recognized_and_shown_upright(turn: int) -> None:
+    from anonymizer_engine.ocr import ocr_pdf
+    from anonymizer_engine.parsers import parse_document
+    from anonymizer_engine.pdfredact.scan import anonymize_scanned_pdf
+
+    buffer = io.BytesIO()
+    _scan_image().rotate(turn, expand=True).save(buffer, format="PDF", resolution=200)
+    data = buffer.getvalue()
+    parsed = parse_document(data, filename="skan.pdf")
+    assert "90010112345" in parsed.text  # readable only once the page is turned upright
+    entries, anonymized = spans_for(parsed.text, ("90010112345", "[PESEL_1]"))
+
+    out = anonymize_scanned_pdf(data, entries, anonymized)
+
+    exported = pikepdf.open(io.BytesIO(out))
+    assert int(exported.pages[0].obj.Rotate) == turn  # shown upright in viewers
+    recognized = ocr_pdf(out).text
+    assert "90010112345" not in recognized and "Pozwany" in recognized
