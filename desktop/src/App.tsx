@@ -102,6 +102,8 @@ declare global {
       openScreen: (screen: AppScreen) => void;
       setWorkspaceView: (view: WorkspaceView) => void;
       storeApi: typeof useAppStore;
+      /** Builds the export like the buttons do and returns it base64-encoded (no save dialog). */
+      exportFile: (format: ExportFormat) => Promise<string | null>;
       snapshot: () => {
         anonymizedText: string | null;
         batchDone: number;
@@ -849,59 +851,57 @@ function App() {
     );
   }, [anonymization.replacementMap, uiState.selectedFileName]);
 
-  const exportDocument = useCallback(
-    async (format: ExportFormat) => {
+  // Builds the exported file; returns null when there is nothing to export (the error is
+  // already shown). Shared by the export buttons and the E2E hook.
+  const buildExportFile = useCallback(
+    async (format: ExportFormat): Promise<Blob | null> => {
       if (!anonymization.anonymizedText) {
-        return;
+        return null;
       }
       const endpoint = await resolveEndpoint();
       if (!endpoint) {
         setAnonymizationError(texts.errors.noEngine);
-        return;
+        return null;
       }
       setExportNotice(null);
-      try {
-        const client = createAnonymizerApiClient(endpoint);
-        const sourceIsDocx = document?.format === "docx";
-        const sourceFile = uiState.selectedFile;
-        const renderer = format === "pdf" && sourceIsDocx && sourceFile ? await getPdfRenderer() : null;
-        let blob: Blob;
-        if (sourceIsDocx && sourceFile && (format === "docx" || renderer)) {
-          // Same file, same offsets: the engine edits the original XML and keeps the layout.
-          blob = await client.exportDocxInPlace({
-            file: sourceFile,
-            offsetMap: anonymization.offsetMap,
-            anonymizedText: anonymization.anonymizedText,
-          });
-          if (format === "pdf") {
-            // The installed office suite lays out the anonymized DOCX exactly as it would
-            // the original, so the PDF looks like the source document.
-            blob = await renderDocxToPdf(blob).catch((error: unknown) => {
-              // The desktop command rejects with a Polish message naming the program.
-              throw new Error(typeof error === "string" ? error : texts.errors.pdfRenderFailed);
-            });
-            if (renderer === "libreoffice") {
-              setExportNotice(texts.generation.exportPdfLibreOffice);
-            }
-          }
-        } else {
-          blob = await client.exportDocument({
-            anonymizedText: anonymization.anonymizedText,
-            format,
-            blocks: blocksForExport(anonymization.anonymizedText),
-          });
-          if (sourceIsDocx) {
-            setExportNotice(
-              format === "docx" || !sourceFile
-                ? texts.generation.exportSimplifiedLayout
-                : texts.generation.exportPdfWithoutWord,
-            );
-          }
+      const client = createAnonymizerApiClient(endpoint);
+      const sourceIsDocx = document?.format === "docx";
+      const sourceFile = uiState.selectedFile;
+      const renderer = format === "pdf" && sourceIsDocx && sourceFile ? await getPdfRenderer() : null;
+      if (sourceIsDocx && sourceFile && (format === "docx" || renderer)) {
+        // Same file, same offsets: the engine edits the original XML and keeps the layout.
+        const docx = await client.exportDocxInPlace({
+          file: sourceFile,
+          offsetMap: anonymization.offsetMap,
+          anonymizedText: anonymization.anonymizedText,
+        });
+        if (format === "docx") {
+          return docx;
         }
-        await saveBinaryFile(poufnikFileName(uiState.selectedFileName, format), blob, format);
-      } catch (error) {
-        setAnonymizationError(toUserMessage(error));
+        // The installed office suite lays out the anonymized DOCX exactly as it would the
+        // original, so the PDF looks like the source document.
+        const pdf = await renderDocxToPdf(docx).catch((error: unknown) => {
+          // The desktop command rejects with a Polish message naming the program.
+          throw new Error(typeof error === "string" ? error : texts.errors.pdfRenderFailed);
+        });
+        if (renderer === "libreoffice") {
+          setExportNotice(texts.generation.exportPdfLibreOffice);
+        }
+        return pdf;
       }
+      const blob = await client.exportDocument({
+        anonymizedText: anonymization.anonymizedText,
+        format,
+        blocks: blocksForExport(anonymization.anonymizedText),
+      });
+      if (sourceIsDocx) {
+        setExportNotice(
+          format === "docx" || !sourceFile
+            ? texts.generation.exportSimplifiedLayout
+            : texts.generation.exportPdfWithoutWord,
+        );
+      }
+      return blob;
     },
     [
       anonymization.anonymizedText,
@@ -910,8 +910,21 @@ function App() {
       resolveEndpoint,
       setAnonymizationError,
       uiState.selectedFile,
-      uiState.selectedFileName,
     ],
+  );
+
+  const exportDocument = useCallback(
+    async (format: ExportFormat) => {
+      try {
+        const blob = await buildExportFile(format);
+        if (blob) {
+          await saveBinaryFile(poufnikFileName(uiState.selectedFileName, format), blob, format);
+        }
+      } catch (error) {
+        setAnonymizationError(toUserMessage(error));
+      }
+    },
+    [buildExportFile, setAnonymizationError, uiState.selectedFileName],
   );
 
   const loadPrompts = useCallback(async () => {
@@ -1129,6 +1142,18 @@ function App() {
       openScreen: setScreen,
       setWorkspaceView,
       storeApi: useAppStore,
+      exportFile: async (format: ExportFormat) => {
+        const blob = await buildExportFile(format);
+        if (!blob) {
+          return null;
+        }
+        const bytes = new Uint8Array(await blob.arrayBuffer());
+        let binary = "";
+        bytes.forEach((byte) => {
+          binary += String.fromCharCode(byte);
+        });
+        return btoa(binary);
+      },
       snapshot: () => {
         const state = useAppStore.getState();
         return {
@@ -1151,7 +1176,14 @@ function App() {
     return () => {
       delete window.__ANONYMIZER_E2E__;
     };
-  }, [batchItems, processFile, productTier, restoreDocumentSession, setHistoryEnabled]);
+  }, [
+    batchItems,
+    buildExportFile,
+    processFile,
+    productTier,
+    restoreDocumentSession,
+    setHistoryEnabled,
+  ]);
 
   if (authState.status === "loading") {
     return (

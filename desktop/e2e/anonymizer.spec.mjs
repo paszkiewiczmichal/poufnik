@@ -163,6 +163,26 @@ describe("Anonymizer desktop E2E", () => {
     expect(restored).to.include("44051401359");
   });
 
+  it("exports the DOCX in place, keeping every part of the original package", async () => {
+    await e2e("enableEarlyBird");
+    await importDocument();
+    await clickButton("Przejdź do wyniku");
+    await waitForResultText();
+
+    const exported = Buffer.from(await e2e("exportFile", "docx"), "base64");
+    const original = fs.readFileSync(fixturePath);
+
+    // The in-place export keeps the original package (styles, numbering, sections) minus
+    // the parts sanitizing always removes; the old rebuild produced a fresh template.
+    const removedBySanitizing = (name) =>
+      /^customXml\/|comments|people\.xml|^docProps\/(custom\.xml|thumbnail)/.test(name);
+    expect(zipMemberNames(exported)).to.deep.equal(
+      zipMemberNames(original).filter((name) => !removedBySanitizing(name)),
+    );
+    const snapshot = await e2e("snapshot");
+    expect(snapshot.processingError).to.equal(null);
+  });
+
   it("keeps the original text when an entity is unchecked before anonymization", async () => {
     await importDocument();
     await e2e("rejectFirstEntityContaining", "Jan");
@@ -196,6 +216,22 @@ describe("Anonymizer desktop E2E", () => {
     expect(snapshot.entityCount).to.be.greaterThan(0);
   });
 });
+
+/** File names from a ZIP central directory (enough to compare DOCX packages). */
+function zipMemberNames(buffer) {
+  const names = [];
+  let offset = buffer.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+  const entries = buffer.readUInt16LE(offset + 10);
+  offset = buffer.readUInt32LE(offset + 16);
+  for (let index = 0; index < entries; index += 1) {
+    const nameLength = buffer.readUInt16LE(offset + 28);
+    const extraLength = buffer.readUInt16LE(offset + 30);
+    const commentLength = buffer.readUInt16LE(offset + 32);
+    names.push(buffer.toString("utf8", offset + 46, offset + 46 + nameLength));
+    offset += 46 + nameLength + extraLength + commentLength;
+  }
+  return names.sort();
+}
 
 async function importDocument() {
   await e2e("importDocument", fixturePath);
