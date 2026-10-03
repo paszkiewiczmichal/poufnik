@@ -9,6 +9,12 @@ export function toUserMessage(error: unknown): string {
     if (error.detail.includes("Tesseract executable was not found")) {
       return texts.errors.tesseractNotFound;
     }
+    if (error.detail.includes("does not match the anonymization result")) {
+      return texts.errors.exportSourceChanged;
+    }
+    if (error.detail.startsWith("Verification failed")) {
+      return texts.errors.exportLeakBlocked;
+    }
     return error.detail || texts.errors.generic;
   }
 

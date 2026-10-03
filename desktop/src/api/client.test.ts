@@ -145,6 +145,34 @@ describe("createAnonymizerApiClient", () => {
       }),
     );
   });
+  it("sends the original DOCX, offsets and text as file parts for in-place export", async () => {
+    const fetcher = vi.fn(async () => new Response(new Blob(["docx"])));
+    const client = createAnonymizerApiClient(endpoint, fetcher as unknown as typeof fetch);
+    const file = new File(["PK"], "umowa.docx");
+    const offsetMap = [
+      {
+        original_start: 0,
+        original_end: 12,
+        anonymized_start: 0,
+        anonymized_end: 9,
+        token: "[OSOBA_1]",
+        category: "PERSON",
+      },
+    ];
+
+    await expect(
+      client.exportDocxInPlace({ file, offsetMap, anonymizedText: "[OSOBA_1] zażółć" }),
+    ).resolves.toBeInstanceOf(Blob);
+
+    const [url, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("http://127.0.0.1:8710/v1/export/docx");
+    expect(init.method).toBe("POST");
+    const form = init.body as FormData;
+    expect((form.get("file") as File).name).toBe("umowa.docx");
+    expect(JSON.parse(await (form.get("offset_map") as Blob).text())).toEqual(offsetMap);
+    expect(await (form.get("anonymized_text") as Blob).text()).toBe("[OSOBA_1] zażółć");
+  });
+
   it("posts anonymizeApiEntities with raw API entities untouched", async () => {
     const fetcher = vi.fn(async () =>
       jsonResponse({

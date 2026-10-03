@@ -106,6 +106,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/export/docx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export Docx In Place
+         * @description Anonymize the original DOCX in place, keeping its layout and formatting.
+         *
+         *     ``offset_map`` (JSON) and ``anonymized_text`` (UTF-8) must come from anonymizing
+         *     exactly this file; the engine re-reads the file and refuses to export when they do
+         *     not match. Both are sent as file parts because plain multipart fields are capped
+         *     at 1 MB, less than a long contract's text.
+         */
+        post: operations["export_docx_in_place_v1_export_docx_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/documents/process": {
         parameters: {
             query?: never;
@@ -233,6 +258,15 @@ export interface components {
             kind: "paragraph" | "heading" | "table_cell" | "page_break";
             /** Page */
             page?: number | null;
+        };
+        /** Body_export_docx_in_place_v1_export_docx_post */
+        Body_export_docx_in_place_v1_export_docx_post: {
+            /** File */
+            file: string;
+            /** Offset Map */
+            offset_map: string;
+            /** Anonymized Text */
+            anonymized_text: string;
         };
         /** Body_process_document_v1_documents_process_post */
         Body_process_document_v1_documents_process_post: {
@@ -396,6 +430,8 @@ export interface components {
             page_count: number;
             /** Text */
             text: string;
+            /** Notices */
+            notices?: string[];
         };
         /** PromptTemplateResponse */
         PromptTemplateResponse: {
@@ -646,6 +682,67 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ExportRequest"];
+            };
+        };
+        responses: {
+            /** @description Anonymized document export. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": string;
+                    "application/pdf": string;
+                };
+            };
+            /** @description Bad request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Request payload exceeds the configured limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Validation error. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+        };
+    };
+    export_docx_in_place_v1_export_docx_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_export_docx_in_place_v1_export_docx_post"];
             };
         };
         responses: {

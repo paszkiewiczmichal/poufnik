@@ -21,6 +21,8 @@ interface ResultViewProps {
   onCopyDocument: () => void;
   onSaveMap: () => void;
   onExport: (format: ExportFormat) => void;
+  exportNotice?: string | null;
+  documentNotices?: string[];
   onLoadPrompts: () => void;
   onPromptSearch: (search: string) => void;
   onSelectPrompt: (id: string) => void;
@@ -38,6 +40,8 @@ export function ResultView({
   onCopyDocument,
   onSaveMap,
   onExport,
+  exportNotice = null,
+  documentNotices = [],
   onLoadPrompts,
   onPromptSearch,
   onSelectPrompt,
@@ -54,6 +58,9 @@ export function ResultView({
   const hasResult = Boolean(anonymizedText && replacementMap);
   const replacementCount = replacementMap?.entries.length ?? 0;
   const occurrenceCount = anonymization.offsetMap.length || replacementCount;
+  const visibleNotices = documentNotices
+    .map((code) => texts.generation.notices[code])
+    .filter((notice): notice is string => Boolean(notice));
 
   const tabs: { id: ResultTab; label: string }[] = [
     { id: "text", label: texts.generation.tabText },
@@ -136,6 +143,21 @@ export function ResultView({
                 </button>
               </div>
             </div>
+            {exportNotice ? (
+              <p className="status-note" role="status">
+                {exportNotice}
+              </p>
+            ) : null}
+            {visibleNotices.length > 0 ? (
+              <div className="status-note document-notices">
+                <span className="caps-label">{texts.generation.noticesTitle}</span>
+                <ul>
+                  {visibleNotices.map((notice) => (
+                    <li key={notice}>{notice}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             <pre className="result-text">{anonymizedText}</pre>
           </div>
 

@@ -46,6 +46,8 @@ interface DocumentWorkspaceProps {
   onCopyDocument: () => void;
   onSaveMap: () => void;
   onExport: (format: ExportFormat) => void;
+  exportNotice?: string | null;
+  documentNotices?: string[];
   onLoadPrompts: () => void;
   onPromptSearch: (search: string) => void;
   onSelectPrompt: (id: string) => void;
@@ -78,6 +80,8 @@ export function DocumentWorkspace({
   onCopyDocument,
   onSaveMap,
   onExport,
+  exportNotice,
+  documentNotices,
   onLoadPrompts,
   onPromptSearch,
   onSelectPrompt,
@@ -212,6 +216,8 @@ export function DocumentWorkspace({
           onCopyDocument={onCopyDocument}
           onSaveMap={onSaveMap}
           onExport={onExport}
+          exportNotice={exportNotice}
+          documentNotices={documentNotices}
           onLoadPrompts={onLoadPrompts}
           onPromptSearch={onPromptSearch}
           onSelectPrompt={onSelectPrompt}

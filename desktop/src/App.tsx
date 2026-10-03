@@ -34,6 +34,7 @@ import {
 import { enabledCustomRulePayloads } from "./domain/customRules";
 import { poufnikFileName } from "./domain/batchExport";
 import { blocksForExport } from "./domain/documentSegments";
+import { getPdfRenderer, renderDocxToPdf } from "./tauri/pdf";
 import { texts } from "./i18n";
 import { useAppStore } from "./store/useAppStore";
 import { getAppVersion } from "./tauri/app";
@@ -158,6 +159,7 @@ function App() {
     resetDocument,
   } = useAppStore();
   const [appVersion, setAppVersion] = useState("");
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
   const [screen, setScreen] = useState<AppScreen>("flow");
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("document");
   const [updateConsent, setUpdateConsentState] = useState<UpdateConsent>(null);
@@ -857,19 +859,59 @@ function App() {
         setAnonymizationError(texts.errors.noEngine);
         return;
       }
+      setExportNotice(null);
       try {
         const client = createAnonymizerApiClient(endpoint);
-        const blob = await client.exportDocument({
-          anonymizedText: anonymization.anonymizedText,
-          format,
-          blocks: blocksForExport(anonymization.anonymizedText),
-        });
+        const sourceIsDocx = document?.format === "docx";
+        const sourceFile = uiState.selectedFile;
+        const renderer = format === "pdf" && sourceIsDocx && sourceFile ? await getPdfRenderer() : null;
+        let blob: Blob;
+        if (sourceIsDocx && sourceFile && (format === "docx" || renderer)) {
+          // Same file, same offsets: the engine edits the original XML and keeps the layout.
+          blob = await client.exportDocxInPlace({
+            file: sourceFile,
+            offsetMap: anonymization.offsetMap,
+            anonymizedText: anonymization.anonymizedText,
+          });
+          if (format === "pdf") {
+            // The installed office suite lays out the anonymized DOCX exactly as it would
+            // the original, so the PDF looks like the source document.
+            blob = await renderDocxToPdf(blob).catch((error: unknown) => {
+              // The desktop command rejects with a Polish message naming the program.
+              throw new Error(typeof error === "string" ? error : texts.errors.pdfRenderFailed);
+            });
+            if (renderer === "libreoffice") {
+              setExportNotice(texts.generation.exportPdfLibreOffice);
+            }
+          }
+        } else {
+          blob = await client.exportDocument({
+            anonymizedText: anonymization.anonymizedText,
+            format,
+            blocks: blocksForExport(anonymization.anonymizedText),
+          });
+          if (sourceIsDocx) {
+            setExportNotice(
+              format === "docx" || !sourceFile
+                ? texts.generation.exportSimplifiedLayout
+                : texts.generation.exportPdfWithoutWord,
+            );
+          }
+        }
         await saveBinaryFile(poufnikFileName(uiState.selectedFileName, format), blob, format);
       } catch (error) {
         setAnonymizationError(toUserMessage(error));
       }
     },
-    [anonymization.anonymizedText, resolveEndpoint, setAnonymizationError, uiState.selectedFileName],
+    [
+      anonymization.anonymizedText,
+      anonymization.offsetMap,
+      document?.format,
+      resolveEndpoint,
+      setAnonymizationError,
+      uiState.selectedFile,
+      uiState.selectedFileName,
+    ],
   );
 
   const loadPrompts = useCallback(async () => {
@@ -1326,6 +1368,8 @@ function App() {
                   onCopyDocument={copyAnonymizedDocument}
                   onSaveMap={saveReplacementMap}
                   onExport={exportDocument}
+                  exportNotice={exportNotice}
+                  documentNotices={document?.notices ?? []}
                   onLoadPrompts={loadPrompts}
                   onPromptSearch={setPromptSearch}
                   onSelectPrompt={setSelectedPrompt}

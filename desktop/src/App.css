@@ -845,6 +845,16 @@ button:disabled {
   background: var(--success-bg);
 }
 
+.document-notices ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: var(--fs-sm);
+}
+
+.document-notices li + li {
+  margin-top: 2px;
+}
+
 .error-note {
   border-color: var(--danger-line);
   color: var(--danger);

@@ -16,6 +16,7 @@ use tauri_plugin_shell::{
 
 mod browser_login;
 mod history;
+mod pdf_render;
 #[cfg(target_os = "windows")]
 mod win_job;
 
@@ -465,6 +466,8 @@ pub fn run() {
             history::get_document_history_entry,
             history::delete_document_history_entry,
             history::clear_document_history,
+            pdf_render::pdf_renderer,
+            pdf_render::render_docx_to_pdf,
         ])
         .setup({
             let engine_state = engine_state.clone();

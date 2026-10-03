@@ -296,6 +296,11 @@ export const texts = {
     droppedMany: "Wybierz jeden dokument naraz.",
     noDocument: "Nie ma aktywnego dokumentu.",
     noReplacementMap: "Brak mapy zastąpień. Najpierw wykonaj anonimizację albo wczytaj mapę JSON.",
+    pdfRenderFailed: "Nie udało się utworzyć PDF w programie biurowym. Wyeksportuj DOCX i zapisz go jako PDF w Wordzie.",
+    exportSourceChanged:
+      "Plik źródłowy zmienił się od chwili importu. Zaimportuj dokument ponownie, aby go wyeksportować.",
+    exportLeakBlocked:
+      "Eksport DOCX zatrzymany: w pliku zostały dane, których Poufnik nie może bezpiecznie zastąpić (np. w wykresie). Usuń je w Wordzie i zaimportuj dokument ponownie.",
   },
   document: {
     title: "Dokument",
@@ -393,6 +398,27 @@ export const texts = {
     saveMap: "Zapisz mapę zastąpień",
     exportDocx: "Eksportuj DOCX",
     exportPdf: "Eksportuj PDF",
+    exportSimplifiedLayout:
+      "Oryginalny plik nie jest dostępny (dokument otwarty z historii), więc DOCX zapisano w uproszczonym układzie. Aby zachować wygląd oryginału, zaimportuj plik ponownie.",
+    exportPdfLibreOffice:
+      "PDF utworzono w LibreOffice - jego wygląd może minimalnie różnić się od tego w Microsoft Word.",
+    exportPdfWithoutWord:
+      "Na tym komputerze nie ma Microsoft Word, więc PDF ma uproszczony układ. Aby uzyskać PDF wyglądający jak oryginał, wyeksportuj DOCX i w Wordzie wybierz Zapisz jako PDF.",
+    noticesTitle: "Co Poufnik zmienił w pliku",
+    notices: {
+      tracked_changes_accepted:
+        "Śledzone zmiany zostały zaakceptowane - wynik zawiera ostateczną wersję tekstu.",
+      comments_removed: "Komentarze zostały usunięte.",
+      metadata_cleared: "Usunięto autora, firmę i inne metadane pliku.",
+      content_controls_unbound: "Pola formularza powiązane z ukrytymi danymi zostały odłączone.",
+      custom_xml_removed: "Usunięto ukryte dane dołączone do pliku (np. właściwości SharePoint).",
+      descriptions_cleared: "Usunięto opisy obrazów i podpowiedzi linków.",
+      mail_merge_removed: "Usunięto powiązanie z korespondencją seryjną.",
+      embedded_document_removed:
+        "Usunięto osadzony dokument, którego treści Poufnik nie odczytuje.",
+      images_or_objects_present:
+        "Dokument zawiera obrazy lub osadzone obiekty. Poufnik nie zmienia ich zawartości - sprawdź je przed wysłaniem.",
+    } as Record<string, string>,
     mapWarning: "Zapisany plik mapy pozwala przywrócić dane. Traktuj go jak dane wrażliwe.",
     mapWarningTitle: "Zapis mapy zastąpień",
     copied: "Skopiowano do schowka.",

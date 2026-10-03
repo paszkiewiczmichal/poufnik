@@ -55,6 +55,27 @@ describe("toUserMessage", () => {
     expect(toUserMessage(new Error("network down"))).toBe("network down");
   });
 
+  it("explains in Polish why an in-place DOCX export was refused", () => {
+    expect(
+      toUserMessage(
+        apiError({
+          status: 400,
+          detail:
+            "The source document does not match the anonymization result (the file was changed after it was imported).",
+        }),
+      ),
+    ).toBe(texts.errors.exportSourceChanged);
+    expect(
+      toUserMessage(
+        apiError({
+          status: 400,
+          detail:
+            "Verification failed: anonymized values remain outside the document text (word/charts/chart1.xml).",
+        }),
+      ),
+    ).toBe(texts.errors.exportLeakBlocked);
+  });
+
   it("falls back to the generic message for a non-Error value", () => {
     expect(toUserMessage("some string")).toBe(texts.errors.generic);
     expect(toUserMessage(null)).toBe(texts.errors.generic);

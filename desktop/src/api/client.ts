@@ -10,6 +10,7 @@ import type {
   EngineHealthStatus,
   ExportBlock,
   ExportFormat,
+  OffsetMapEntry,
   PromptTemplate,
   ReplacementMap,
 } from "../types";
@@ -67,6 +68,12 @@ export interface AnonymizerApiClient {
     anonymizedText: string;
     format: ExportFormat;
     blocks?: ExportBlock[];
+  }): Promise<Blob>;
+  /** Anonymizes the original DOCX in place, so the result keeps its full layout. */
+  exportDocxInPlace(options: {
+    file: File;
+    offsetMap: OffsetMapEntry[];
+    anonymizedText: string;
   }): Promise<Blob>;
 }
 
@@ -169,6 +176,22 @@ export function createAnonymizerApiClient(
           blocks,
         }),
       }),
+    exportDocxInPlace: ({ file, offsetMap, anonymizedText }) => {
+      // Text and offset map go as file parts: plain multipart fields are capped at 1 MB.
+      const form = new FormData();
+      form.append("file", file, file.name);
+      form.append(
+        "offset_map",
+        new Blob([JSON.stringify(offsetMap)], { type: "application/json" }),
+        "offset_map.json",
+      );
+      form.append(
+        "anonymized_text",
+        new Blob([anonymizedText], { type: "text/plain;charset=utf-8" }),
+        "anonymized_text.txt",
+      );
+      return requestBlob("/v1/export/docx", { method: "POST", body: form });
+    },
   };
 }
 

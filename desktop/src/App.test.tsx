@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => {
     anonymizeApiEntities: vi.fn(),
     deanonymize: vi.fn(),
     exportDocument: vi.fn(),
+    exportDocxInPlace: vi.fn(),
     health,
     listPrompts: vi.fn(),
     processDocument: vi.fn(),
@@ -57,6 +58,8 @@ const mocks = vi.hoisted(() => {
     readStoredAuthToken: vi.fn(),
     refreshAccountsToken: vi.fn(),
     saveBinaryFile: vi.fn(),
+    getPdfRenderer: vi.fn(),
+    renderDocxToPdf: vi.fn(),
     exportBatchResultsToDirectory: vi.fn(),
     saveDocumentHistoryEntryIfEnabled: vi.fn(),
     saveCustomRegexRules: vi.fn(),
@@ -74,7 +77,8 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("./api/client", () => ({
+vi.mock("./api/client", async (importOriginal) => ({
+  ApiError: (await importOriginal<typeof import("./api/client")>()).ApiError,
   createAnonymizerApiClient: vi.fn(() => mocks.apiClient),
 }));
 
@@ -161,6 +165,11 @@ vi.mock("./tauri/external", () => ({
 
 vi.mock("./tauri/app", () => ({
   getAppVersion: vi.fn(async () => "9.9.9"),
+}));
+
+vi.mock("./tauri/pdf", () => ({
+  getPdfRenderer: mocks.getPdfRenderer,
+  renderDocxToPdf: mocks.renderDocxToPdf,
 }));
 
 const endpoint: EngineEndpoint = {
@@ -411,6 +420,126 @@ describe("App engine health", () => {
 
     await waitFor(() => expect(mocks.saveBinaryFile).toHaveBeenCalled());
     expect(mocks.saveBinaryFile.mock.calls[0][0]).toBe("umowa najmu_poufnik.docx");
+  });
+
+  function seedDocxResult(selectedFile: File | null) {
+    const offsetMap = [
+      {
+        original_start: 8,
+        original_end: 23,
+        anonymized_start: 8,
+        anonymized_end: 17,
+        token: "[OSOBA_1]",
+        category: "PERSON",
+      },
+    ];
+    useAppStore.setState((state) => ({
+      uiState: { ...state.uiState, selectedFileName: "umowa.docx", selectedFile },
+      document: {
+        filename: "umowa.docx",
+        format: "docx",
+        source: "parsed",
+        page_count: 1,
+        text: "Umowa z Janem Kowalskim",
+        notices: ["tracked_changes_accepted"],
+      },
+      anonymization: {
+        ...state.anonymization,
+        anonymizedText: "Umowa z [OSOBA_1]",
+        replacementMap: { entries: [], document_fingerprint: "x" } as never,
+        offsetMap,
+      },
+    }));
+    mocks.apiClient.listPrompts.mockResolvedValue([]);
+    return offsetMap;
+  }
+
+  it("exports a DOCX source in place from the original file and lists what was changed", async () => {
+    const original = new File(["PK"], "umowa.docx");
+    const offsetMap = seedDocxResult(original);
+    mocks.apiClient.exportDocxInPlace.mockResolvedValue(new Blob(["docx"]));
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: /Wynik/ }));
+    expect(
+      await screen.findByText(texts.generation.notices.tracked_changes_accepted),
+    ).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: texts.generation.exportDocx }));
+
+    await waitFor(() => expect(mocks.saveBinaryFile).toHaveBeenCalled());
+    expect(mocks.apiClient.exportDocxInPlace).toHaveBeenCalledWith({
+      file: original,
+      offsetMap,
+      anonymizedText: "Umowa z [OSOBA_1]",
+    });
+    expect(mocks.apiClient.exportDocument).not.toHaveBeenCalled();
+    expect(screen.queryByText(texts.generation.exportSimplifiedLayout)).not.toBeInTheDocument();
+  });
+
+  it("falls back to the simplified DOCX and says so when the original file is gone", async () => {
+    seedDocxResult(null);
+    mocks.apiClient.exportDocument.mockResolvedValue(new Blob(["docx"]));
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: /Wynik/ }));
+    fireEvent.click(await screen.findByRole("button", { name: texts.generation.exportDocx }));
+
+    await waitFor(() => expect(mocks.saveBinaryFile).toHaveBeenCalled());
+    expect(mocks.apiClient.exportDocxInPlace).not.toHaveBeenCalled();
+    expect(
+      await screen.findByText(texts.generation.exportSimplifiedLayout),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the PDF of a DOCX source with Word from the in-place anonymized DOCX", async () => {
+    const original = new File(["PK"], "umowa.docx");
+    seedDocxResult(original);
+    const anonymizedDocx = new Blob(["docx"]);
+    const pdf = new Blob(["%PDF"], { type: "application/pdf" });
+    mocks.getPdfRenderer.mockResolvedValue("word");
+    mocks.apiClient.exportDocxInPlace.mockResolvedValue(anonymizedDocx);
+    mocks.renderDocxToPdf.mockResolvedValue(pdf);
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: /Wynik/ }));
+    fireEvent.click(await screen.findByRole("button", { name: texts.generation.exportPdf }));
+
+    await waitFor(() => expect(mocks.saveBinaryFile).toHaveBeenCalled());
+    expect(mocks.renderDocxToPdf).toHaveBeenCalledWith(anonymizedDocx);
+    expect(mocks.saveBinaryFile.mock.calls[0][1]).toBe(pdf);
+    expect(mocks.apiClient.exportDocument).not.toHaveBeenCalled();
+  });
+
+  it("shows the office program's own message when rendering the PDF fails", async () => {
+    seedDocxResult(new File(["PK"], "umowa.docx"));
+    mocks.getPdfRenderer.mockResolvedValue("word");
+    mocks.apiClient.exportDocxInPlace.mockResolvedValue(new Blob(["docx"]));
+    mocks.renderDocxToPdf.mockRejectedValue("Microsoft Word nie odpowiada - przerwano tworzenie PDF.");
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: /Wynik/ }));
+    fireEvent.click(await screen.findByRole("button", { name: texts.generation.exportPdf }));
+
+    expect(
+      await screen.findByText("Microsoft Word nie odpowiada - przerwano tworzenie PDF."),
+    ).toBeInTheDocument();
+    expect(mocks.saveBinaryFile).not.toHaveBeenCalled();
+  });
+
+  it("explains the simplified PDF when no office program can render the DOCX", async () => {
+    seedDocxResult(new File(["PK"], "umowa.docx"));
+    mocks.getPdfRenderer.mockResolvedValue(null);
+    mocks.apiClient.exportDocument.mockResolvedValue(new Blob(["%PDF"]));
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: /Wynik/ }));
+    fireEvent.click(await screen.findByRole("button", { name: texts.generation.exportPdf }));
+
+    expect(await screen.findByText(texts.generation.exportPdfWithoutWord)).toBeInTheDocument();
+    expect(mocks.renderDocxToPdf).not.toHaveBeenCalled();
+    expect(mocks.apiClient.exportDocument).toHaveBeenCalledWith(
+      expect.objectContaining({ format: "pdf" }),
+    );
   });
 
   it("shows the real app version fetched from Tauri, not a hardcoded one", async () => {
