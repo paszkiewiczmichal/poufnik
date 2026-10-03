@@ -47,6 +47,8 @@ MAX_DOCX_UNCOMPRESSED_BYTES = 200 * 1024 * 1024
 MAX_DOCX_MEMBER_BYTES = 100 * 1024 * 1024
 MAX_DOCX_COMPRESSION_RATIO = 200
 MAX_PDF_PAGES = 1000
+# Notice: the PDF was imported, but its glyphs could not be mapped for an in-place export.
+PDF_LAYOUT_UNAVAILABLE = "pdf_layout_export_unavailable"
 
 
 class _TextBuilder:
@@ -145,8 +147,37 @@ def parse_docx(source: Source) -> ParsedDocument:
 
 
 def parse_pdf(source: Source) -> ParsedDocument:
-    data = _read_bytes(source)
+    """Parse PDF text together with a glyph map (see :mod:`anonymizer_engine.pdfredact`).
 
+    The document is sanitized in memory first (form fields flattened, annotations and
+    metadata removed), so the text is exactly what an in-place export redacts. A PDF whose
+    glyphs cannot be mapped reliably is still imported, without in-place export.
+    """
+    data = _read_bytes(source)
+    from anonymizer_engine.pdfredact import PdfExportError, load
+
+    try:
+        loaded = load(data, max_pages=MAX_PDF_PAGES)
+    except (ValueError, PdfExportError, CorruptedFile):
+        # Still import what the plain reader can read (it raises its own errors otherwise).
+        parsed = _parse_pdf_plain(data)
+        parsed.notices.append(PDF_LAYOUT_UNAVAILABLE)
+        return parsed
+    text_map = loaded.text_map
+    page_count = len(text_map.pages)
+    threshold = _MIN_TEXT_LAYER_CHARS_PER_PAGE * page_count
+    has_text_layer = page_count == 0 or text_map.extracted_chars >= threshold
+    return ParsedDocument(
+        text=text_map.text,
+        blocks=text_map.blocks,
+        format="pdf",
+        has_text_layer=has_text_layer,
+        page_count=page_count,
+        notices=loaded.notices,
+    )
+
+
+def _parse_pdf_plain(data: bytes) -> ParsedDocument:
     try:
         import pdfplumber
     except ImportError as exc:  # pragma: no cover - dependency is declared in pyproject
@@ -188,15 +219,20 @@ def parse_document(
     if document_format == "docx":
         return parse_docx(data)
     if document_format == "pdf":
-        if force_ocr:
-            from anonymizer_engine.ocr import ocr_pdf
+        if not force_ocr:
+            parsed = parse_pdf(data)
+            if parsed.has_text_layer:
+                return parsed
+        # OCR reads the sanitized PDF - the same bytes an in-place export recognizes again.
+        from anonymizer_engine.ocr import ocr_pdf
+        from anonymizer_engine.pdfredact.scan import sanitized_pdf
 
-            return ocr_pdf(data)
-        parsed = parse_pdf(data)
-        if not parsed.has_text_layer:
-            from anonymizer_engine.ocr import ocr_pdf
-
-            return ocr_pdf(data)
+        try:
+            sanitized, notices = sanitized_pdf(data)
+        except Exception:
+            sanitized, notices = data, []
+        parsed = ocr_pdf(sanitized)
+        parsed.notices.extend(notices)
         return parsed
     if document_format in {"png", "jpg", "heic"}:
         from anonymizer_engine.ocr import build_ocr_image_document

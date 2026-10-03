@@ -19,6 +19,7 @@ dependencies = [
   "spacy>=3.8,<3.9",
   "uvicorn>=0.34",
   "pillow-heif>=1.4.0",
+  "pikepdf>=9",
 ]
 
 [dependency-groups]

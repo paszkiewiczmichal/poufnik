@@ -62,6 +62,8 @@ from anonymizer_engine.licensing import BASIC_PLAN, Plan, UsageCounter
 from anonymizer_engine.ocr import OcrError
 from anonymizer_engine.parsers import ParserError, parse_document
 from anonymizer_engine.parsers.models import Block, ParsedDocument
+from anonymizer_engine.pdfredact import anonymize_pdf_in_place
+from anonymizer_engine.pdfredact.scan import anonymize_scanned_pdf
 from anonymizer_engine.prompts import PromptLibrary, load_prompt_library
 from anonymizer_engine.wordml import anonymize_docx_in_place
 
@@ -349,6 +351,33 @@ def _install_routes(app: FastAPI) -> None:
             headers={"Content-Disposition": 'attachment; filename="anonymized.docx"'},
         )
 
+    @app.post("/v1/export/pdf", response_class=Response, responses=_EXPORT_RESPONSES)
+    async def export_pdf_in_place(
+        file: Annotated[UploadFile, File()],
+        offset_map: Annotated[UploadFile, File()],
+        anonymized_text: Annotated[UploadFile, File()],
+        ocr: Annotated[bool, Form()] = False,
+    ) -> Response:
+        """Anonymize the original PDF in place, keeping its look.
+
+        Text PDFs lose the glyphs of every value (a token is drawn instead); scanned pages
+        are re-rendered with the values painted over. ``ocr`` must say whether the document
+        text came from OCR, exactly as when it was imported.
+        """
+        data = await file.read()
+        if len(data) > FILE_LIMIT_BYTES:
+            raise PayloadTooLarge(_size_limit_detail(FILE_LIMIT_BYTES))
+        text = _read_utf8_part(await anonymized_text.read())
+        _ensure_text_size(text)
+        entries = _parse_offset_map(await offset_map.read())
+        exporter = anonymize_scanned_pdf if ocr else anonymize_pdf_in_place
+        content = await run_in_threadpool(exporter, data, entries, text)
+        return Response(
+            content,
+            media_type="application/pdf",
+            headers={"Content-Disposition": 'attachment; filename="anonymized.pdf"'},
+        )
+
     @app.post("/v1/documents/process", response_model=DocumentProcessResponse)
     async def process_document(
         file: Annotated[UploadFile, File()],
@@ -586,7 +615,7 @@ def _current_api_key(app: FastAPI) -> str | None:
 def _request_size_limit(path: str) -> int | None:
     if path == "/v1/documents/process":
         return FILE_LIMIT_BYTES
-    if path == "/v1/export/docx":
+    if path in {"/v1/export/docx", "/v1/export/pdf"}:
         # The original file plus the anonymized text and offset map sent alongside it.
         return FILE_LIMIT_BYTES + 2 * TEXT_LIMIT_BYTES
     if path.startswith("/v1/"):

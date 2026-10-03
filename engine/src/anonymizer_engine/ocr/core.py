@@ -7,6 +7,7 @@ import os
 import shutil
 import subprocess
 import warnings
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from anonymizer_engine.ocr.exceptions import OcrExecutionError, TesseractNotFound
@@ -63,12 +64,39 @@ def _ensure_image_within_limits(pil_image: Image) -> None:
 
 
 def ocr_image(image: bytes | Image, languages: str = _DEFAULT_LANGUAGES) -> str:
-    """Return OCR text for an image using Tesseract.
+    """Return OCR text for an image using Tesseract (see :func:`ocr_image_words`)."""
+    return ocr_image_words(image, languages=languages).text
 
-    The image is sent to the offline system Tesseract 5 binary over stdin and OCR text is
-    read from stdout, so the service does not create document-content temporary files.
-    Preprocessing is deliberately minimal: grayscale conversion only; deskew and denoise are
-    future accuracy improvements.
+
+@dataclass(frozen=True)
+class OcrWord:
+    """A recognized word with its box in pixels of the image passed to Tesseract."""
+
+    text: str
+    left: int
+    top: int
+    width: int
+    height: int
+    line: tuple[int, int, int] = (0, 0, 0)  # (block, paragraph, line) numbers
+
+
+@dataclass
+class OcrResult:
+    """OCR text plus, for every character of it, the index of its word (-1 = separator)."""
+
+    text: str
+    words: list[OcrWord]
+    owners: list[int]
+
+
+def ocr_image_words(image: bytes | Image, languages: str = _DEFAULT_LANGUAGES) -> OcrResult:
+    """OCR an image with Tesseract and keep the position of every word.
+
+    The image is sent to the offline system Tesseract 5 binary over stdin and its TSV
+    output is read from stdout, so no document-content temporary files are created. The
+    text is rebuilt from the TSV exactly as Tesseract's plain-text output lays it out:
+    words joined by a space, one line per text line, a blank line between paragraphs.
+    Preprocessing is deliberately minimal: grayscale conversion only.
     """
     try:
         from PIL import Image as PilImage
@@ -107,6 +135,7 @@ def ocr_image(image: bytes | Image, languages: str = _DEFAULT_LANGUAGES) -> str:
         languages,
         "--psm",
         "6",
+        "tsv",
     ]
     try:
         result = subprocess.run(
@@ -126,12 +155,80 @@ def ocr_image(image: bytes | Image, languages: str = _DEFAULT_LANGUAGES) -> str:
         detail = f": {error}" if error else "."
         raise OcrExecutionError(f"Tesseract OCR failed{detail}")
 
-    text = result.stdout.decode("utf-8", errors="replace")
-    return _normalize_ocr_text(text)
+    return _words_to_text(result.stdout.decode("utf-8", errors="replace"))
+
+
+def _words_to_text(tsv: str) -> OcrResult:
+    words: list[OcrWord] = []
+    keys: list[tuple[str, str, str, str]] = []
+    for line in tsv.replace("\r\n", "\n").split("\n")[1:]:
+        columns = line.split("\t")
+        if len(columns) < 12 or columns[0] != "5":
+            continue
+        text = columns[11].strip()
+        if not text:
+            continue
+        words.append(
+            OcrWord(
+                text=text,
+                left=int(columns[6]),
+                top=int(columns[7]),
+                width=int(columns[8]),
+                height=int(columns[9]),
+                line=(int(columns[2]), int(columns[3]), int(columns[4])),
+            )
+        )
+        keys.append((columns[1], columns[2], columns[3], columns[4]))
+
+    parts: list[str] = []
+    owners: list[int] = []
+    for index, (word, key) in enumerate(zip(words, keys, strict=True)):
+        if index > 0:
+            previous = keys[index - 1]
+            if key[:3] != previous[:3]:
+                separator = "\n\n"  # new paragraph (or block)
+            elif key != previous:
+                separator = "\n"
+            else:
+                separator = " "
+            parts.append(separator)
+            owners.extend([-1] * len(separator))
+        parts.append(word.text)
+        owners.extend([index] * len(word.text))
+    return OcrResult(text="".join(parts), words=words, owners=owners)
 
 
 def ocr_pdf(pdf_bytes: bytes, languages: str = _DEFAULT_LANGUAGES) -> ParsedDocument:
     """Rasterize PDF pages at 300 DPI with pypdfium2 and OCR them sequentially."""
+    return ocr_pdf_mapped(pdf_bytes, languages=languages)[0]
+
+
+@dataclass
+class OcrPage:
+    """OCR of one PDF page; word boxes are in pixels of a render at ``scale`` (with the
+    page's own rotation applied, as displayed)."""
+
+    index: int
+    scale: float
+    width_px: int
+    height_px: int
+    words: list[OcrWord]
+
+
+@dataclass
+class OcrPdfMap:
+    """For every character of the OCR text: its page and word index (-1 = separator)."""
+
+    pages: list[OcrPage]
+    owner_page: list[int] = field(default_factory=list)
+    owner_word: list[int] = field(default_factory=list)
+
+
+def ocr_pdf_mapped(
+    pdf_bytes: bytes,
+    languages: str = _DEFAULT_LANGUAGES,
+) -> tuple[ParsedDocument, OcrPdfMap]:
+    """OCR every page of a PDF and keep where each recognized word sits on its page."""
     try:
         import pypdfium2 as pdfium
     except ImportError as exc:  # pragma: no cover - dependency is declared in pyproject
@@ -169,8 +266,17 @@ def ocr_pdf(pdf_bytes: bytes, languages: str = _DEFAULT_LANGUAGES) -> ParsedDocu
 
             # PDFium is not thread-safe; keep this sequential for now. A future process pool
             # can parallelize pages without sharing PDFium state across threads.
-            page_text = ocr_image(page_image, languages=languages)
-            builder.append_page_text(page_text, page=page_index + 1)
+            result = ocr_image_words(page_image, languages=languages)
+            builder.pages.append(
+                OcrPage(
+                    index=page_index,
+                    scale=render_scale,
+                    width_px=page_image.width,
+                    height_px=page_image.height,
+                    words=result.words,
+                )
+            )
+            builder.append_page_text(result, page=page_index + 1)
     except (DocumentTooLarge, OcrExecutionError, TesseractNotFound):
         raise
     except Exception as exc:
@@ -178,22 +284,26 @@ def ocr_pdf(pdf_bytes: bytes, languages: str = _DEFAULT_LANGUAGES) -> ParsedDocu
     finally:
         pdf.close()
 
-    return builder.build(page_count=page_count)
+    return builder.build(page_count=page_count), builder.map
 
 
 class _OcrDocumentBuilder:
     def __init__(self) -> None:
         self.parts: list[str] = []
         self.blocks: list[Block] = []
+        self.pages: list[OcrPage] = []
+        self.map = OcrPdfMap(pages=self.pages)
         self.length = 0
         self._last_char = ""
 
-    def append_raw(self, value: str) -> None:
+    def append_raw(self, value: str, page: int = -1, owners: list[int] | None = None) -> None:
         if not value:
             return
         self.parts.append(value)
         self.length += len(value)
         self._last_char = value[-1]
+        self.map.owner_page.extend([page] * len(value))
+        self.map.owner_word.extend(owners if owners is not None else [-1] * len(value))
 
     def append_page_break(self) -> None:
         if self.length > 0 and self._last_char != "\n":
@@ -202,13 +312,13 @@ class _OcrDocumentBuilder:
         self.append_raw("\f")
         self.blocks.append(Block(start=start, end=self.length, kind="page_break", page=None))
 
-    def append_page_text(self, text: str, page: int) -> None:
-        if not text:
+    def append_page_text(self, result: OcrResult, page: int) -> None:
+        if not result.text:
             return
         if self.length > 0:
             self.append_raw("\n\n")
         start = self.length
-        self.append_raw(text)
+        self.append_raw(result.text, page - 1, result.owners)
         self.blocks.append(Block(start=start, end=self.length, kind="paragraph", page=page))
 
     def build(self, page_count: int) -> ParsedDocument:
@@ -265,7 +375,3 @@ def _tesseract_not_found(path: str | None) -> TesseractNotFound:
         "Windows/Chocolatey: choco install tesseract), or set "
         "ANONYMIZER_TESSERACT_PATH to the tesseract executable."
     )
-
-
-def _normalize_ocr_text(text: str) -> str:
-    return text.replace("\r\n", "\n").replace("\r", "\n").strip()

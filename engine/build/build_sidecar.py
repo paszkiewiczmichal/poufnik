@@ -172,6 +172,9 @@ def run_pyinstaller(*, clean: bool) -> None:
         "pypdfium2",
         "--collect-binaries",
         "pillow_heif",
+        # In-place PDF anonymization: pikepdf ships its own qpdf library.
+        "--collect-all",
+        "pikepdf",
         "--hidden-import",
         "pillow_heif",
         "--copy-metadata",

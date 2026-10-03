@@ -166,7 +166,9 @@ def test_parse_document_force_ocr_routes_pdf_to_ocr(
 
     assert parsed.source == "ocr"
     assert parsed.text == "OCR text"
-    assert calls == [pdf_path.read_bytes()]
+    # OCR reads the sanitized PDF (the same bytes an in-place export recognizes again).
+    assert len(calls) == 1
+    assert calls[0].startswith(b"%PDF") and calls[0] != pdf_path.read_bytes()
 
 
 def test_parse_document_image_routes_to_ocr(monkeypatch: pytest.MonkeyPatch) -> None:

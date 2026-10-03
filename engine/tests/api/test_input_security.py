@@ -188,27 +188,21 @@ def test_documents_process_rejects_docx_zip_bomb_by_uncompressed_size(
     assert "uncompressed size exceeds" in response.json()["detail"]
 
 
-def test_documents_process_rejects_pdf_with_5000_pages(
-    client: TestClient,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    import pdfplumber
+def test_documents_process_rejects_pdf_with_too_many_pages(client: TestClient) -> None:
+    import io
 
-    class FakePdf:
-        pages = [object()] * 5000
+    import pikepdf
 
-        def __enter__(self) -> FakePdf:
-            return self
-
-        def __exit__(self, *_args: object) -> None:
-            return None
-
-    monkeypatch.setattr(pdfplumber, "open", lambda _source: FakePdf())
+    pdf = pikepdf.new()
+    for _ in range(1001):
+        pdf.add_blank_page()
+    buffer = io.BytesIO()
+    pdf.save(buffer)
 
     response = client.post(
         "/v1/documents/process",
         headers=HEADERS,
-        files={"file": ("too-many-pages.pdf", b"%PDF-1.7\n%", "application/pdf")},
+        files={"file": ("too-many-pages.pdf", buffer.getvalue(), "application/pdf")},
     )
 
     assert response.status_code == 400
