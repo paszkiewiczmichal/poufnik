@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import io
+import re
 from importlib.resources import as_file, files
 from xml.sax.saxutils import escape
 
 from anonymizer_engine.parsers import Block, ParsedDocument
+
+_XML_UNSAFE_RE = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\ufffe\uffff]")
 
 
 def export_txt(_parsed_doc: ParsedDocument, anonymized_text: str) -> bytes:
@@ -39,10 +42,16 @@ def export_docx(parsed_doc: ParsedDocument, anonymized_text: str) -> bytes:
             index = next_index
             continue
 
-        if block.kind == "heading":
-            document.add_heading(content, level=1)
-        else:
-            document.add_paragraph(content)
+        # A block may span a page boundary ("\f" between PDF pages): that becomes a real
+        # page break, never a raw control character (python-docx rejects those).
+        for page_index, piece in enumerate(content.split("\f")):
+            if page_index > 0:
+                document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
+            piece = _xml_safe(piece)
+            if block.kind == "heading":
+                document.add_heading(piece, level=1)
+            else:
+                document.add_paragraph(piece)
         index += 1
 
     buffer = io.BytesIO()
@@ -116,11 +125,11 @@ def _append_table_or_paragraphs(
         table = document.add_table(rows=len(rows), cols=len(rows[0]))
         for row_index, row in enumerate(rows):
             for col_index, value in enumerate(row):
-                table.cell(row_index, col_index).text = value
+                table.cell(row_index, col_index).text = _xml_safe(value)
         return index
 
     for _item_index, _block, content in run:
-        document.add_paragraph(content)
+        document.add_paragraph(_xml_safe(content))
     return index
 
 
@@ -170,6 +179,11 @@ def _project_blocks(parsed_doc: ParsedDocument, anonymized_text: str) -> list[tu
         projected.append((block, content))
 
     return projected
+
+
+def _xml_safe(text: str) -> str:
+    """Drop characters XML 1.0 cannot hold (form feeds and other C0 controls but tab/LF)."""
+    return _XML_UNSAFE_RE.sub("", text)
 
 
 def _register_dejavu_font() -> str:

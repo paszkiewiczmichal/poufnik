@@ -540,3 +540,25 @@ def _parsed_document(text: str) -> ParsedDocument:
         has_text_layer=True,
         page_count=1,
     )
+
+
+def test_export_docx_turns_pdf_page_breaks_into_word_page_breaks(tmp_path: Path) -> None:
+    from docx import Document
+
+    # Blocks as the desktop sends them: a separator "\n\f\n\n" inside a paragraph block.
+    text = "Strona pierwsza [OSOBA_1]\n\f\n\nStrona druga\x01."
+    parsed = ParsedDocument(
+        text=text,
+        blocks=[Block(start=0, end=len(text), kind="paragraph", page=1)],
+        format="txt",
+        has_text_layer=True,
+        page_count=1,
+    )
+    path = tmp_path / "pages.docx"
+    path.write_bytes(export_docx(parsed, text))
+
+    document = Document(path)
+    body = "\n".join(paragraph.text for paragraph in document.paragraphs)
+    assert "Strona pierwsza [OSOBA_1]" in body and "Strona druga." in body
+    assert "\f" not in body and "\x01" not in body
+    assert 'w:type="page"' in document.element.xml
