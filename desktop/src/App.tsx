@@ -122,6 +122,9 @@ declare global {
   }
 }
 
+// Silnik zgłasza, że PDF udało się wczytać, ale nie da się go wyeksportować w miejscu.
+const PDF_LAYOUT_UNAVAILABLE = "pdf_layout_export_unavailable";
+
 // Limit uzgodniony z copy i audytem bezpieczeństwa (W4/S6).
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 
@@ -846,7 +849,7 @@ function App() {
       return;
     }
     await saveJsonFile(
-      poufnikFileName(uiState.selectedFileName, "json", "map"),
+      poufnikFileName(uiState.selectedFileName, "json", "map", anonymization.replacementMap),
       JSON.stringify(anonymization.replacementMap, null, 2),
     );
   }, [anonymization.replacementMap, uiState.selectedFileName]);
@@ -889,6 +892,17 @@ function App() {
         }
         return pdf;
       }
+      const sourceIsPdf = document?.format === "pdf";
+      const pdfLayoutKnown = !document?.notices?.includes(PDF_LAYOUT_UNAVAILABLE);
+      if (format === "pdf" && sourceIsPdf && sourceFile && pdfLayoutKnown) {
+        // Glyphs of the values are removed from the original PDF (scans: painted over).
+        return client.exportPdfInPlace({
+          file: sourceFile,
+          offsetMap: anonymization.offsetMap,
+          anonymizedText: anonymization.anonymizedText,
+          ocr: document?.source === "ocr",
+        });
+      }
       const blob = await client.exportDocument({
         anonymizedText: anonymization.anonymizedText,
         format,
@@ -900,6 +914,12 @@ function App() {
             ? texts.generation.exportSimplifiedLayout
             : texts.generation.exportPdfWithoutWord,
         );
+      } else if (sourceIsPdf) {
+        setExportNotice(
+          format === "docx"
+            ? texts.generation.exportDocxFromPdf
+            : texts.generation.exportSimplifiedLayout,
+        );
       }
       return blob;
     },
@@ -907,6 +927,8 @@ function App() {
       anonymization.anonymizedText,
       anonymization.offsetMap,
       document?.format,
+      document?.notices,
+      document?.source,
       resolveEndpoint,
       setAnonymizationError,
       uiState.selectedFile,
@@ -918,13 +940,17 @@ function App() {
       try {
         const blob = await buildExportFile(format);
         if (blob) {
-          await saveBinaryFile(poufnikFileName(uiState.selectedFileName, format), blob, format);
+          await saveBinaryFile(
+            poufnikFileName(uiState.selectedFileName, format, "result", anonymization.replacementMap),
+            blob,
+            format,
+          );
         }
       } catch (error) {
         setAnonymizationError(toUserMessage(error));
       }
     },
-    [buildExportFile, setAnonymizationError, uiState.selectedFileName],
+    [buildExportFile, anonymization.replacementMap, setAnonymizationError, uiState.selectedFileName],
   );
 
   const loadPrompts = useCallback(async () => {

@@ -1,4 +1,5 @@
 import type { ReplacementMap } from "../types";
+import { anonymizeFileBaseName } from "./fileNameAnonymization";
 
 export interface BatchExportInput {
   filename: string;
@@ -13,12 +14,16 @@ export interface BatchExportFile {
 
 // Nazwa pliku wynikowego: nazwa oryginału (bez rozszerzenia) + "_poufnik", np.
 // umowa.docx -> umowa_poufnik.docx, a mapa zastąpień -> umowa_poufnik_mapa.json.
+// Dane z mapy zastąpień są w nazwie zamieniane na tokeny, tak jak w treści:
+// "Umowa Kowalski.docx" -> "Umowa [OSOBA_1]_poufnik.docx".
 export function poufnikFileName(
   sourceName: string | null | undefined,
   extension: string,
   kind: "result" | "map" = "result",
+  replacementMap?: ReplacementMap | null,
 ): string {
-  return withPoufnikSuffix(safeBaseName(sourceName ?? ""), extension, kind);
+  const base = anonymizeFileBaseName(safeBaseName(sourceName ?? ""), replacementMap);
+  return withPoufnikSuffix(base, extension, kind);
 }
 
 function withPoufnikSuffix(base: string, extension: string, kind: "result" | "map"): string {
@@ -28,7 +33,10 @@ function withPoufnikSuffix(base: string, extension: string, kind: "result" | "ma
 export function batchExportFiles(items: BatchExportInput[]): BatchExportFile[] {
   const used = new Map<string, number>();
   return items.flatMap((item) => {
-    const base = uniqueBaseName(safeBaseName(item.filename), used);
+    const base = uniqueBaseName(
+      anonymizeFileBaseName(safeBaseName(item.filename), item.replacementMap),
+      used,
+    );
     return [
       {
         filename: withPoufnikSuffix(base, "txt", "result"),

@@ -75,6 +75,13 @@ export interface AnonymizerApiClient {
     offsetMap: OffsetMapEntry[];
     anonymizedText: string;
   }): Promise<Blob>;
+  /** Anonymizes the original PDF in place; ``ocr`` = the text was recognized by OCR. */
+  exportPdfInPlace(options: {
+    file: File;
+    offsetMap: OffsetMapEntry[];
+    anonymizedText: string;
+    ocr: boolean;
+  }): Promise<Blob>;
 }
 
 export function createAnonymizerApiClient(
@@ -176,23 +183,38 @@ export function createAnonymizerApiClient(
           blocks,
         }),
       }),
-    exportDocxInPlace: ({ file, offsetMap, anonymizedText }) => {
-      // Text and offset map go as file parts: plain multipart fields are capped at 1 MB.
-      const form = new FormData();
-      form.append("file", file, file.name);
-      form.append(
-        "offset_map",
-        new Blob([JSON.stringify(offsetMap)], { type: "application/json" }),
-        "offset_map.json",
-      );
-      form.append(
-        "anonymized_text",
-        new Blob([anonymizedText], { type: "text/plain;charset=utf-8" }),
-        "anonymized_text.txt",
-      );
-      return requestBlob("/v1/export/docx", { method: "POST", body: form });
+    exportDocxInPlace: ({ file, offsetMap, anonymizedText }) =>
+      requestBlob("/v1/export/docx", {
+        method: "POST",
+        body: inPlaceExportForm(file, offsetMap, anonymizedText),
+      }),
+    exportPdfInPlace: ({ file, offsetMap, anonymizedText, ocr }) => {
+      const form = inPlaceExportForm(file, offsetMap, anonymizedText);
+      form.append("ocr", String(ocr));
+      return requestBlob("/v1/export/pdf", { method: "POST", body: form });
     },
   };
+}
+
+function inPlaceExportForm(
+  file: File,
+  offsetMap: OffsetMapEntry[],
+  anonymizedText: string,
+): FormData {
+  // Text and offset map go as file parts: plain multipart fields are capped at 1 MB.
+  const form = new FormData();
+  form.append("file", file, file.name);
+  form.append(
+    "offset_map",
+    new Blob([JSON.stringify(offsetMap)], { type: "application/json" }),
+    "offset_map.json",
+  );
+  form.append(
+    "anonymized_text",
+    new Blob([anonymizedText], { type: "text/plain;charset=utf-8" }),
+    "anonymized_text.txt",
+  );
+  return form;
 }
 
 function toApiEntity(entity: DetectedEntity): Omit<DetectedEntity, "id"> {

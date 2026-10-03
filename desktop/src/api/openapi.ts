@@ -131,6 +131,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/export/pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export Pdf In Place
+         * @description Anonymize the original PDF in place, keeping its look.
+         *
+         *     Text PDFs lose the glyphs of every value (a token is drawn instead); scanned pages
+         *     are re-rendered with the values painted over. ``ocr`` must say whether the document
+         *     text came from OCR, exactly as when it was imported.
+         */
+        post: operations["export_pdf_in_place_v1_export_pdf_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/documents/process": {
         parameters: {
             query?: never;
@@ -267,6 +291,20 @@ export interface components {
             offset_map: string;
             /** Anonymized Text */
             anonymized_text: string;
+        };
+        /** Body_export_pdf_in_place_v1_export_pdf_post */
+        Body_export_pdf_in_place_v1_export_pdf_post: {
+            /** File */
+            file: string;
+            /** Offset Map */
+            offset_map: string;
+            /** Anonymized Text */
+            anonymized_text: string;
+            /**
+             * Ocr
+             * @default false
+             */
+            ocr: boolean;
         };
         /** Body_process_document_v1_documents_process_post */
         Body_process_document_v1_documents_process_post: {
@@ -743,6 +781,67 @@ export interface operations {
         requestBody: {
             content: {
                 "multipart/form-data": components["schemas"]["Body_export_docx_in_place_v1_export_docx_post"];
+            };
+        };
+        responses: {
+            /** @description Anonymized document export. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": string;
+                    "application/pdf": string;
+                };
+            };
+            /** @description Bad request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Request payload exceeds the configured limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Validation error. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+        };
+    };
+    export_pdf_in_place_v1_export_pdf_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_export_pdf_in_place_v1_export_pdf_post"];
             };
         };
         responses: {

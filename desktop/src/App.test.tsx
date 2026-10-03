@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => {
     deanonymize: vi.fn(),
     exportDocument: vi.fn(),
     exportDocxInPlace: vi.fn(),
+    exportPdfInPlace: vi.fn(),
     health,
     listPrompts: vi.fn(),
     processDocument: vi.fn(),
@@ -540,6 +541,75 @@ describe("App engine health", () => {
     expect(mocks.apiClient.exportDocument).toHaveBeenCalledWith(
       expect.objectContaining({ format: "pdf" }),
     );
+  });
+
+  function seedPdfResult(options: { source: "parsed" | "ocr"; notices?: string[] }) {
+    const original = new File(["%PDF"], "pozew.pdf");
+    useAppStore.setState((state) => ({
+      uiState: { ...state.uiState, selectedFileName: "pozew.pdf", selectedFile: original },
+      document: {
+        filename: "pozew.pdf",
+        format: "pdf",
+        source: options.source,
+        page_count: 1,
+        text: "Pozew Jana Kowalskiego",
+        notices: options.notices ?? [],
+      },
+      anonymization: {
+        ...state.anonymization,
+        anonymizedText: "Pozew [OSOBA_1]",
+        replacementMap: { entries: [], document_fingerprint: "x" } as never,
+        offsetMap: [],
+      },
+    }));
+    mocks.apiClient.listPrompts.mockResolvedValue([]);
+    return original;
+  }
+
+  it.each([
+    ["parsed", false],
+    ["ocr", true],
+  ] as const)("exports a %s PDF source in place (ocr=%s)", async (source, ocr) => {
+    const original = seedPdfResult({ source });
+    mocks.apiClient.exportPdfInPlace.mockResolvedValue(new Blob(["%PDF"]));
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: /Wynik/ }));
+    fireEvent.click(await screen.findByRole("button", { name: texts.generation.exportPdf }));
+
+    await waitFor(() => expect(mocks.saveBinaryFile).toHaveBeenCalled());
+    expect(mocks.apiClient.exportPdfInPlace).toHaveBeenCalledWith(
+      expect.objectContaining({ file: original, ocr }),
+    );
+    expect(mocks.apiClient.exportDocument).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the simplified PDF when the engine could not map the PDF", async () => {
+    seedPdfResult({ source: "parsed", notices: ["pdf_layout_export_unavailable"] });
+    mocks.apiClient.exportDocument.mockResolvedValue(new Blob(["%PDF"]));
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: /Wynik/ }));
+    expect(
+      await screen.findByText(texts.generation.notices.pdf_layout_export_unavailable),
+    ).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: texts.generation.exportPdf }));
+
+    await waitFor(() => expect(mocks.saveBinaryFile).toHaveBeenCalled());
+    expect(mocks.apiClient.exportPdfInPlace).not.toHaveBeenCalled();
+    expect(await screen.findByText(texts.generation.exportSimplifiedLayout)).toBeInTheDocument();
+  });
+
+  it("explains that a DOCX made from a PDF has a simplified layout", async () => {
+    seedPdfResult({ source: "parsed" });
+    mocks.apiClient.exportDocument.mockResolvedValue(new Blob(["docx"]));
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: /Wynik/ }));
+    fireEvent.click(await screen.findByRole("button", { name: texts.generation.exportDocx }));
+
+    expect(await screen.findByText(texts.generation.exportDocxFromPdf)).toBeInTheDocument();
+    expect(mocks.apiClient.exportPdfInPlace).not.toHaveBeenCalled();
   });
 
   it("shows the real app version fetched from Tauri, not a hardcoded one", async () => {

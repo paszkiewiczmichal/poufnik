@@ -173,6 +173,25 @@ describe("createAnonymizerApiClient", () => {
     expect(await (form.get("anonymized_text") as Blob).text()).toBe("[OSOBA_1] zażółć");
   });
 
+  it("sends the OCR flag with an in-place PDF export", async () => {
+    const fetcher = vi.fn(async () => new Response(new Blob(["%PDF"])));
+    const client = createAnonymizerApiClient(endpoint, fetcher as unknown as typeof fetch);
+
+    await client.exportPdfInPlace({
+      file: new File(["%PDF"], "skan.pdf"),
+      offsetMap: [],
+      anonymizedText: "tekst",
+      ocr: true,
+    });
+
+    const [url, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("http://127.0.0.1:8710/v1/export/pdf");
+    const form = init.body as FormData;
+    expect(form.get("ocr")).toBe("true");
+    expect((form.get("file") as File).name).toBe("skan.pdf");
+    expect(await (form.get("anonymized_text") as Blob).text()).toBe("tekst");
+  });
+
   it("posts anonymizeApiEntities with raw API entities untouched", async () => {
     const fetcher = vi.fn(async () =>
       jsonResponse({

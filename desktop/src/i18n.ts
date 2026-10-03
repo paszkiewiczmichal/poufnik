@@ -400,6 +400,8 @@ export const texts = {
     exportPdf: "Eksportuj PDF",
     exportSimplifiedLayout:
       "Oryginalny plik nie jest dostępny (dokument otwarty z historii), więc DOCX zapisano w uproszczonym układzie. Aby zachować wygląd oryginału, zaimportuj plik ponownie.",
+    exportDocxFromPdf:
+      "PDF nie przechowuje układu dokumentu Worda, więc DOCX z PDF ma uproszczony układ. Aby zachować wygląd oryginału, wybierz Eksportuj PDF.",
     exportPdfLibreOffice:
       "PDF utworzono w LibreOffice - jego wygląd może minimalnie różnić się od tego w Microsoft Word.",
     exportPdfWithoutWord:
@@ -416,6 +418,15 @@ export const texts = {
       mail_merge_removed: "Usunięto powiązanie z korespondencją seryjną.",
       embedded_document_removed:
         "Usunięto osadzony dokument, którego treści Poufnik nie odczytuje.",
+      form_fields_flattened:
+        "Wypełnione pola formularza zamieniono na zwykły tekst strony - ich treść też jest anonimizowana.",
+      annotations_removed: "Usunięto adnotacje, komentarze i linki z pliku PDF.",
+      bookmarks_removed: "Usunięto zakładki (spis treści) pliku PDF.",
+      attachments_removed: "Usunięto załączniki osadzone w pliku PDF.",
+      scripts_removed: "Usunięto skrypty z pliku PDF.",
+      hidden_descriptions_removed: "Usunięto ukryte opisy tekstu (np. dla czytników ekranu).",
+      pdf_layout_export_unavailable:
+        "Tego PDF nie da się zanonimizować z zachowaniem wyglądu - eksport PDF będzie miał uproszczony układ.",
       images_or_objects_present:
         "Dokument zawiera obrazy lub osadzone obiekty. Poufnik nie zmienia ich zawartości - sprawdź je przed wysłaniem.",
     } as Record<string, string>,
