@@ -132,7 +132,7 @@ def _strip_in_content(
     if resources is not None:
         properties = resources.get(Name.Properties)
         if properties is not None:
-            for value in properties.values():
+            for _key, value in properties.items():
                 if isinstance(value, Dictionary):
                     for key in _MARKED_CONTENT_TEXT_KEYS:
                         if key in value:
@@ -140,7 +140,7 @@ def _strip_in_content(
                             changed = True
         xobjects = resources.get(Name.XObject)
         if xobjects is not None:
-            for xobject in xobjects.values():
+            for _key, xobject in xobjects.items():
                 if (
                     not isinstance(xobject, pikepdf.Stream)
                     or xobject.get(Name.Subtype) != Name.Form
