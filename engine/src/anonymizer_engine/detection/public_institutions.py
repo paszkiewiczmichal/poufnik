@@ -15,11 +15,26 @@ from anonymizer_engine.detection.models import (
     ValidationStatus,
 )
 
+# Odstęp w obrębie jednej linii. Nazwa urzędu/sądu i miejscowości nie przechodzi przez
+# złamanie wiersza - inaczej nagłówek "SĄD REJONOWY\nWYROK\nW IMIENIU [...]" albo
+# "Urząd Skarbowy w Gdańsku\nJan Kowalski" sklejał się z kolejnymi wierszami w jedną
+# encję (w drugim przypadku nazwisko lądowało w odrzuconej instytucji publicznej).
+_HS = r"[^\S\r\n\v\f\x85\u2028\u2029]+"
 _PLACE_WORD = r"(?-i:[A-ZĄĆĘŁŃÓŚŹŻ])[\wąćęłńóśźżĄĆĘŁŃÓŚŹŻ.-]*"
-_PLACE = rf"{_PLACE_WORD}(?:\s+{_PLACE_WORD}){{0,3}}"
+# Samodzielna liczba rzymska ("XXV Wydział") zaczyna wydział, a nie ciąg nazwy miejscowości.
+_SEAT_WORD = rf"(?!(?-i:[IVXLCDM]{{1,8}})\b){_PLACE_WORD}"
+_PLACE = rf"{_SEAT_WORD}(?:{_HS}{_SEAT_WORD}){{0,3}}"
 _MINISTRY_TAIL_WORD = r"(?:i|w|we|oraz|do|dla|z|ze|[A-ZĄĆĘŁŃÓŚŹŻ][\wąćęłńóśźżĄĆĘŁŃÓŚŹŻ.-]*)"
+_COURT_TYPE = (
+    r"(?:Rejonow(?:y|ego|emu|ym)|Okręgow(?:y|ego|emu|ym)|Apelacyjn(?:y|ego|emu|ym))"
+)
+# "Sąd Rejonowy Gdańsk-Północ w Gdańsku" - nazwa okręgu plus siedziba.
+_COURT_SEAT = rf"(?:{_HS}w{_HS}{_PLACE})?"
+# Wydział po przecinku albo w nowym wierszu nagłówka ("[...] w Szczecinie\nI Wydział
+# Cywilny") - liczba rzymska + "Wydział" to dość mocna kotwica, żeby przejść przez \n.
 _COURT_DEPARTMENT = (
-    rf"(?:,\s*[IVXLCDM]{{1,8}}\s+Wydział(?:\s+{_PLACE_WORD}){{1,5}}(?:\s+KRS)?)?"
+    rf"(?:(?:\s*,\s*|\s+)(?-i:[IVXLCDM]{{1,8}}){_HS}Wydział"
+    rf"(?:{_HS}{_PLACE_WORD}){{1,5}}(?:{_HS}KRS)?)?"
 )
 
 # Sąd Najwyższy/NSA (bez lokalizacji, wyłącznie cytowanie orzecznictwa) zostają
@@ -28,25 +43,41 @@ _COURT_DEPARTMENT = (
 # jednak do odnalezienia sprawy w publicznym rejestrze i identyfikacji stron, więc
 # ma trafić do maskowania - stąd osobna lista, oddzielona od _PUBLIC_PATTERNS,
 # której trafienia detect_named_courts() zwraca jako sensytywne, a nie publiczne.
+# Sąd BEZ miejscowości ("Sąd Okręgowy", "Sąd I instancji") nikogo nie identyfikuje
+# i nie jest wykrywany wcale - patrz is_generic_court_reference().
 _COURT_PATTERNS = [
     re.compile(
-        rf"\bSąd(?:u|em|zie)?\s+"
-        rf"(?:Rejonow(?:y|ego|ym)|Okręgow(?:y|ego|ym)|Apelacyjn(?:y|ego|ym))"
-        rf"\s+(?:w|we|dla)\s+{_PLACE}",
+        rf"\bSąd(?:u|owi|em|zie)?{_HS}{_COURT_TYPE}"
+        rf"{_HS}(?:w|we|dla){_HS}{_PLACE}{_COURT_SEAT}{_COURT_DEPARTMENT}",
         re.IGNORECASE,
     ),
     re.compile(
-        rf"\bSąd(?:u|em|zie)?\s+"
-        rf"(?:Rejonow(?:y|ego|ym)|Okręgow(?:y|ego|ym)|Apelacyjn(?:y|ego|ym))"
-        rf"\s+{_PLACE}{_COURT_DEPARTMENT}",
+        rf"\bSąd(?:u|owi|em|zie)?{_HS}{_COURT_TYPE}"
+        rf"{_HS}{_PLACE}{_COURT_SEAT}{_COURT_DEPARTMENT}",
         re.IGNORECASE,
     ),
     re.compile(
-        rf"\bWojewódzk(?:i|iego|im)\s+Sąd(?:u|em|zie)?\s+Administracyjn(?:y|ego|ym)"
-        rf"\s+w\s+{_PLACE}",
+        rf"\bWojewódzk(?:i|iego|iemu|im){_HS}Sąd(?:u|owi|em|zie)?{_HS}"
+        rf"Administracyjn(?:y|ego|emu|ym){_HS}w{_HS}{_PLACE}{_COURT_DEPARTMENT}",
         re.IGNORECASE,
     ),
 ]
+
+# Słowa, z których składa się ogólne odwołanie do sądu albo samego wydziału, bez
+# miejscowości: "Sąd", "Wysoki Sądzie", "Sąd I instancji", "Sądowi Okręgowemu",
+# "II Wydział Karny", "Wydział Gospodarczy Krajowego Rejestru Sądowego".
+_GENERIC_COURT_WORD_RE = re.compile(
+    r"sąd(?:u|owi|em|zie|y|ów|om|ami|ach)?"
+    r"|wydzia(?:ł|łu|łowi|łem|le|ły|łów|łom|łami|łach)"
+    r"|(?:rejonow|okręgow|apelacyjn|administracyjn|powszechn|odwoławcz|cywiln|karn"
+    r"|gospodarcz|rodzinn|penitencjarn|wizytacyjn|pierwsz|krajow|sądow|orzekając)"
+    r"(?:y|a|e|ego|ej|emu|ym|ą|ych|ymi)"
+    r"|(?:wojewódzk|wysok|drug)(?:i|a|ie|iego|iej|iemu|im|ą|ich|imi)"
+    r"|instancj(?:a|i|ę|ą)|pracy|ubezpieczeń|społecznych|nieletnich|ksiąg|wieczystych"
+    r"|rejestr(?:u|ze|em)?|krs|meriti|i|oraz|do|spraw"
+)
+_GENERIC_COURT_ANCHOR_RE = re.compile(r"sąd|wydzia")
+_ROMAN_NUMERAL_WORD_RE = re.compile(r"[IVXLCDM]{1,8}")
 
 _CURATED_PUBLIC_INSTITUTIONS = [
     "Agencja Bezpieczeństwa Wewnętrznego",
@@ -240,8 +271,8 @@ _INFLECTED_PUBLIC_INSTITUTIONS = [
 
 _PUBLIC_PATTERNS = [
     re.compile(
-        rf"\bMinisterstw(?:o|a|u|ie|em)\s+{_MINISTRY_TAIL_WORD}"
-        rf"(?:\s+{_MINISTRY_TAIL_WORD}){{0,8}}",
+        rf"\bMinisterstw(?:o|a|u|ie|em){_HS}{_MINISTRY_TAIL_WORD}"
+        rf"(?:{_HS}{_MINISTRY_TAIL_WORD}){{0,8}}",
     ),
     re.compile(
         rf"\bProkuratur(?:a|y|ze|ą)\s+"
@@ -345,6 +376,8 @@ def detect_named_courts(text: str) -> list[DetectedEntity]:
         for match in pattern.finditer(text):
             start, end = _trim_span(text, match.start(), match.end())
             value = text[start:end]
+            if is_generic_court_reference(value):
+                continue
             entities.append(
                 DetectedEntity(
                     category=EntityCategory.COMPANY,
@@ -359,6 +392,23 @@ def detect_named_courts(text: str) -> list[DetectedEntity]:
                 )
             )
     return _dedupe(entities)
+
+
+def is_generic_court_reference(value: str) -> bool:
+    """True for a court/division mention without any location, e.g. "Sądu Okręgowego".
+
+    Such a mention ("Sąd", "Wysoki Sądzie", "Sąd I instancji", "II Wydział Karny")
+    identifies nobody, so it must not be detected at all - unlike a court with its seat
+    ("Sąd Rejonowy w Gdańsku"), which detect_named_courts() masks.
+    """
+    words = re.findall(r"\w+", value)
+    if not words or not any(_GENERIC_COURT_ANCHOR_RE.match(word.casefold()) for word in words):
+        return False
+    return all(
+        _ROMAN_NUMERAL_WORD_RE.fullmatch(word)
+        or _GENERIC_COURT_WORD_RE.fullmatch(word.casefold())
+        for word in words
+    )
 
 
 def _detect_lemma_phrases(

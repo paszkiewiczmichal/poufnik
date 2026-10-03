@@ -15,6 +15,7 @@ from anonymizer_engine.detection.public_institutions import (
     curated_public_institution_count,
     detect_named_courts,
     detect_public_institutions,
+    is_generic_court_reference,
 )
 
 
@@ -108,6 +109,191 @@ def test_named_court_masks_whole_span_not_just_the_city() -> None:
     ]
 
 
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        ("SĄD REJONOWY W GDAŃSKU\nWYROK", "SĄD REJONOWY W GDAŃSKU"),
+        (
+            "Sąd Okręgowy w Warszawie, XXV Wydział Cywilny, wydał wyrok.",
+            "Sąd Okręgowy w Warszawie, XXV Wydział Cywilny",
+        ),
+        (
+            "Sąd Okręgowy w Warszawie XXV Wydział Cywilny wydał wyrok.",
+            "Sąd Okręgowy w Warszawie XXV Wydział Cywilny",
+        ),
+        (
+            "Sąd Okręgowy w Warszawie\nXXV Wydział Cywilny\nWYROK",
+            "Sąd Okręgowy w Warszawie\nXXV Wydział Cywilny",
+        ),
+        (
+            "prowadzonego przez Sąd Rejonowy Gdańsk-Północ w Gdańsku, VII Wydział "
+            "Gospodarczy Krajowego Rejestru Sądowego, pod numerem KRS",
+            "Sąd Rejonowy Gdańsk-Północ w Gdańsku, VII Wydział "
+            "Gospodarczy Krajowego Rejestru Sądowego",
+        ),
+        ("Sądowi Okręgowemu w Gdańsku przekazano akta.", "Sądowi Okręgowemu w Gdańsku"),
+        (
+            "Wojewódzki Sąd Administracyjny w Gdańsku oddalił skargę.",
+            "Wojewódzki Sąd Administracyjny w Gdańsku",
+        ),
+    ],
+)
+def test_named_court_span_stays_within_court_seat_and_division(text: str, expected: str) -> None:
+    # Sąd z miejscowością (i ewentualnym wydziałem) jest maskowany jako jedna encja, ale
+    # nazwa nie może przejść przez złamanie wiersza na kolejny nagłówek ("WYROK").
+    assert [entity.text for entity in detect_named_courts(text)] == [expected]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "SĄD REJONOWY\nWYROK\nW IMIENIU RZECZYPOSPOLITEJ POLSKIEJ",
+        "SĄD REJONOWY\nW IMIENIU RZECZYPOSPOLITEJ POLSKIEJ",
+        "Sąd Rejonowy Wydział Cywilny oddalił powództwo.",
+        "Sąd Okręgowy I Wydział Cywilny oddalił apelację.",
+        "Sąd Okręgowy jako sąd odwoławczy rozpoznał apelację.",
+    ],
+)
+def test_court_without_location_is_not_a_named_court(text: str) -> None:
+    assert detect_named_courts(text) == []
+
+
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        ("Urząd Skarbowy w Gdańsku\nJan Kowalski", "Urząd Skarbowy w Gdańsku"),
+        ("Ministerstwo Zdrowia\nJan Kowalski", "Ministerstwo Zdrowia"),
+    ],
+)
+def test_public_institution_does_not_swallow_next_line(text: str, expected: str) -> None:
+    # Wcześniej nazwisko z następnego wiersza trafiało do odrzuconej (jawnej)
+    # instytucji publicznej i nie było maskowane.
+    assert [entity.text for entity in detect_public_institutions(text)] == [expected]
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "Sąd",
+        "SĄD\n",
+        "Sądu Okręgowego",
+        "Sądowi Okręgowemu",
+        "Sądem Apelacyjnym",
+        "Wysoki Sądzie",
+        "Sąd I instancji",
+        "Sąd pierwszej instancji",
+        "sąd odwoławczy",
+        "I Wydział Cywilny",
+        "XXV Wydział Cywilny",
+        "Wydziału Cywilnego",
+        "IV Wydział Pracy i Ubezpieczeń Społecznych",
+        "Gospodarczy Krajowego Rejestru Sądowego",
+    ],
+)
+def test_generic_court_reference_is_recognized(value: str) -> None:
+    assert is_generic_court_reference(value)
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "Sąd Rejonowy w Gdańsku",
+        "Sąd Rejonowy Gdańsk-Północ",
+        "Sąd Okręgowy w Warszawie XXV Wydział Cywilny",
+        "Kancelaria Przykład sp. z o.o.",
+        "Jan Kowalski",
+        "Krajowego Rejestru",
+        "Wysoki",
+        "II",
+    ],
+)
+def test_specific_names_are_not_generic_court_references(value: str) -> None:
+    assert not is_generic_court_reference(value)
+
+
+def test_generic_court_mentions_tagged_by_ner_are_dropped_but_real_entities_stay() -> None:
+    text = (
+        "W ocenie Sądu Okręgowego apelacja Jana Kowalskiego przeciwko Kancelaria "
+        "Przykład sp. z o.o. nie zasługuje na uwzględnienie. Sąd Rejonowy w Gdańsku, "
+        "I Wydział Cywilny, wydał wyrok. Wysoki Sądzie, wnoszę jak na wstępie."
+    )
+
+    class Ner:
+        last_tokens = []
+
+        def analyze(self, _text: str, _language: str) -> list[DetectedEntity]:
+            return [
+                _entity_at(text, "Sądu Okręgowego", EntityCategory.COMPANY),
+                _entity_at(text, "Jana Kowalskiego", EntityCategory.PERSON),
+                _entity_at(text, "I Wydział Cywilny", EntityCategory.COMPANY),
+                _entity_at(text, "Sądzie", EntityCategory.COMPANY),
+            ]
+
+    result = detect_all(text, ner_engine=Ner())
+
+    assert [(entity.category, entity.text) for entity in result.entities] == [
+        (EntityCategory.PERSON, "Jana Kowalskiego"),
+        (EntityCategory.COMPANY, "Przykład sp. z o.o."),
+        (EntityCategory.COMPANY, "Sąd Rejonowy w Gdańsku, I Wydział Cywilny"),
+    ]
+
+
+def test_generic_division_before_krs_number_is_not_a_company() -> None:
+    # Regex "nazwa firmy przed numerem KRS" brał wcześniej sam opis wydziału za firmę.
+    text = "wpisana przez VII Wydział Gospodarczy Krajowego Rejestru Sądowego, KRS 0000123456."
+
+    result = detect_all(text, ner_engine=_NoopNer())
+
+    assert [entity.category for entity in result.entities] == [EntityCategory.KRS]
+
+
+def _real_ner_available() -> bool:
+    from anonymizer_engine.detection.ner import spacy_model_available
+
+    return spacy_model_available()
+
+
+@pytest.mark.skipif(
+    not _real_ner_available(),
+    reason="pl_core_news_lg model is required to exercise the real NER engine offline.",
+)
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        ("W ocenie Sądu Okręgowego apelacja nie zasługuje na uwzględnienie.", []),
+        ("Sąd Apelacyjny oddalił apelację. Sądowi znane są okoliczności.", []),
+        ("Wysoki Sądzie, wnoszę o oddalenie powództwa.", []),
+        ("SĄD\nustalił, że pozwany nie zapłacił.", []),
+        ("Sąd Okręgowy jako sąd odwoławczy rozpoznał apelację.", []),
+        ("Sprawa trafiła do Wydziału Cywilnego.", []),
+        ("II Wydział Karny rozpoznał sprawę.", []),
+        (
+            "Sąd Rejonowy w Gdańsku, I Wydział Cywilny, wydał wyrok.",
+            [(EntityCategory.COMPANY, "Sąd Rejonowy w Gdańsku, I Wydział Cywilny")],
+        ),
+        (
+            "Jan Kowalski pozwał Kancelaria Przykład sp. z o.o. przed Sądem Okręgowym.",
+            [
+                (EntityCategory.PERSON, "Jan Kowalski"),
+                (EntityCategory.COMPANY, "Przykład sp. z o.o."),
+            ],
+        ),
+    ],
+)
+def test_real_ner_does_not_mask_generic_court_mentions(
+    text: str,
+    expected: list[tuple[EntityCategory, str]],
+) -> None:
+    result = detect_all(text, language="pl")
+
+    sensitive = [
+        (entity.category, entity.text)
+        for entity in result.entities
+        if entity.status is EntityStatus.ACCEPTED
+    ]
+    assert sensitive == expected
+
+
 def test_curated_public_institution_list_has_required_size() -> None:
     assert curated_public_institution_count() >= 150
 
@@ -197,6 +383,11 @@ class _NoopNer:
 
     def analyze(self, _text: str, _language: str) -> list[DetectedEntity]:
         return []
+
+
+def _entity_at(text: str, value: str, category: EntityCategory) -> DetectedEntity:
+    start = text.index(value)
+    return _entity(text, start, start + len(value), category)
 
 
 def _entity(

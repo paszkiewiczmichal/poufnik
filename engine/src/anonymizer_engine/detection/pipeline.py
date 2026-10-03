@@ -19,6 +19,7 @@ from anonymizer_engine.detection.places import detect_places, has_address_contex
 from anonymizer_engine.detection.public_institutions import (
     detect_named_courts,
     detect_public_institutions,
+    is_generic_court_reference,
 )
 
 _POSTAL_CODE_RE = r"\d{2}-\d{3}"
@@ -37,12 +38,15 @@ def detect_all(
 ) -> DetectionResult:
     """Detect deterministic, dictionary-backed and NER-backed entities in one pass."""
     deterministic_entities = detect_deterministic(text) + detect_custom_rules(text, custom_rules)
-    company_entities = detect_companies(text, deterministic_entities)
+    company_entities = _filter_generic_court_companies(
+        detect_companies(text, deterministic_entities)
+    )
     engine = ner_engine or _default_ner_engine()
     ner_entities = engine.analyze(text, language)
     tokens = getattr(engine, "last_tokens", None)
     ner_entities = _filter_ner_person_false_positives(text, ner_entities)
     ner_entities = _filter_ner_address_false_positives(text, ner_entities)
+    ner_entities = _filter_generic_court_companies(ner_entities)
     public_entities = detect_public_institutions(text, tokens)
     court_entities = detect_named_courts(text)
     ner_entities = downrank_unsupported_company_entities(
@@ -166,6 +170,19 @@ def _filter_ner_address_false_positives(
         if not (
             entity.category is EntityCategory.ADDRESS
             and _address_entity_is_pkd_code_fragment(text, entity)
+        )
+    ]
+
+
+def _filter_generic_court_companies(entities: list[DetectedEntity]) -> list[DetectedEntity]:
+    # NER (and the "name before KRS number" regex) tag a bare "Sądu Okręgowego" or
+    # "I Wydział Cywilny" as COMPANY; without a location it identifies nobody.
+    return [
+        entity
+        for entity in entities
+        if not (
+            entity.category is EntityCategory.COMPANY
+            and is_generic_court_reference(entity.text)
         )
     ]
 
