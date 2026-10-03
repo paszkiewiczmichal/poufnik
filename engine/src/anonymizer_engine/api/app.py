@@ -15,13 +15,20 @@ from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
+from pydantic import TypeAdapter, ValidationError
 from starlette.concurrency import run_in_threadpool
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
 
 from anonymizer_engine import __version__
-from anonymizer_engine.anonymize import anonymize, deanonymize, export_docx, export_pdf
+from anonymizer_engine.anonymize import (
+    OffsetMapEntry,
+    anonymize,
+    deanonymize,
+    export_docx,
+    export_pdf,
+)
 from anonymizer_engine.api.config import config_file_path, get_config_dir, load_config
 from anonymizer_engine.api.problems import (
     PayloadTooLarge,
@@ -56,6 +63,7 @@ from anonymizer_engine.ocr import OcrError
 from anonymizer_engine.parsers import ParserError, parse_document
 from anonymizer_engine.parsers.models import Block, ParsedDocument
 from anonymizer_engine.prompts import PromptLibrary, load_prompt_library
+from anonymizer_engine.wordml import anonymize_docx_in_place
 
 TEXT_LIMIT_BYTES = 10 * 1024 * 1024
 FILE_LIMIT_BYTES = 100 * 1024 * 1024
@@ -88,6 +96,7 @@ _COMMON_PROBLEM_RESPONSES: dict[int, dict[str, Any]] = {
         "content": {"application/problem+json": {"schema": _PROBLEM_SCHEMA}},
     },
 }
+_DOCX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 _EXPORT_RESPONSES: dict[int, dict[str, Any]] = {
     **_COMMON_PROBLEM_RESPONSES,
     200: {
@@ -304,7 +313,7 @@ def _install_routes(app: FastAPI) -> None:
         parsed_doc = _export_parsed_document(request)
         if request.format == "docx":
             payload = export_docx(parsed_doc, request.anonymized_text)
-            media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            media_type = _DOCX_MEDIA_TYPE
         else:
             payload = export_pdf(parsed_doc, request.anonymized_text)
             media_type = "application/pdf"
@@ -312,6 +321,32 @@ def _install_routes(app: FastAPI) -> None:
             payload,
             media_type=media_type,
             headers={"Content-Disposition": f'attachment; filename="anonymized.{request.format}"'},
+        )
+
+    @app.post("/v1/export/docx", response_class=Response, responses=_EXPORT_RESPONSES)
+    async def export_docx_in_place(
+        file: Annotated[UploadFile, File()],
+        offset_map: Annotated[UploadFile, File()],
+        anonymized_text: Annotated[UploadFile, File()],
+    ) -> Response:
+        """Anonymize the original DOCX in place, keeping its layout and formatting.
+
+        ``offset_map`` (JSON) and ``anonymized_text`` (UTF-8) must come from anonymizing
+        exactly this file; the engine re-reads the file and refuses to export when they do
+        not match. Both are sent as file parts because plain multipart fields are capped
+        at 1 MB, less than a long contract's text.
+        """
+        data = await file.read()
+        if len(data) > FILE_LIMIT_BYTES:
+            raise PayloadTooLarge(_size_limit_detail(FILE_LIMIT_BYTES))
+        text = _read_utf8_part(await anonymized_text.read())
+        _ensure_text_size(text)
+        entries = _parse_offset_map(await offset_map.read())
+        result = await run_in_threadpool(anonymize_docx_in_place, data, entries, text)
+        return Response(
+            result.content,
+            media_type=_DOCX_MEDIA_TYPE,
+            headers={"Content-Disposition": 'attachment; filename="anonymized.docx"'},
         )
 
     @app.post("/v1/documents/process", response_model=DocumentProcessResponse)
@@ -425,6 +460,7 @@ def _process_document_sync(
             source=parsed.source,
             page_count=parsed.page_count,
             text=parsed.text,
+            notices=parsed.notices,
         ),
         entities=detection.entities,
         anonymized_text=result.anonymized_text,
@@ -550,6 +586,9 @@ def _current_api_key(app: FastAPI) -> str | None:
 def _request_size_limit(path: str) -> int | None:
     if path == "/v1/documents/process":
         return FILE_LIMIT_BYTES
+    if path == "/v1/export/docx":
+        # The original file plus the anonymized text and offset map sent alongside it.
+        return FILE_LIMIT_BYTES + 2 * TEXT_LIMIT_BYTES
     if path.startswith("/v1/"):
         return TEXT_LIMIT_BYTES
     return None
@@ -563,6 +602,20 @@ def _ensure_text_size(text: str) -> None:
 def _size_limit_detail(limit: int) -> str:
     size_mb = limit // (1024 * 1024)
     return f"Request payload exceeds the {size_mb} MB limit."
+
+
+def _read_utf8_part(value: bytes) -> str:
+    try:
+        return value.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ProblemException(422, "Unprocessable Entity", "Text part is not UTF-8.") from exc
+
+
+def _parse_offset_map(value: bytes) -> list[OffsetMapEntry]:
+    try:
+        return TypeAdapter(list[OffsetMapEntry]).validate_json(value)
+    except ValidationError as exc:
+        raise ProblemException(422, "Unprocessable Entity", "Invalid offset_map.") from exc
 
 
 def _export_parsed_document(request: ExportRequest) -> ParsedDocument:

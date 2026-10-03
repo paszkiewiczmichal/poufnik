@@ -126,6 +126,8 @@ class ProcessedDocument(BaseModel):
     source: DocumentSource
     page_count: int = Field(ge=0)
     text: str
+    # What import changed or could not handle, e.g. "tracked_changes_accepted".
+    notices: list[str] = Field(default_factory=list)
 
 
 class DocumentProcessResponse(BaseModel):

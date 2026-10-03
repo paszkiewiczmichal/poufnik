@@ -32,6 +32,9 @@ class ParsedDocument(BaseModel):
     has_text_layer: bool
     page_count: int = Field(ge=0)
     source: DocumentSource = "parsed"
+    # Machine-readable codes describing what parsing changed or could not handle
+    # (e.g. "tracked_changes_accepted", "comments_removed"); shown to the user.
+    notices: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_blocks(self) -> ParsedDocument:

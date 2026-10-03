@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import json
 import os
 import socket
@@ -316,6 +317,63 @@ def test_documents_process_contract_for_docx(client: TestClient, tmp_path: Path)
     assert "[PESEL_1]" in payload["anonymized_text"]
     assert payload["replacement_map"]["entries"]
     assert payload["offset_map"]
+
+
+def test_export_docx_in_place_round_trip_keeps_the_original_document(
+    client: TestClient, tmp_path: Path
+) -> None:
+    from docx import Document
+
+    path = tmp_path / "umowa.docx"
+    document = Document()
+    document.add_heading("Umowa testowa", level=1)
+    document.add_paragraph("PESEL 44051401359, e-mail jan@example.com.")
+    document.sections[0].header.paragraphs[0].text = "Nagłówek kancelarii"
+    document.save(path)
+    processed = client.post(
+        "/v1/documents/process",
+        headers=HEADERS,
+        files={"file": (path.name, path.read_bytes(), "application/octet-stream")},
+        data={"force_ocr": "false", "language": "pl"},
+    ).json()
+
+    response = client.post(
+        "/v1/export/docx",
+        headers=HEADERS,
+        files={
+            "file": (path.name, path.read_bytes(), "application/octet-stream"),
+            "offset_map": (
+                "offset_map.json",
+                json.dumps(processed["offset_map"]),
+                "application/json",
+            ),
+            "anonymized_text": ("text.txt", processed["anonymized_text"].encode(), "text/plain"),
+        },
+    )
+
+    assert response.status_code == 200
+    exported = Document(io.BytesIO(response.content))
+    assert exported.paragraphs[0].style.name == "Heading 1"
+    assert exported.sections[0].header.paragraphs[0].text == "Nagłówek kancelarii"
+    body = "\n".join(paragraph.text for paragraph in exported.paragraphs)
+    assert "44051401359" not in body and "[PESEL_1]" in body
+
+
+def test_export_docx_in_place_rejects_a_different_file(client: TestClient, tmp_path: Path) -> None:
+    path = _write_docx(tmp_path / "umowa.docx")
+
+    response = client.post(
+        "/v1/export/docx",
+        headers=HEADERS,
+        files={
+            "file": (path.name, path.read_bytes(), "application/octet-stream"),
+            "offset_map": ("offset_map.json", "[]", "application/json"),
+            "anonymized_text": ("text.txt", b"Inny dokument", "text/plain"),
+        },
+    )
+
+    assert response.status_code == 400
+    assert "does not match" in response.json()["detail"]
 
 
 def test_text_size_limit_returns_413_problem_json(client: TestClient) -> None:

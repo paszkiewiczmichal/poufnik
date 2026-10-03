@@ -7,7 +7,6 @@ import mimetypes
 import re
 import zipfile
 from pathlib import Path
-from typing import Any
 
 from anonymizer_engine.parsers.exceptions import (
     CorruptedFile,
@@ -123,24 +122,26 @@ def parse_txt(source: Source) -> ParsedDocument:
 
 
 def parse_docx(source: Source) -> ParsedDocument:
+    """Parse DOCX text straight from its XML (see :mod:`anonymizer_engine.wordml`).
+
+    The document is sanitized in memory first (tracked changes accepted, comments and
+    personal metadata removed), so the parsed text is exactly what an in-place export
+    of the same file will contain.
+    """
     data = _read_bytes(source)
     _validate_docx_archive(data)
 
-    try:
-        from docx import Document
-    except ImportError as exc:  # pragma: no cover - dependency is declared in pyproject
-        raise RuntimeError("python-docx is required to parse DOCX files.") from exc
+    from anonymizer_engine.wordml import load
 
-    try:
-        document = Document(io.BytesIO(data))
-    except Exception as exc:
-        raise CorruptedFile("DOCX file is corrupted or not a valid DOCX document.") from exc
-
-    builder = _TextBuilder()
-    _append_docx_headers(document, builder)
-    _append_docx_container(document, builder)
-    _append_docx_footers(document, builder)
-    return builder.build("docx", has_text_layer=True, page_count=1)
+    _package, text_map, notices = load(data)
+    return ParsedDocument(
+        text=text_map.text,
+        blocks=text_map.blocks,
+        format="docx",
+        has_text_layer=True,
+        page_count=1,
+        notices=notices,
+    )
 
 
 def parse_pdf(source: Source) -> ParsedDocument:
@@ -203,79 +204,6 @@ def parse_document(
         return build_ocr_image_document(data, document_format)
 
     raise UnsupportedFormat(f"Unsupported document format: {document_format!r}")
-
-
-def _append_docx_headers(document: Any, builder: _TextBuilder) -> None:
-    _append_docx_section_stories(
-        document,
-        builder,
-        ("header", "first_page_header", "even_page_header"),
-    )
-
-
-def _append_docx_footers(document: Any, builder: _TextBuilder) -> None:
-    _append_docx_section_stories(
-        document,
-        builder,
-        ("footer", "first_page_footer", "even_page_footer"),
-    )
-
-
-def _append_docx_section_stories(
-    document: Any,
-    builder: _TextBuilder,
-    story_names: tuple[str, ...],
-) -> None:
-    seen_story_ids: set[int] = set()
-    for section in document.sections:
-        for story_name in story_names:
-            story = getattr(section, story_name)
-            if story.is_linked_to_previous:
-                continue
-            story_id = id(story._element)
-            if story_id in seen_story_ids:
-                continue
-            seen_story_ids.add(story_id)
-            _append_docx_container(story, builder)
-
-
-def _append_docx_container(container: Any, builder: _TextBuilder) -> None:
-    for item in container.iter_inner_content():
-        if hasattr(item, "rows"):
-            _append_docx_table(item, builder)
-            continue
-        text = _clean_text(item.text)
-        if not text:
-            continue
-        builder.append_block(text, _docx_paragraph_kind(item), None)
-
-
-def _append_docx_table(table: Any, builder: _TextBuilder) -> None:
-    table_started = False
-    for row in table.rows:
-        cells = [(_clean_text(cell.text), cell) for cell in row.cells]
-        if not any(text for text, _cell in cells):
-            continue
-        if not table_started:
-            if builder.length > 0:
-                builder.append_raw("\n\n")
-            table_started = True
-        else:
-            builder.append_raw("\n")
-
-        for cell_index, (cell_text, _cell) in enumerate(cells):
-            if cell_index > 0:
-                builder.append_raw("\t")
-            if cell_text:
-                builder.append_table_cell(cell_text)
-
-
-def _docx_paragraph_kind(paragraph: Any) -> BlockKind:
-    style = getattr(paragraph, "style", None)
-    style_name = (getattr(style, "name", "") or "").casefold()
-    if style_name == "title" or style_name.startswith("heading"):
-        return "heading"
-    return "paragraph"
 
 
 def _clean_text(text: str) -> str:
@@ -378,8 +306,7 @@ def _validate_docx_archive(data: bytes) -> None:
         total_uncompressed += member.file_size
         if member.file_size > MAX_DOCX_MEMBER_BYTES:
             raise DocumentTooLarge(
-                "DOCX archive member exceeds the maximum uncompressed size "
-                f"({member.filename})."
+                f"DOCX archive member exceeds the maximum uncompressed size ({member.filename})."
             )
         if member.compress_size > 0:
             ratio = member.file_size / member.compress_size
