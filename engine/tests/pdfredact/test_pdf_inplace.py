@@ -13,7 +13,7 @@ from pathlib import Path
 import pikepdf
 import pytest
 from pdf_builder import glyph_positions, raw_pdf, spans_for, text_of
-from pikepdf import Dictionary, Name
+from pikepdf import Dictionary, Name, PdfImage
 
 from anonymizer_engine.pdfredact import PdfExportError, anonymize_pdf_in_place
 
@@ -443,3 +443,48 @@ def test_fake_bold_text_drawn_several_times_is_read_once_and_removed_entirely() 
     # Every one of the four copies of every letter of the value is gone.
     assert sum(removed.values()) == 4 * len("JustynaKowalska")
     assert not glyph_positions(out) - glyph_positions(data)
+
+
+@pytest.mark.ocr
+@_REQUIRES_TESSERACT
+def test_value_written_in_a_screenshot_is_painted_over_in_the_picture() -> None:
+    from PIL import Image, ImageDraw, ImageFont
+
+    from anonymizer_engine.ocr.core import ocr_image
+
+    shot = Image.new("RGB", (900, 120), "white")
+    draw = ImageDraw.Draw(shot)
+    font = ImageFont.load_default(size=40)
+    # OCR of a screenshot loses the diacritics: KOWALSKA, not KOWALSKĄ.
+    draw.text((20, 35), "Message from KOWALSKA about work", fill="black", font=font)
+    assert "KOWALSKA" in ocr_image(shot)  # the picture really shows the name
+    encoded = io.BytesIO()
+    shot.save(encoded, format="JPEG", quality=95)
+
+    def screenshot(pdf: pikepdf.Pdf) -> dict:
+        image = pdf.make_stream(
+            encoded.getvalue(),
+            Type=Name.XObject,
+            Subtype=Name.Image,
+            Width=900,
+            Height=120,
+            ColorSpace=Name.DeviceRGB,
+            BitsPerComponent=8,
+            Filter=Name.DCTDecode,
+        )
+        return {"/XObject": Dictionary(Shot=image)}
+
+    content = b"BT /F1 12 Tf 72 700 Td (Od: Anna Kowalska) Tj ET q 450 0 0 60 72 500 cm /Shot Do Q"
+    data = raw_pdf(content, extra_resources=screenshot)
+
+    out, _ = _export(data, ("Anna Kowalska", "[OSOBA_1]"))
+
+    exported = pikepdf.open(io.BytesIO(out))
+    (picture,) = exported.pages[0].images.values()
+    pixels = PdfImage(picture).as_pil_image()
+    assert pixels.size == (900, 120)  # same picture, same place on the page
+    read = ocr_image(pixels)
+    assert "KOWALSKA" not in read.upper()
+    assert "Message" in read and "work" in read  # the rest of the picture stays readable
+    drawn = pikepdf.unparse_content_stream(pikepdf.parse_content_stream(exported.pages[0]))
+    assert b"/Shot Do" in drawn

@@ -32,7 +32,7 @@ _TEXT_SHOWING = {"Tj", "TJ", "'", '"'}
 _TOKEN_RE = re.compile(r"\[[A-ZĄĆĘŁŃÓŚŹŻ]+(?:_[A-ZĄĆĘŁŃÓŚŹŻ]+)*_\d+\]")
 _MIN_VALUE_LENGTH = 3
 _MIN_RAW_SCAN_LENGTH = 4
-_LABEL_MIN_HSCALE = 60.0
+_LABEL_MIN_HSCALE = 50.0
 _LABEL_MIN_SIZE_RATIO = 0.55
 _INVISIBLE_RENDER_MODES = {3, 7}
 _REDACTION_FILL = "0.92"
@@ -141,12 +141,22 @@ def anonymize_pdf_in_place(
         if page_map.rotation != page_map.declared_rotation:
             # The page was read in another quarter turn to get upright text: show it so.
             pdf.pages[page_map.index].obj.Rotate = page_map.rotation
+    painted_images = False
+    if any(page.images for page in text_map.pages):
+        from anonymizer_engine.pdfredact.images import paint_values_in_images
+
+        painted_images = bool(paint_values_in_images(pdf, values, scan_pages))
     pdf.remove_unreferenced_resources()
 
     output = io.BytesIO()
     pdf.save(output, compress_streams=True, object_stream_mode=pikepdf.ObjectStreamMode.generate)
     content = output.getvalue()
     _verify(content, anonymized_text, values)
+    if painted_images:
+        from anonymizer_engine.pdfredact.images import verify_images
+
+        with pikepdf.open(io.BytesIO(content)) as saved:
+            verify_images([raw for page in saved.pages for raw in page.images.values()], values)
     if scan_pages:
         from anonymizer_engine.pdfredact.scan import verify_rasters
 
@@ -475,7 +485,7 @@ class Label:
 
 def fit_token(token: str, size: float, room: float) -> tuple[float, float, float]:
     """Font size, horizontal scale (Tz) and drawn width of a token that should fit ``room``:
-    narrowed first (down to 60 %), then made smaller (down to 55 %), then allowed to run on."""
+    narrowed first (down to 50 %), then made smaller (down to 55 %), then allowed to run on."""
     from reportlab.pdfbase.pdfmetrics import stringWidth
 
     hscale = 100.0

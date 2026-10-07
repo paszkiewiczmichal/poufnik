@@ -432,7 +432,7 @@ export const texts = {
       pdf_layout_export_unavailable:
         "Tego PDF nie da się zanonimizować z zachowaniem wyglądu - eksport PDF będzie miał uproszczony układ.",
       images_or_objects_present:
-        "Dokument zawiera obrazy lub osadzone obiekty. Poufnik nie zmienia ich zawartości - sprawdź je przed wysłaniem.",
+        "Dokument zawiera obrazy lub osadzone obiekty. W eksporcie PDF dane zanonimizowane w tekście są zamalowywane także na obrazach (np. na zrzutach ekranu), ale obraz może pokazywać inne dane - sprawdź obrazy przed wysłaniem.",
     } as Record<string, string>,
     mapWarning: "Zapisany plik mapy pozwala przywrócić dane. Traktuj go jak dane wrażliwe.",
     mapWarningTitle: "Zapis mapy zastąpień",
