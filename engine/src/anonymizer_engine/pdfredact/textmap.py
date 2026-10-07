@@ -21,6 +21,7 @@ from pdfminer.layout import LTChar
 from pdfminer.pdfinterp import PDFPageInterpreter
 from pdfminer.pdftypes import stream_value
 from pdfminer.psparser import literal_name
+from pdfplumber import utils
 
 from anonymizer_engine.parsers.exceptions import CorruptedFile
 from anonymizer_engine.parsers.models import Block
@@ -70,6 +71,10 @@ class PageMap:
     # Rotation the page was read with (text upright) and the one the file declares.
     rotation: int = 0
     declared_rotation: int = 0
+    # Glyphs drawn again on top of another ("fake bold": the same character several times a
+    # fraction of a point apart): kept index -> indexes of its extra copies. The extra copies
+    # are not part of the text, but they must go when the character is anonymized.
+    duplicates: dict[int, list[int]] = field(default_factory=dict)
 
 
 @dataclass
@@ -94,6 +99,10 @@ class PdfTextMap:
                 continue
             seen.add((page, char))
             result.append((page, char))
+            for extra in self.pages[page].duplicates.get(char, ()):
+                if (page, extra) not in seen:
+                    seen.add((page, extra))
+                    result.append((page, extra))
         return result
 
 
@@ -231,6 +240,7 @@ def build_text_map(data: bytes) -> PdfTextMap:
                 page._layout = layout  # pdfplumber reads chars from this layout
                 chars = page.chars
                 _check_alignment(chars, device.glyphs, index, float(page.mediabox[0]))
+                duplicates, extra_copies = _find_overprinted(chars)
                 pages.append(
                     PageMap(
                         index=index,
@@ -243,11 +253,17 @@ def build_text_map(data: bytes) -> PdfTextMap:
                         height=float(layout.height),
                         rotation=rotation,
                         declared_rotation=int(page.page_obj.rotate or 0) % 360,
+                        duplicates=duplicates,
                     )
                 )
                 if index > 0:
                     builder.page_break()
-                textmap = page._get_textmap()
+                textmap = utils.chars_to_textmap(
+                    [char for position, char in enumerate(chars) if position not in extra_copies],
+                    layout_bbox=page.bbox,
+                    layout_width=page.width,
+                    layout_height=page.height,
+                )
                 page_chars, page_owner = _expand(textmap.tuples, chars)
                 extracted += len("".join(page_chars).strip())
                 builder.page_paragraphs(page_chars, page_owner, index)
@@ -325,6 +341,39 @@ def _check_alignment(
         # pdfplumber shifts x by the MediaBox origin; y0 is pdfminer's untouched value.
         if abs(char["x0"] - mediabox_x0 - glyph.x0) > 0.01 or abs(char["y0"] - glyph.y0) > 0.01:
             raise ValueError(f"PDF page {page + 1}: glyph order does not match characters.")
+
+
+_OVERPRINT_TOLERANCE = 1.0  # points; pdfplumber's own dedupe default
+
+
+def _find_overprinted(chars: list[dict[str, Any]]) -> tuple[dict[int, list[int]], set[int]]:
+    """Find characters drawn again on top of an earlier one (same text, font, size, and a
+    position within a point). Documents printed from mail clients draw bold headers this
+    way - without this, "Monday" would be read as "MMMMoooonnnndddaaayyyy"."""
+    kept: dict[tuple[str, str, float, int, int], list[int]] = {}
+    duplicates: dict[int, list[int]] = {}
+    extra: set[int] = set()
+    cell = 2 * _OVERPRINT_TOLERANCE
+    for index, char in enumerate(chars):
+        x, y = char["x0"], char["top"]
+        cx, cy = int(x // cell), int(y // cell)
+        base = (char["text"], str(char.get("fontname")), round(float(char["size"]), 2))
+        original = None
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for candidate in kept.get((*base, cx + dx, cy + dy), ()):
+                    other = chars[candidate]
+                    if (
+                        abs(other["x0"] - x) <= _OVERPRINT_TOLERANCE
+                        and abs(other["top"] - y) <= _OVERPRINT_TOLERANCE
+                    ):
+                        original = candidate
+        if original is None:
+            kept.setdefault((*base, cx, cy), []).append(index)
+        else:
+            duplicates.setdefault(original, []).append(index)
+            extra.add(index)
+    return duplicates, extra
 
 
 def _expand(

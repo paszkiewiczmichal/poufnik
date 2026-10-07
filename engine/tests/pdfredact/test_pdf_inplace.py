@@ -418,3 +418,28 @@ def test_sideways_or_upside_down_scan_is_recognized_and_shown_upright(turn: int)
     assert int(exported.pages[0].obj.Rotate) == turn  # shown upright in viewers
     recognized = ocr_pdf(out).text
     assert "90010112345" not in recognized and "Pozwany" in recognized
+
+
+def test_fake_bold_text_drawn_several_times_is_read_once_and_removed_entirely() -> None:
+    # Mail clients print bold headers by drawing each line four times 0.26 pt apart.
+    line = b"(Od: Justyna Kowalska, Gdansk, zamieszkala przy ulicy Morskiej.) Tj"
+    content = (
+        b"BT /F1 12 Tf "
+        + b" ".join(b"1 0 0 1 %.2f 700 Tm " % (72 + 0.26 * copy) + line for copy in range(4))
+        + b" ET"
+    )
+    data = raw_pdf(content)
+
+    assert text_of(data) == "Od: Justyna Kowalska, Gdansk, zamieszkala przy ulicy Morskiej."
+
+    out, _ = _export(data, ("Justyna Kowalska", "[OSOBA_1]"))
+
+    exported = text_of(out)
+    # The token is narrower than the name, so the reader may see a gap before the comma.
+    assert exported.startswith("Od: [OSOBA_1]")
+    assert exported.endswith(", Gdansk, zamieszkala przy ulicy Morskiej.")
+    assert "Justyna" not in exported and "Kowalska" not in exported
+    removed = glyph_positions(data) - glyph_positions(out)
+    # Every one of the four copies of every letter of the value is gone.
+    assert sum(removed.values()) == 4 * len("JustynaKowalska")
+    assert not glyph_positions(out) - glyph_positions(data)

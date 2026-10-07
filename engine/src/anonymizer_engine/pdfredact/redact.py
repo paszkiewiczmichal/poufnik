@@ -33,7 +33,7 @@ _TOKEN_RE = re.compile(r"\[[A-ZĄĆĘŁŃÓŚŹŻ]+(?:_[A-ZĄĆĘŁŃÓŚŹŻ]+)
 _MIN_VALUE_LENGTH = 3
 _MIN_RAW_SCAN_LENGTH = 4
 _LABEL_MIN_HSCALE = 60.0
-_LABEL_MIN_SIZE_RATIO = 0.75
+_LABEL_MIN_SIZE_RATIO = 0.55
 _INVISIBLE_RENDER_MODES = {3, 7}
 _REDACTION_FILL = "0.92"
 NOTICE_IMAGES = "images_or_objects_present"
@@ -475,7 +475,7 @@ class Label:
 
 def fit_token(token: str, size: float, room: float) -> tuple[float, float, float]:
     """Font size, horizontal scale (Tz) and drawn width of a token that should fit ``room``:
-    narrowed first (down to 60 %), then made smaller (down to 75 %), then allowed to run on."""
+    narrowed first (down to 60 %), then made smaller (down to 55 %), then allowed to run on."""
     from reportlab.pdfbase.pdfmetrics import stringWidth
 
     hscale = 100.0
@@ -679,7 +679,12 @@ def _verify(content: bytes, anonymized_text: str, values: SensitiveValues) -> No
         raise PdfExportError(
             "Verification failed: an anonymized value is still in the document text."
         )
-    found_tokens = Counter(_TOKEN_RE.findall(text))
+    # Tokens are checked in drawing order: a token squeezed into a tight gap may touch the
+    # next character, which a position-ordered read would then slip into the middle of it.
+    drawn = "\n".join(
+        "".join(glyph.text for glyph in page.glyphs) for page in loaded.text_map.pages
+    )
+    found_tokens = Counter(_TOKEN_RE.findall(drawn))
     if any(found_tokens[token] < 1 for token in values.tokens):
         raise PdfExportError(
             "Verification failed: anonymization tokens are missing in the document."
