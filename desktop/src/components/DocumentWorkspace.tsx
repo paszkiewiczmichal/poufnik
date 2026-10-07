@@ -135,7 +135,7 @@ export function DocumentWorkspace({
             {view === "document" ? <>{texts.review.step} · </> : null}
             {document.format.toUpperCase()} ·{" "}
             {document.source === "ocr" ? texts.document.sourceOcr : texts.document.sourceParsed} ·{" "}
-            {document.page_count} {texts.document.pages}
+            {texts.document.pages(document.page_count)}
           </div>
         </div>
         {view === "document" && (

@@ -1073,6 +1073,7 @@ button:disabled {
 
 .screen {
   width: 100%;
+  margin-inline: auto;
   padding: var(--sp-8) var(--sp-9);
 }
 

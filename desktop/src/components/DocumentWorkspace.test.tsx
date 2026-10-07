@@ -22,7 +22,9 @@ describe("DocumentWorkspace Early Bird features", () => {
   it("gates comparison for Basic users", () => {
     renderWorkspace("basic", { view: "compare" });
 
-    expect(screen.getByTestId("tier-gate")).toHaveTextContent(texts.compare.title);
+    expect(screen.getByTestId("tier-gate")).toHaveTextContent(
+      "Porównanie oryginału i wyniku – funkcja dostępna z darmowym kontem Early Bird.",
+    );
     expect(screen.queryByText(texts.compare.original)).not.toBeInTheDocument();
   });
 

@@ -146,7 +146,7 @@ export const texts = {
     freeBadge: "Darmowa",
     freeAccountBadge: "Darmowe konto",
     earlyBirdFeature: (featureName: string) =>
-      `${featureName} - funkcja dostępna z darmowym kontem Early Bird.`,
+      `${featureName.replace(/\.$/, "")} – funkcja dostępna z darmowym kontem Early Bird.`,
     earlyBirdHint: "Konto jest darmowe - dokumenty nadal są przetwarzane lokalnie.",
     backToResult: "Wróć do wyniku",
     earlyBirdActive: "Warstwa Early Bird jest aktywna.",
@@ -302,7 +302,13 @@ export const texts = {
     title: "Dokument",
     sourceParsed: "tekst",
     sourceOcr: "OCR",
-    pages: "stron",
+    pages: (count: number) => {
+      const lastTwo = count % 100;
+      const last = count % 10;
+      if (count === 1) return "1 strona";
+      if (last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14)) return `${count} strony`;
+      return `${count} stron`;
+    },
     newDocument: "Nowy dokument",
     previousPage: "Poprzednia strona",
     nextPage: "Następna strona",
