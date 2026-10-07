@@ -13,7 +13,12 @@ from anonymizer_engine.detection.companies import (
 from anonymizer_engine.detection.consolidation import consolidate_entity_groups
 from anonymizer_engine.detection.deterministic import detect_custom_rules, detect_deterministic
 from anonymizer_engine.detection.dictionary import detect_dictionary, is_negative_person_text
-from anonymizer_engine.detection.models import DetectedEntity, DetectionResult, EntityCategory
+from anonymizer_engine.detection.models import (
+    DetectedEntity,
+    DetectionResult,
+    EntityCategory,
+    EntityStatus,
+)
 from anonymizer_engine.detection.ner import NerEngine, SpacyPresidioEngine
 from anonymizer_engine.detection.places import detect_places, has_address_context, is_place_name
 from anonymizer_engine.detection.public_institutions import (
@@ -28,6 +33,30 @@ _POSTAL_CODE_RE = r"\d{2}-\d{3}"
 # "/73.20.Z/, 9) pozostałe [...]". The NER model sometimes tags just the leading
 # "/73" as ADDRESS because it resembles a street-number suffix.
 _PKD_CODE_SUFFIX_RE = re.compile(r"^\.\d{2}\.[A-Z]\b")
+# Words that NER tags as names in printed e-mails and calendar lines ("Monday, October 5",
+# "Central European Summer Time", "Temat: Prośba o ...", "contract.PDF"). An entity made
+# only of these words identifies nobody.
+_NOT_A_NAME_WORDS = {
+    *(
+        "monday tuesday wednesday thursday friday saturday sunday "
+        "january february march april may june july august september october november "
+        "december"
+    ).split(),
+    *"summer winter standard daylight time central european eastern western zone".split(),
+    *"gmt utc cet cest est pst".split(),
+    *"temat prośba pytanie zapytanie wiadomość odpowiedź załącznik załączniki".split(),
+    *"subject from sent cc bcc fwd fw re odp pozdrawiam".split(),
+    *"pdf docx doc jpg jpeg png xlsx xls zip".split(),
+}
+_NAME_WORD_RE = re.compile(r"[^\W\d_]+")
+# "Justyna Ł." - a first name followed by the initial of the surname.
+_TRAILING_INITIAL_RE = re.compile(r" [A-ZĄĆĘŁŃÓŚŹŻ]\.")
+# "Kancelaria Radcy Prawnego Jan Kowalski" is one firm named after its owner.
+_LAW_FIRM_PREFIX_RE = re.compile(
+    r"Kancelari[a-ząęółśżźćń]*\s+(?:Radc[a-ząęółśżźćń]*\s+Prawn[a-ząęółśżźćń]*"
+    r"|Adwokack[a-ząęółśżźćń]*|Adwokat[a-ząęółśżźćń]*|Notarialn[a-ząęółśżźćń]*"
+    r"|Prawn[a-ząęółśżźćń]*)$"
+)
 
 
 def detect_all(
@@ -67,7 +96,10 @@ def detect_all(
         *court_entities,
     ]
     entities = _merge_entities(regex_entities, dictionary_entities, ner_entities)
+    entities = [entity for entity in entities if not _is_not_a_name(entity)]
+    entities = _merge_law_firm_owner_names(text, _extend_trailing_initials(text, entities))
     entities = _merge_postal_address_clusters(text, entities)
+    entities = _propagate_repeated_names(text, entities)
     entities, groups = consolidate_entity_groups(entities, text, tokens)
     return DetectionResult(text=text, entities=entities, entity_groups=groups)
 
@@ -169,9 +201,109 @@ def _filter_ner_address_false_positives(
         for entity in entities
         if not (
             entity.category is EntityCategory.ADDRESS
-            and _address_entity_is_pkd_code_fragment(text, entity)
+            and (
+                _address_entity_is_pkd_code_fragment(text, entity)
+                # A lone lowercase word ("środkowoeuropejski") is never an address.
+                or re.fullmatch(r"[a-ząćęłńóśźż-]+", entity.text) is not None
+            )
         )
     ]
+
+
+def _is_not_a_name(entity: DetectedEntity) -> bool:
+    if entity.category not in {
+        EntityCategory.PERSON,
+        EntityCategory.COMPANY,
+        EntityCategory.ADDRESS,
+    }:
+        return False
+    words = [word.casefold() for word in _NAME_WORD_RE.findall(entity.text)]
+    return bool(words) and all(word in _NOT_A_NAME_WORDS for word in words)
+
+
+def _extend_trailing_initials(text: str, entities: list[DetectedEntity]) -> list[DetectedEntity]:
+    """Take the surname initial into the person: "Justyna Ł." must not leave "Ł." behind."""
+    taken = [(entity.start, entity.end) for entity in entities]
+    result: list[DetectedEntity] = []
+    for entity in entities:
+        match = _TRAILING_INITIAL_RE.match(text, entity.end)
+        if (
+            entity.category is EntityCategory.PERSON
+            and match
+            and not any(start < match.end() and entity.end < end for start, end in taken)
+        ):
+            entity = entity.model_copy(
+                update={"end": match.end(), "text": text[entity.start : match.end()]}
+            )
+        result.append(entity)
+    return result
+
+
+def _propagate_repeated_names(text: str, entities: list[DetectedEntity]) -> list[DetectedEntity]:
+    """Mark every other exact occurrence of a detected person or company name.
+
+    NER misses a name in some sentences ("klienta JDN") while finding it in others; one
+    unmasked mention would reveal what every token stands for.
+    """
+    names: dict[str, DetectedEntity] = {}
+    for entity in entities:
+        if (
+            entity.category in {EntityCategory.PERSON, EntityCategory.COMPANY}
+            and entity.status is not EntityStatus.REJECTED
+            and len(entity.text) >= 3
+            and entity.text[0].isupper()
+        ):
+            names.setdefault(entity.text, entity)
+    if not names:
+        return entities
+    taken = sorted((entity.start, entity.end) for entity in entities)
+    added: list[DetectedEntity] = []
+    pattern = re.compile(
+        r"(?<!\w)(?:" + "|".join(re.escape(name) for name in sorted(names, key=len, reverse=True))
+        + r")(?!\w)"
+    )
+    for match in pattern.finditer(text):
+        if any(start < match.end() and match.start() < end for start, end in taken):
+            continue
+        source = names[match.group()]
+        added.append(
+            source.model_copy(
+                update={
+                    "start": match.start(),
+                    "end": match.end(),
+                    "entity_group_id": None,
+                    "canonical_text": None,
+                }
+            )
+        )
+    return sorted([*entities, *added], key=lambda item: (item.start, item.end))
+
+
+def _merge_law_firm_owner_names(
+    text: str, entities: list[DetectedEntity]
+) -> list[DetectedEntity]:
+    """Join "Kancelaria Radcy Prawnego" and the owner's name that follows into one firm."""
+    ordered = sorted(entities, key=lambda item: (item.start, item.end))
+    result: list[DetectedEntity] = []
+    skip: set[int] = set()
+    for index, entity in enumerate(ordered):
+        if index in skip:
+            continue
+        following = ordered[index + 1] if index + 1 < len(ordered) else None
+        if (
+            entity.category is EntityCategory.COMPANY
+            and following is not None
+            and following.category is EntityCategory.PERSON
+            and _LAW_FIRM_PREFIX_RE.search(entity.text)
+            and text[entity.end : following.start].strip() == ""
+            and "\n" not in text[entity.end : following.start]
+        ):
+            entity = entity.model_copy(
+                update={"end": following.end, "text": text[entity.start : following.end]}
+            )
+            skip.add(index + 1)
+        result.append(entity)
+    return result
 
 
 def _filter_generic_court_companies(entities: list[DetectedEntity]) -> list[DetectedEntity]:

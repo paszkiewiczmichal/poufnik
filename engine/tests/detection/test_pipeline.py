@@ -221,3 +221,98 @@ def test_resolves_spacy_model_from_pyinstaller_internal_dir(tmp_path, monkeypatc
 
     assert resolve_spacy_model("fake_pl_model") == str(model_dir)
     assert spacy_model_available("fake_pl_model") is True
+
+
+class ListedNerEngine:
+    """NER stub that tags the given (text, category) spans at their first occurrence."""
+
+    def __init__(self, spans: list[tuple[str, EntityCategory]]) -> None:
+        self.spans = spans
+        self.last_tokens: list[Token] = []
+
+    def analyze(self, text: str, language: str) -> list[DetectedEntity]:
+        entities = []
+        for value, category in self.spans:
+            start = text.index(value)
+            entities.append(
+                DetectedEntity(
+                    category=category,
+                    start=start,
+                    end=start + len(value),
+                    text=value,
+                    confidence=0.85,
+                    source="ner",
+                    validation=ValidationStatus.NOT_APPLICABLE,
+                )
+            )
+        return entities
+
+
+def _found(text: str, spans: list[tuple[str, EntityCategory]]) -> list[tuple[str, EntityCategory]]:
+    result = detect_all(text, ner_engine=ListedNerEngine(spans))
+    return [(text[e.start : e.end], e.category) for e in result.entities]
+
+
+def test_printed_e_mail_header_words_are_not_names_or_addresses() -> None:
+    text = (
+        "Monday, October 5, 2026 at 12:21 AM Central European Summer Time\n"
+        "Temat: Prośba o konsultację\n"
+        "Data: niedziela, czas środkowoeuropejski letni\n"
+        "Załącznik: umowa.PDF\n"
+    )
+    found = _found(
+        text,
+        [
+            ("Monday", EntityCategory.COMPANY),
+            ("Summer Time", EntityCategory.PERSON),
+            ("Prośba", EntityCategory.PERSON),
+            ("środkowoeuropejski", EntityCategory.ADDRESS),
+            ("PDF", EntityCategory.COMPANY),
+        ],
+    )
+
+    assert found == []
+
+
+def test_numbered_attachment_file_names_are_not_tax_numbers() -> None:
+    text = "Załączniki: 1000064013.jpg, 1000070420.pdf\n\nNIP firmy: 1000064013"
+
+    result = detect_all(text, ner_engine=ListedNerEngine([]))
+
+    # Only the number labelled as NIP stays; the same digits as a file name do not.
+    assert [(e.category, e.start) for e in result.entities] == [
+        (EntityCategory.NIP, text.rindex("1000064013"))
+    ]
+
+
+def test_surname_initial_after_a_first_name_belongs_to_the_person() -> None:
+    text = "Od: Justyna Ł.\nDo: biuro"
+
+    assert _found(text, [("Justyna", EntityCategory.PERSON)]) == [
+        ("Justyna Ł.", EntityCategory.PERSON)
+    ]
+
+
+def test_law_firm_named_after_its_owner_is_one_company() -> None:
+    text = "Do: Kancelaria Radcy Prawnego Jan Nowak\nW załączeniu dokumenty."
+
+    found = _found(
+        text,
+        [
+            ("Kancelaria Radcy Prawnego", EntityCategory.COMPANY),
+            ("Jan Nowak", EntityCategory.PERSON),
+        ],
+    )
+
+    assert found == [("Kancelaria Radcy Prawnego Jan Nowak", EntityCategory.COMPANY)]
+
+
+def test_every_repeat_of_a_detected_name_is_marked() -> None:
+    text = (
+        "Pracodawca ACME przekazał dane klienta ACME.\n"
+        "Później ACME odmówił. ACMEX to inna firma."
+    )
+
+    found = _found(text, [("ACME", EntityCategory.COMPANY)])
+
+    assert found == [("ACME", EntityCategory.COMPANY)] * 3

@@ -23,6 +23,10 @@ from anonymizer_engine.detection.models import (
 # pre-filter and does not catch every catastrophic shape (e.g. ``(a|a)*b``).
 CUSTOM_RULE_TIMEOUT_SECONDS = 2.0
 
+_FILE_EXTENSION_AFTER_RE = re.compile(
+    r"\.(?:jpe?g|png|gif|heic|tiff?|bmp|pdf|docx?|xlsx?|odt|rtf|txt|zip|eml|msg)(?![A-Za-z0-9])",
+    re.IGNORECASE,
+)
 _PESEL_RE = re.compile(r"\d{11}")
 _NIP_RE = re.compile(
     r"(?:PL[\s-]?)?(?:\d{3}[\s-]?\d{3}[\s-]?\d{2}[\s-]?\d{2}"
@@ -176,7 +180,13 @@ def detect_deterministic(text: str) -> list[DetectedEntity]:
     ]
     for recognizer in recognizers:
         entities.extend(recognizer(text))
+    entities = [entity for entity in entities if not _is_file_name_number(text, entity)]
     return _dedupe_overlaps(entities)
+
+
+def _is_file_name_number(text: str, entity: DetectedEntity) -> bool:
+    """A bare number that is a file name, e.g. the attachment "1000064013.jpg" in an e-mail."""
+    return entity.text.isdigit() and bool(_FILE_EXTENSION_AFTER_RE.match(text, entity.end))
 
 
 def detect_custom_rules(
