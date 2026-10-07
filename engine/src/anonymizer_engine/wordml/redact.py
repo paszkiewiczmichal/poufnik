@@ -45,8 +45,8 @@ _TEXT_ATTRIBUTES: dict[str, tuple[str, ...]] = {
     "textpath": ("string",),
 }
 _TEXT_LOCAL_NAMES = {"t", "instrText", "delText"}
-# Verification also looks at numeric chart values and document properties: a sensitive
-# value there cannot be rewritten safely, so it must stop the export instead.
+# Verification also looks at numeric chart values and document properties: any sensitive
+# value still there stops the export.
 _REPORTED_LOCAL_NAMES = {
     "v",
     "lpstr",
@@ -253,8 +253,29 @@ def _apply_safety_net(package: DocxPackage, text_map: TextMap, sensitive: _Sensi
             if replaced != value:
                 element.set(attribute, replaced)
                 changed = True
+        changed |= _drop_numeric_chart_points(root, sensitive)
         if changed:
             package.mark_dirty(name)
+
+
+def _drop_numeric_chart_points(root: etree._Element, sensitive: _SensitiveValues) -> bool:
+    """Remove chart data points whose number is an anonymized value (e.g. an account number).
+
+    A token is not a number, so the point is dropped: the chart shows a gap there.
+    """
+    changed = False
+    for value in [node for node in root.iter() if isinstance(node.tag, str)]:
+        if etree.QName(value).localname != "v" or not value.text:
+            continue
+        if not _has_ancestor(value, {"numCache", "numLit"}) or not sensitive.find(value.text):
+            continue
+        point = value.getparent()
+        if point is not None and etree.QName(point).localname == "pt":
+            container = point.getparent()
+            if container is not None:
+                container.remove(point)
+                changed = True
+    return changed
 
 
 def _net_relationships(package: DocxPackage, name: str, sensitive: _SensitiveValues) -> None:

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { ApiError } from "./client";
-import { toUserMessage } from "./errors";
+import { fallbackOnEngineRefusal, toUserMessage } from "./errors";
 import { texts } from "../i18n";
 
 function apiError(options: {
@@ -55,25 +55,20 @@ describe("toUserMessage", () => {
     expect(toUserMessage(new Error("network down"))).toBe("network down");
   });
 
-  it("explains in Polish why an in-place DOCX export was refused", () => {
-    expect(
-      toUserMessage(
-        apiError({
-          status: 400,
-          detail:
-            "The source document does not match the anonymization result (the file was changed after it was imported).",
-        }),
-      ),
-    ).toBe(texts.errors.exportSourceChanged);
-    expect(
-      toUserMessage(
-        apiError({
-          status: 400,
-          detail:
-            "Verification failed: anonymized values remain outside the document text (word/charts/chart1.xml).",
-        }),
-      ),
-    ).toBe(texts.errors.exportLeakBlocked);
+  it("lets an in-place export refused by the engine fall back to the simplified file", () => {
+    const refused = apiError({
+      status: 400,
+      detail: "Verification failed: anonymized values remain outside the document text (word/charts/chart1.xml).",
+    });
+    expect(fallbackOnEngineRefusal(refused)).toBeNull();
+    expect(fallbackOnEngineRefusal(apiError({ status: 422, detail: "Invalid offset_map." }))).toBeNull();
+  });
+
+  it("does not hide failures that a simplified file would hit too", () => {
+    const tooLarge = apiError({ status: 413 });
+    expect(() => fallbackOnEngineRefusal(tooLarge)).toThrow(tooLarge);
+    const engineDown = new TypeError("Failed to fetch");
+    expect(() => fallbackOnEngineRefusal(engineDown)).toThrow(engineDown);
   });
 
   it("falls back to the generic message for a non-Error value", () => {

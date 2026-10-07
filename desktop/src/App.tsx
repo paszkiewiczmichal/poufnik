@@ -3,7 +3,7 @@ import type { Update } from "@tauri-apps/plugin-updater";
 
 import "./App.css";
 import { createAnonymizerApiClient } from "./api/client";
-import { toUserMessage } from "./api/errors";
+import { fallbackOnEngineRefusal, toUserMessage } from "./api/errors";
 import { AccountsClientError, loginToAccounts, refreshAccountsToken } from "./auth/client";
 import { getAccountsPublicKeyPem } from "./auth/publicKey";
 import {
@@ -868,16 +868,34 @@ function App() {
       }
       setExportNotice(null);
       const client = createAnonymizerApiClient(endpoint);
+      const anonymizedText = anonymization.anonymizedText;
+      // Built only from the anonymized text, so it cannot contain an original value.
+      const exportSimplified = async (target: ExportFormat, notice: string | null) => {
+        const blob = await client.exportDocument({
+          anonymizedText,
+          format: target,
+          blocks: blocksForExport(anonymizedText),
+        });
+        if (notice) {
+          setExportNotice(notice);
+        }
+        return blob;
+      };
       const sourceIsDocx = document?.format === "docx";
       const sourceFile = uiState.selectedFile;
       const renderer = format === "pdf" && sourceIsDocx && sourceFile ? await getPdfRenderer() : null;
       if (sourceIsDocx && sourceFile && (format === "docx" || renderer)) {
         // Same file, same offsets: the engine edits the original XML and keeps the layout.
-        const docx = await client.exportDocxInPlace({
-          file: sourceFile,
-          offsetMap: anonymization.offsetMap,
-          anonymizedText: anonymization.anonymizedText,
-        });
+        const docx = await client
+          .exportDocxInPlace({
+            file: sourceFile,
+            offsetMap: anonymization.offsetMap,
+            anonymizedText: anonymization.anonymizedText,
+          })
+          .catch(fallbackOnEngineRefusal);
+        if (!docx) {
+          return exportSimplified(format, texts.generation.exportFaithfulFailed);
+        }
         if (format === "docx") {
           return docx;
         }
@@ -896,18 +914,17 @@ function App() {
       const pdfLayoutKnown = !document?.notices?.includes(PDF_LAYOUT_UNAVAILABLE);
       if (format === "pdf" && sourceIsPdf && sourceFile && pdfLayoutKnown) {
         // Glyphs of the values are removed from the original PDF (scans: painted over).
-        return client.exportPdfInPlace({
-          file: sourceFile,
-          offsetMap: anonymization.offsetMap,
-          anonymizedText: anonymization.anonymizedText,
-          ocr: document?.source === "ocr",
-        });
+        const pdf = await client
+          .exportPdfInPlace({
+            file: sourceFile,
+            offsetMap: anonymization.offsetMap,
+            anonymizedText: anonymization.anonymizedText,
+            ocr: document?.source === "ocr",
+          })
+          .catch(fallbackOnEngineRefusal);
+        return pdf ?? exportSimplified(format, texts.generation.exportFaithfulFailed);
       }
-      const blob = await client.exportDocument({
-        anonymizedText: anonymization.anonymizedText,
-        format,
-        blocks: blocksForExport(anonymization.anonymizedText),
-      });
+      const blob = await exportSimplified(format, null);
       if (sourceIsDocx) {
         setExportNotice(
           format === "docx" || !sourceFile

@@ -297,10 +297,6 @@ export const texts = {
     noDocument: "Nie ma aktywnego dokumentu.",
     noReplacementMap: "Brak mapy zastąpień. Najpierw wykonaj anonimizację albo wczytaj mapę JSON.",
     pdfRenderFailed: "Nie udało się utworzyć PDF w programie biurowym. Wyeksportuj DOCX i zapisz go jako PDF w Wordzie.",
-    exportSourceChanged:
-      "Plik źródłowy zmienił się od chwili importu. Zaimportuj dokument ponownie, aby go wyeksportować.",
-    exportLeakBlocked:
-      "Eksport DOCX zatrzymany: w pliku zostały dane, których Poufnik nie może bezpiecznie zastąpić (np. w wykresie). Usuń je w Wordzie i zaimportuj dokument ponownie.",
   },
   document: {
     title: "Dokument",
@@ -402,6 +398,8 @@ export const texts = {
       "Oryginalny plik nie jest dostępny (dokument otwarty z historii), więc DOCX zapisano w uproszczonym układzie. Aby zachować wygląd oryginału, zaimportuj plik ponownie.",
     exportDocxFromPdf:
       "PDF nie przechowuje układu dokumentu Worda, więc DOCX z PDF ma uproszczony układ. Aby zachować wygląd oryginału, wybierz Eksportuj PDF.",
+    exportFaithfulFailed:
+      "Nie udało się zachować wyglądu oryginału bez ryzyka, że w pliku zostaną dane, więc dokument zapisano w uproszczonym układzie. Treść jest taka sama jak w zakładce Zanonimizowany tekst.",
     exportPdfLibreOffice:
       "PDF utworzono w LibreOffice - jego wygląd może minimalnie różnić się od tego w Microsoft Word.",
     exportPdfWithoutWord:

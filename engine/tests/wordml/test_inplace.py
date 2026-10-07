@@ -285,11 +285,14 @@ def test_value_in_an_unwalked_part_is_replaced_by_the_safety_net() -> None:
     assert "[OSOBA_1]" in glossary_out
 
 
-def test_value_that_cannot_be_rewritten_safely_stops_the_export() -> None:
+def test_anonymized_number_in_chart_data_is_dropped_and_other_points_stay() -> None:
     chart = (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         '<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">'
-        "<c:numCache><c:pt><c:v>44051401359</c:v></c:pt></c:numCache></c:chartSpace>"
+        '<c:numCache><c:ptCount val="2"/>'
+        '<c:pt idx="0"><c:v>44051401359</c:v></c:pt>'
+        '<c:pt idx="1"><c:v>1250</c:v></c:pt>'
+        "</c:numCache></c:chartSpace>"
     )
     data = build_docx(
         p(r("PESEL 44051401359")),
@@ -297,8 +300,13 @@ def test_value_that_cannot_be_rewritten_safely_stops_the_export() -> None:
         document_rels=[("rIdH", "chart", "charts/chart1.xml", False)],
     )
 
-    with pytest.raises(DocxExportError, match="word/charts/chart1.xml"):
-        _export(data, ("44051401359", "[PESEL_1]"))
+    out, _ = _export(data, ("44051401359", "[PESEL_1]"))
+
+    chart_out = read_part(out, "word/charts/chart1.xml")
+    assert "44051401359" not in chart_out
+    # The token is not a number, so the point is removed rather than rewritten.
+    assert "[PESEL_1]" not in chart_out
+    assert '<c:pt idx="1"><c:v>1250</c:v></c:pt>' in chart_out
 
 
 def test_values_the_user_left_visible_stay_and_are_not_reported() -> None:
