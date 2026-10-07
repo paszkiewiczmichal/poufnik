@@ -25,7 +25,6 @@ function makePromptState(overrides: Partial<PromptState> = {}): PromptState {
     status: "ready",
     error: null,
     items: [makePrompt()],
-    search: "",
     selectedId: null,
     ...overrides,
   };
@@ -34,7 +33,6 @@ function makePromptState(overrides: Partial<PromptState> = {}): PromptState {
 function renderPanel(props: Partial<Parameters<typeof PromptsPanel>[0]> = {}) {
   const handlers = {
     onLoad: vi.fn(),
-    onSearch: vi.fn(),
     onSelect: vi.fn(),
     onCopyPrompt: vi.fn(),
   };
@@ -69,41 +67,30 @@ describe("PromptsPanel", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("brak połączenia");
   });
 
-  it("shows the empty note when the list is ready but empty", () => {
-    renderPanel({ prompts: makePromptState({ status: "ready", items: [] }) });
-
-    expect(screen.getByText(texts.prompts.empty)).toBeInTheDocument();
-  });
-
-  it("filters prompts by title or tag against the search box", () => {
-    renderPanel({
-      prompts: makePromptState({
-        items: [makePrompt({ id: "p1", title: "Wezwanie" }), makePrompt({ id: "p2", title: "Pozew" })],
-        search: "pozew",
-      }),
-    });
-
-    expect(screen.queryByText("Wezwanie")).not.toBeInTheDocument();
-    expect(screen.getAllByText("Pozew").length).toBeGreaterThan(0);
-  });
-
-  it("calls onSearch when typing in the search box", () => {
-    const handlers = renderPanel();
-
-    fireEvent.change(screen.getByLabelText(texts.prompts.search), { target: { value: "wezwanie" } });
-
-    expect(handlers.onSearch).toHaveBeenCalledWith("wezwanie");
-  });
-
-  it("selects the first filtered prompt by default and marks it active", () => {
+  it("selects the first prompt by default and marks it active", () => {
     renderPanel({
       prompts: makePromptState({
         items: [makePrompt({ id: "p1", title: "Wezwanie" }), makePrompt({ id: "p2", title: "Pozew" })],
       }),
     });
 
-    expect(screen.getByRole("heading", { name: "Wezwanie" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Wezwanie/ })).toHaveClass("prompt-item--active");
+    expect(screen.getByRole("button", { name: /Wezwanie/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /Pozew/ })).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("previews the instruction without the document placeholder", () => {
+    renderPanel({
+      prompts: makePromptState({
+        items: [
+          makePrompt({
+            body: "Streść dokument.\n\n=== DOKUMENT ===\n{{DOKUMENT}}\n=== KONIEC DOKUMENTU ===\n",
+          }),
+        ],
+      }),
+    });
+
+    expect(screen.getByText("Streść dokument.")).toBeInTheDocument();
+    expect(screen.queryByText(/DOKUMENT/)).not.toBeInTheDocument();
   });
 
   it("calls onSelect when a prompt in the list is clicked", () => {

@@ -232,7 +232,7 @@ function promptState(): PromptState {
     status: "idle",
     error: null,
     items: [],
-    search: "",
+   
     selectedId: null,
   };
 }

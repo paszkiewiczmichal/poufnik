@@ -1,7 +1,7 @@
-id: pleading-response-plan
-title: "Plan odpowiedzi na pismo procesowe"
-category: pisma_procesowe
-description: "Linia obrony, odpowiedź na każdy zarzut i potrzebne dowody."
+id: reply-draft
+title: "Projekt odpowiedzi na pismo lub e-mail"
+category: praca_ogolna
+description: "Dwa warianty: stanowczy i ugodowy, bez niezamierzonych zobowiązań."
 body: |
   ZASADY
   1. Dokument jest zanonimizowany: znaczniki w nawiasach kwadratowych, np. [OSOBA_1], [FIRMA_1], [ADRES_1], zastępują prawdziwe dane. Zachowaj je bez zmian (ten sam znacznik to ten sam podmiot) i nie zgaduj, co ukrywają.
@@ -11,13 +11,10 @@ body: |
   5. Pisz po polsku, jasno i konkretnie. Na końcu dodaj jedno zdanie, że analiza ma charakter pomocniczy i wymaga weryfikacji przez prawnika.
 
   ZADANIE
-  Przygotuj plan odpowiedzi na to pismo strony przeciwnej (odpowiedź na pozew, replika lub sprzeciw).
-  1. Lista twierdzeń i zarzutów strony przeciwnej, każdy z krótkim dosłownym cytatem.
-  2. Dla każdego: czy go kwestionować, jakim argumentem i jakim dowodem.
-  3. Zarzuty formalne i procesowe, które warto rozważyć [DO WERYFIKACJI].
-  4. Proponowany szkielet pisma (nagłówki sekcji z jednym zdaniem treści).
-  5. Czego brakuje do napisania odpowiedzi: informacje i dokumenty, o które trzeba poprosić klienta.
-  Nie pisz pełnego tekstu pisma, dopóki nie uzupełnię braków z punktu 5.
+  Przygotuj projekt odpowiedzi na to pismo lub wiadomość w dwóch wariantach:
+  A. Stanowczy: jasno przedstawia nasze stanowisko i oczekiwania.
+  B. Ugodowy: zostawia przestrzeń do porozumienia.
+  W obu wariantach nie uznawaj roszczeń, nie składaj obietnic ani zobowiązań i nie przyznawaj faktów, chyba że wprost o to poproszę. Pod każdym wariantem wypisz zdania, które mogą mieć skutki prawne, i wyjaśnij jakie.
 
   === DOKUMENT (zanonimizowany) ===
   {{DOKUMENT}}

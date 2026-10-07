@@ -64,7 +64,6 @@ interface AppStore {
   setPromptsLoading: () => void;
   setPromptsError: (message: string) => void;
   setPrompts: (prompts: PromptState["items"]) => void;
-  setPromptSearch: (search: string) => void;
   setSelectedPrompt: (id: string | null) => void;
   setDeanonymizationInput: (input: string) => void;
   setDeanonymizationLoading: () => void;
@@ -103,7 +102,6 @@ const initialPrompts: PromptState = {
   status: "idle",
   error: null,
   items: [],
-  search: "",
   selectedId: null,
 };
 
@@ -378,10 +376,6 @@ export const useAppStore = create<AppStore>((set) => ({
         items: prompts,
         selectedId: state.prompts.selectedId ?? prompts[0]?.id ?? null,
       },
-    })),
-  setPromptSearch: (search) =>
-    set((state) => ({
-      prompts: { ...state.prompts, search },
     })),
   setSelectedPrompt: (id) =>
     set((state) => ({

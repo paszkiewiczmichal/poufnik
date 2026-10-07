@@ -24,7 +24,6 @@ interface ResultViewProps {
   exportNotice?: string | null;
   documentNotices?: string[];
   onLoadPrompts: () => void;
-  onPromptSearch: (search: string) => void;
   onSelectPrompt: (id: string) => void;
   onCopyPrompt: (text: string) => void;
   onDeanonymizationInput: (input: string) => void;
@@ -43,7 +42,6 @@ export function ResultView({
   exportNotice = null,
   documentNotices = [],
   onLoadPrompts,
-  onPromptSearch,
   onSelectPrompt,
   onCopyPrompt,
   onDeanonymizationInput,
@@ -165,7 +163,6 @@ export function ResultView({
             prompts={prompts}
             anonymizedText={anonymizedText}
             onLoad={onLoadPrompts}
-            onSearch={onPromptSearch}
             onSelect={onSelectPrompt}
             onCopyPrompt={onCopyPrompt}
           />

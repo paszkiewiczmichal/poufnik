@@ -49,7 +49,6 @@ interface DocumentWorkspaceProps {
   exportNotice?: string | null;
   documentNotices?: string[];
   onLoadPrompts: () => void;
-  onPromptSearch: (search: string) => void;
   onSelectPrompt: (id: string) => void;
   onCopyPrompt: (text: string) => void;
   onDeanonymizationInput: (input: string) => void;
@@ -83,7 +82,6 @@ export function DocumentWorkspace({
   exportNotice,
   documentNotices,
   onLoadPrompts,
-  onPromptSearch,
   onSelectPrompt,
   onCopyPrompt,
   onDeanonymizationInput,
@@ -219,7 +217,6 @@ export function DocumentWorkspace({
           exportNotice={exportNotice}
           documentNotices={documentNotices}
           onLoadPrompts={onLoadPrompts}
-          onPromptSearch={onPromptSearch}
           onSelectPrompt={onSelectPrompt}
           onCopyPrompt={onCopyPrompt}
           onDeanonymizationInput={onDeanonymizationInput}

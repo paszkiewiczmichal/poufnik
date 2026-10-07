@@ -2024,21 +2024,15 @@ button:disabled {
 
 /* Prompty */
 
-.prompt-panel .search-input {
-  margin: var(--sp-3) 18px 0;
-  width: calc(100% - 36px);
-}
-
 .prompt-list {
   display: grid;
 }
 
 .prompt-item {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--sp-3);
+  display: grid;
+  gap: 2px;
   width: 100%;
-  padding: 13px 18px;
+  padding: 11px 18px;
   border: 0;
   border-bottom: 1px solid var(--line-faint);
   background: transparent;
@@ -2053,78 +2047,34 @@ button:disabled {
   background: var(--navy-bg);
 }
 
-.prompt-item__body {
-  flex: 1;
-  min-width: 0;
-}
-
 .prompt-item__title {
-  display: block;
   color: var(--ink);
   font-size: var(--fs-base-plus);
   font-weight: 600;
 }
 
 .prompt-item__desc {
-  display: block;
-  margin-top: 3px;
   color: var(--muted);
   font-size: var(--fs-sm);
   line-height: var(--lh-normal);
 }
 
 .prompt-preview {
+  display: grid;
+  gap: var(--sp-3);
   padding: 14px 18px;
   border-top: 1px solid var(--line-soft);
-  display: grid;
-  gap: 8px;
 }
 
-.prompt-preview h3 {
-  margin: 0;
-  color: var(--ink);
-  font-family: var(--font-serif);
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.prompt-preview p {
-  margin: 0;
-  color: var(--muted);
-  font-size: var(--fs-sm);
-  line-height: 1.45;
-}
-
-.prompt-preview pre {
-  max-height: 180px;
+.prompt-preview__text {
   margin: 0;
   padding: 12px 14px;
-  overflow: auto;
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius);
+  border-left: 3px solid var(--line);
   background: var(--surface-raised);
-  color: #26313c;
-  font-family: var(--font-mono);
-  font-size: var(--fs-sm);
-  line-height: 1.6;
-  overflow-wrap: anywhere;
-  white-space: pre-wrap;
-}
-
-.tag-row {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.tag-row span {
-  padding: 2px 7px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  color: var(--muted);
-  background: var(--surface-raised);
-  font-family: var(--font-mono);
-  font-size: var(--fs-sm);
+  color: var(--text-soft);
+  font-size: var(--fs-base);
+  line-height: var(--lh-relaxed);
+  white-space: pre-line;
 }
 
 .empty-note {

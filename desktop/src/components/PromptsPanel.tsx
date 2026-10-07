@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 
 import { renderPrompt } from "../domain/prompts";
 import { texts } from "../i18n";
@@ -8,7 +8,6 @@ interface PromptsPanelProps {
   prompts: PromptState;
   anonymizedText: string | null;
   onLoad: () => void;
-  onSearch: (search: string) => void;
   onSelect: (id: string) => void;
   onCopyPrompt: (text: string) => void;
 }
@@ -17,7 +16,6 @@ export function PromptsPanel({
   prompts,
   anonymizedText,
   onLoad,
-  onSearch,
   onSelect,
   onCopyPrompt,
 }: PromptsPanelProps) {
@@ -27,19 +25,8 @@ export function PromptsPanel({
     }
   }, [onLoad, prompts.status]);
 
-  const filtered = useMemo(() => {
-    const query = prompts.search.trim().toLowerCase();
-    if (!query) {
-      return prompts.items;
-    }
-    return prompts.items.filter((prompt) => {
-      const haystack = `${prompt.title} ${prompt.tags.join(" ")}`.toLowerCase();
-      return haystack.includes(query);
-    });
-  }, [prompts.items, prompts.search]);
-
   const selected =
-    filtered.find((prompt) => prompt.id === prompts.selectedId) ?? filtered[0] ?? null;
+    prompts.items.find((prompt) => prompt.id === prompts.selectedId) ?? prompts.items[0] ?? null;
 
   return (
     <section className="card prompt-panel" aria-labelledby="prompt-panel-title">
@@ -49,14 +36,6 @@ export function PromptsPanel({
         </h3>
         <p className="card__header-note">{texts.prompts.lead}</p>
       </div>
-      <input
-        className="search-input"
-        type="search"
-        value={prompts.search}
-        onChange={(event) => onSearch(event.target.value)}
-        placeholder={texts.prompts.search}
-        aria-label={texts.prompts.search}
-      />
 
       {prompts.status === "loading" && <p className="empty-note">{texts.prompts.loading}</p>}
       {prompts.status === "error" && prompts.error && (
@@ -66,43 +45,24 @@ export function PromptsPanel({
       )}
 
       <div className="prompt-list">
-        {filtered.length === 0 && prompts.status === "ready" ? (
-          <p className="empty-note">{texts.prompts.empty}</p>
-        ) : (
-          filtered.map((prompt) => (
-            <button
-              className={`prompt-item ${selected?.id === prompt.id ? "prompt-item--active" : ""}`}
-              key={prompt.id}
-              type="button"
-              onClick={() => onSelect(prompt.id)}
-            >
-              <span className="prompt-item__body">
-                <span className="prompt-item__title">{prompt.title}</span>
-                <span className="prompt-item__desc">{prompt.description}</span>
-              </span>
-            </button>
-          ))
-        )}
+        {prompts.items.map((prompt) => (
+          <button
+            className={`prompt-item ${selected?.id === prompt.id ? "prompt-item--active" : ""}`}
+            key={prompt.id}
+            type="button"
+            aria-pressed={selected?.id === prompt.id}
+            onClick={() => onSelect(prompt.id)}
+          >
+            <span className="prompt-item__title">{prompt.title}</span>
+            <span className="prompt-item__desc">{prompt.description}</span>
+          </button>
+        ))}
       </div>
 
       {selected && (
         <article className="prompt-preview">
-          <h3>{selected.title}</h3>
-          <p>{selected.description}</p>
-          <div className="tag-row">
-            {selected.tags.map((tag) => (
-              <span key={tag}>{tag}</span>
-            ))}
-          </div>
-          <pre>{selected.body}</pre>
+          <p className="prompt-preview__text">{readablePrompt(selected.body)}</p>
           <div className="toolbar">
-            <button
-              className="ghost-button ghost-button--compact"
-              type="button"
-              onClick={() => onCopyPrompt(selected.body)}
-            >
-              {texts.prompts.copyPrompt}
-            </button>
             <button
               className="primary-button primary-button--compact"
               type="button"
@@ -114,9 +74,24 @@ export function PromptsPanel({
             >
               {texts.prompts.copyWithDocument}
             </button>
+            <button
+              className="ghost-button ghost-button--compact"
+              type="button"
+              onClick={() => onCopyPrompt(selected.body)}
+            >
+              {texts.prompts.copyPrompt}
+            </button>
           </div>
         </article>
       )}
     </section>
   );
+}
+
+// The preview shows the instruction itself; the document markers are noise to a reader.
+function readablePrompt(body: string): string {
+  return body
+    .replace(/=== DOKUMENT[^=]*===\s*\{\{DOKUMENT\}\}\s*=== KONIEC DOKUMENTU ===/, "")
+    .replace("{{DOKUMENT}}", "")
+    .trim();
 }

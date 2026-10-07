@@ -154,7 +154,6 @@ function App() {
     setPromptsLoading,
     setPromptsError,
     setPrompts,
-    setPromptSearch,
     setSelectedPrompt,
     setDeanonymizationInput,
     setDeanonymizationLoading,
@@ -1446,7 +1445,6 @@ function App() {
                   exportNotice={exportNotice}
                   documentNotices={document?.notices ?? []}
                   onLoadPrompts={loadPrompts}
-                  onPromptSearch={setPromptSearch}
                   onSelectPrompt={setSelectedPrompt}
                   onCopyPrompt={copyPrompt}
                   onDeanonymizationInput={setDeanonymizationInput}

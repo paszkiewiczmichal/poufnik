@@ -1,7 +1,7 @@
-id: pleading-response-plan
-title: "Plan odpowiedzi na pismo procesowe"
-category: pisma_procesowe
-description: "Linia obrony, odpowiedź na każdy zarzut i potrzebne dowody."
+id: judgment-summary
+title: "Podsumowanie wyroku lub postanowienia"
+category: orzeczenia
+description: "Rozstrzygnięcie, stan faktyczny, argumenty stron i zasady przyjęte przez sąd."
 body: |
   ZASADY
   1. Dokument jest zanonimizowany: znaczniki w nawiasach kwadratowych, np. [OSOBA_1], [FIRMA_1], [ADRES_1], zastępują prawdziwe dane. Zachowaj je bez zmian (ten sam znacznik to ten sam podmiot) i nie zgaduj, co ukrywają.
@@ -11,13 +11,13 @@ body: |
   5. Pisz po polsku, jasno i konkretnie. Na końcu dodaj jedno zdanie, że analiza ma charakter pomocniczy i wymaga weryfikacji przez prawnika.
 
   ZADANIE
-  Przygotuj plan odpowiedzi na to pismo strony przeciwnej (odpowiedź na pozew, replika lub sprzeciw).
-  1. Lista twierdzeń i zarzutów strony przeciwnej, każdy z krótkim dosłownym cytatem.
-  2. Dla każdego: czy go kwestionować, jakim argumentem i jakim dowodem.
-  3. Zarzuty formalne i procesowe, które warto rozważyć [DO WERYFIKACJI].
-  4. Proponowany szkielet pisma (nagłówki sekcji z jednym zdaniem treści).
-  5. Czego brakuje do napisania odpowiedzi: informacje i dokumenty, o które trzeba poprosić klienta.
-  Nie pisz pełnego tekstu pisma, dopóki nie uzupełnię braków z punktu 5.
+  Podsumuj to orzeczenie:
+  1. Sąd, data, sygnatura i rodzaj orzeczenia (tylko jeśli są w dokumencie).
+  2. Rozstrzygnięcie w jednym-dwóch zdaniach.
+  3. Stan faktyczny w kilku punktach.
+  4. Argumenty każdej ze stron.
+  5. Zasady prawne przyjęte przez sąd, w tabeli: zasada, krótki dosłowny cytat z uzasadnienia.
+  6. Co z tego orzeczenia wynika dla podobnych spraw i czym może się od nich różnić.
 
   === DOKUMENT (zanonimizowany) ===
   {{DOKUMENT}}

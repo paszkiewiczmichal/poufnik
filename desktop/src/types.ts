@@ -101,7 +101,6 @@ export interface PromptState {
   status: "idle" | "loading" | "error" | "ready";
   error: string | null;
   items: PromptTemplate[];
-  search: string;
   selectedId: string | null;
 }
 

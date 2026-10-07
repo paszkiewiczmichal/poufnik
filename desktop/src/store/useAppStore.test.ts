@@ -20,7 +20,7 @@ function resetStore() {
       replacementMap: null,
       offsetMap: [],
     },
-    prompts: { status: "idle", error: null, items: [], search: "", selectedId: null },
+    prompts: { status: "idle", error: null, items: [], selectedId: null },
     deanonymization: {
       status: "idle",
       error: null,
@@ -438,7 +438,7 @@ describe("prompt actions", () => {
 
   it("setPrompts keeps the existing selection when one is already selected", () => {
     useAppStore.setState({
-      prompts: { status: "idle", error: null, items: [], search: "", selectedId: "p2" },
+      prompts: { status: "idle", error: null, items: [], selectedId: "p2" },
     });
 
     useAppStore.getState().setPrompts([prompt1, prompt2] as never);
@@ -446,10 +446,7 @@ describe("prompt actions", () => {
     expect(useAppStore.getState().prompts.selectedId).toBe("p2");
   });
 
-  it("setPromptSearch and setSelectedPrompt update their fields directly", () => {
-    useAppStore.getState().setPromptSearch("wezwanie");
-    expect(useAppStore.getState().prompts.search).toBe("wezwanie");
-
+  it("setSelectedPrompt updates the selection directly", () => {
     useAppStore.getState().setSelectedPrompt("p1");
     expect(useAppStore.getState().prompts.selectedId).toBe("p1");
   });

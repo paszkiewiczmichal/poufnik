@@ -26,7 +26,7 @@ function baseAnonymization(overrides: Partial<AnonymizationState> = {}): Anonymi
 }
 
 function basePrompts(overrides: Partial<PromptState> = {}): PromptState {
-  return { status: "ready", error: null, items: [], search: "", selectedId: null, ...overrides };
+  return { status: "ready", error: null, items: [], selectedId: null, ...overrides };
 }
 
 function baseDeanonymization(overrides: Partial<DeanonymizationState> = {}): DeanonymizationState {

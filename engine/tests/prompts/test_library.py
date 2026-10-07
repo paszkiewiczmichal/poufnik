@@ -55,8 +55,13 @@ BUILTIN_RULE_MARKERS = (
 def test_builtin_library_has_prompts_for_each_area() -> None:
     library = load_prompt_library()
 
-    assert len(library.templates) >= 12
-    assert {"analiza_umowy", "pisma_procesowe", "rodo", "praca_ogolna"} <= set(library.categories)
+    assert len(library.templates) == 10
+    assert set(library.categories) == {
+        "analiza_umowy",
+        "pisma_procesowe",
+        "orzeczenia",
+        "praca_ogolna",
+    }
 
 
 def test_every_builtin_prompt_carries_the_shared_working_rules() -> None:

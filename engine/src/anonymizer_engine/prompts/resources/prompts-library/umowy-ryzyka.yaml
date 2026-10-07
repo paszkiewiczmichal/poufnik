@@ -1,7 +1,7 @@
-id: pleading-response-plan
-title: "Plan odpowiedzi na pismo procesowe"
-category: pisma_procesowe
-description: "Linia obrony, odpowiedź na każdy zarzut i potrzebne dowody."
+id: contract-risk-review
+title: "Analiza ryzyk umowy"
+category: analiza_umowy
+description: "Ryzyka dla wskazanej strony, ich waga i propozycje zmian."
 body: |
   ZASADY
   1. Dokument jest zanonimizowany: znaczniki w nawiasach kwadratowych, np. [OSOBA_1], [FIRMA_1], [ADRES_1], zastępują prawdziwe dane. Zachowaj je bez zmian (ten sam znacznik to ten sam podmiot) i nie zgaduj, co ukrywają.
@@ -11,13 +11,10 @@ body: |
   5. Pisz po polsku, jasno i konkretnie. Na końcu dodaj jedno zdanie, że analiza ma charakter pomocniczy i wymaga weryfikacji przez prawnika.
 
   ZADANIE
-  Przygotuj plan odpowiedzi na to pismo strony przeciwnej (odpowiedź na pozew, replika lub sprzeciw).
-  1. Lista twierdzeń i zarzutów strony przeciwnej, każdy z krótkim dosłownym cytatem.
-  2. Dla każdego: czy go kwestionować, jakim argumentem i jakim dowodem.
-  3. Zarzuty formalne i procesowe, które warto rozważyć [DO WERYFIKACJI].
-  4. Proponowany szkielet pisma (nagłówki sekcji z jednym zdaniem treści).
-  5. Czego brakuje do napisania odpowiedzi: informacje i dokumenty, o które trzeba poprosić klienta.
-  Nie pisz pełnego tekstu pisma, dopóki nie uzupełnię braków z punktu 5.
+  Przeanalizuj ryzyka tej umowy dla strony, którą wskażę (jeśli nie wskażę, zapytaj).
+  Dla każdego ryzyka podaj: postanowienie (numer paragrafu i krótki dosłowny cytat), na czym polega ryzyko, poziom (wysoki / średni / niski) i propozycję zmiany brzmienia.
+  Zwróć uwagę zwłaszcza na: odpowiedzialność i jej ograniczenia, kary umowne, wypowiedzenie i czas trwania, płatności, poufność, prawa do rezultatów pracy, dane osobowe oraz rozstrzyganie sporów.
+  Zacznij od trzech najpoważniejszych ryzyk.
 
   === DOKUMENT (zanonimizowany) ===
   {{DOKUMENT}}

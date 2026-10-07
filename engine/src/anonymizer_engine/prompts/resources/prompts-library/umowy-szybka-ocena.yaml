@@ -1,7 +1,7 @@
-id: pleading-response-plan
-title: "Plan odpowiedzi na pismo procesowe"
-category: pisma_procesowe
-description: "Linia obrony, odpowiedź na każdy zarzut i potrzebne dowody."
+id: contract-triage
+title: "Szybka ocena umowy (zielone / żółte / czerwone)"
+category: analiza_umowy
+description: "Czy umowę można podpisać, co negocjować, co jest nie do przyjęcia."
 body: |
   ZASADY
   1. Dokument jest zanonimizowany: znaczniki w nawiasach kwadratowych, np. [OSOBA_1], [FIRMA_1], [ADRES_1], zastępują prawdziwe dane. Zachowaj je bez zmian (ten sam znacznik to ten sam podmiot) i nie zgaduj, co ukrywają.
@@ -11,13 +11,11 @@ body: |
   5. Pisz po polsku, jasno i konkretnie. Na końcu dodaj jedno zdanie, że analiza ma charakter pomocniczy i wymaga weryfikacji przez prawnika.
 
   ZADANIE
-  Przygotuj plan odpowiedzi na to pismo strony przeciwnej (odpowiedź na pozew, replika lub sprzeciw).
-  1. Lista twierdzeń i zarzutów strony przeciwnej, każdy z krótkim dosłownym cytatem.
-  2. Dla każdego: czy go kwestionować, jakim argumentem i jakim dowodem.
-  3. Zarzuty formalne i procesowe, które warto rozważyć [DO WERYFIKACJI].
-  4. Proponowany szkielet pisma (nagłówki sekcji z jednym zdaniem treści).
-  5. Czego brakuje do napisania odpowiedzi: informacje i dokumenty, o które trzeba poprosić klienta.
-  Nie pisz pełnego tekstu pisma, dopóki nie uzupełnię braków z punktu 5.
+  Oceń tę umowę z perspektywy strony, którą wskażę (jeśli nie wskażę, zapytaj, po której stronie jestem).
+  1. W dwóch zdaniach: czego dotyczy umowa i kto jest jej stronami.
+  2. Ogólna ocena: ZIELONA (można podpisać), ŻÓŁTA (do negocjacji) albo CZERWONA (nie podpisywać bez zmian), z uzasadnieniem.
+  3. Tabela postanowień wymagających uwagi: postanowienie (numer paragrafu), kolor, dlaczego, co zaproponować.
+  4. Czego w umowie brakuje, a co zwykle powinno się w niej znaleźć.
 
   === DOKUMENT (zanonimizowany) ===
   {{DOKUMENT}}
