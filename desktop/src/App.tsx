@@ -40,7 +40,7 @@ import { useAppStore } from "./store/useAppStore";
 import { getAppVersion } from "./tauri/app";
 import { copyText, readClipboardText } from "./tauri/clipboard";
 import { loadCustomRegexRules, saveCustomRegexRules } from "./tauri/customRules";
-import { getEngineEndpoint, listenToEngineStatus } from "./tauri/engine";
+import { getEngineEndpoint, getEngineStatus, listenToEngineStatus } from "./tauri/engine";
 import {
   getDocumentHistoryEnabled,
   saveDocumentHistoryEntryIfEnabled,
@@ -81,6 +81,7 @@ import type {
   BatchProcessSuccess,
   DocumentProcessResponse,
   EngineEndpoint,
+  EngineStatusEvent,
   EntityCategory,
   ExportFormat,
   ReplacementMap,
@@ -436,7 +437,7 @@ function App() {
     let active = true;
     let unlisten: (() => void) | null = null;
 
-    listenToEngineStatus((event) => {
+    const applyStatus = (event: EngineStatusEvent) => {
       if (!active) {
         return;
       }
@@ -450,22 +451,20 @@ function App() {
       } else {
         setEngineFailed(event.message);
       }
-    })
+    };
+
+    listenToEngineStatus(applyStatus)
       .then((dispose) => {
         unlisten = dispose;
       })
       .catch((error: unknown) => setEngineFailed(toUserMessage(error)));
 
-    getEngineEndpoint()
-      .then((endpoint) => {
+    // The engine may have failed (or become ready) before this listener existed.
+    getEngineStatus()
+      .then(applyStatus)
+      .catch((error: unknown) => {
         if (active) {
-          setEngineReady(endpoint);
-          void refreshEngineHealth(endpoint);
-        }
-      })
-      .catch(() => {
-        if (active) {
-          setEngineStarting();
+          setEngineFailed(toUserMessage(error));
         }
       });
 

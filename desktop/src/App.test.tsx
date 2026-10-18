@@ -37,6 +37,7 @@ const mocks = vi.hoisted(() => {
     fileFromPath: vi.fn(),
     getDocumentHistoryEnabled: vi.fn(),
     getEngineEndpoint: vi.fn(),
+    getEngineStatus: vi.fn(),
     getRegistrationUrl: vi.fn(),
     getStoredBasicChoice: vi.fn(),
     getUpdateConsent: vi.fn(),
@@ -124,6 +125,7 @@ vi.mock("./tauri/customRules", () => ({
 
 vi.mock("./tauri/engine", () => ({
   getEngineEndpoint: mocks.getEngineEndpoint,
+  getEngineStatus: mocks.getEngineStatus,
   listenToEngineStatus: mocks.listenToEngineStatus,
 }));
 
@@ -194,6 +196,7 @@ describe("App engine health", () => {
     mocks.clearStoredAuthToken.mockResolvedValue(undefined);
     mocks.getDocumentHistoryEnabled.mockReturnValue(false);
     mocks.getEngineEndpoint.mockResolvedValue(endpoint);
+    mocks.getEngineStatus.mockResolvedValue({ status: "ready", endpoint });
     mocks.getRegistrationUrl.mockReturnValue("http://127.0.0.1:8000/register");
     mocks.getStoredBasicChoice.mockReturnValue(true);
     mocks.getUpdateConsent.mockReturnValue(false);
@@ -257,6 +260,21 @@ describe("App engine health", () => {
     expect(await screen.findByRole("status")).toHaveTextContent(
       texts.engine.degradedBanner,
     );
+  });
+
+  it("shows an engine that failed before the window started listening as failed", async () => {
+    mocks.getEngineEndpoint.mockRejectedValue("Proces engine zakonczyl prace przed gotowoscia.");
+    mocks.getEngineStatus.mockResolvedValue({
+      status: "failed",
+      message: "Proces engine zakonczyl prace przed gotowoscia.",
+    });
+
+    render(<App />);
+
+    expect(
+      await screen.findByText(/Proces engine zakonczyl prace przed gotowoscia/),
+    ).toBeInTheDocument();
+    expect(mocks.health).not.toHaveBeenCalled();
   });
 
   it("shows the optional login screen on a fresh install", async () => {

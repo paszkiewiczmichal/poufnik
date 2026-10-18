@@ -119,6 +119,29 @@ struct SidecarStartup {
     token: String,
 }
 
+// Current engine state for a window that may have missed earlier status events: when the
+// sidecar dies within the first second, its "failed" event is emitted before the webview
+// starts listening, and get_engine_endpoint's error alone can't tell failed from starting.
+#[tauri::command]
+fn get_engine_status(state: State<'_, SharedEngineState>) -> Result<EngineStatusPayload, String> {
+    let guard = state
+        .lock()
+        .map_err(|_| "Nie można odczytać stanu engine.".to_string())?;
+    if let Some(message) = &guard.failed_message {
+        return Ok(EngineStatusPayload::Failed {
+            message: message.clone(),
+        });
+    }
+    Ok(match &guard.endpoint {
+        Some(endpoint) => EngineStatusPayload::Ready {
+            endpoint: endpoint.clone(),
+        },
+        None => EngineStatusPayload::Starting {
+            attempt: guard.restart_count,
+        },
+    })
+}
+
 #[tauri::command]
 fn get_engine_endpoint(state: State<'_, SharedEngineState>) -> Result<EngineEndpoint, String> {
     let guard = state
@@ -494,6 +517,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
+            get_engine_status,
             get_engine_endpoint,
             browser_login::start_browser_login_listener,
             browser_login::await_browser_login,

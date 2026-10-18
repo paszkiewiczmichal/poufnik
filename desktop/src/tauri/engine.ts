@@ -9,6 +9,10 @@ export async function getEngineEndpoint(): Promise<EngineEndpoint> {
   return invoke<EngineEndpoint>("get_engine_endpoint");
 }
 
+export async function getEngineStatus(): Promise<EngineStatusEvent> {
+  return invoke<EngineStatusEvent>("get_engine_status");
+}
+
 export async function listenToEngineStatus(
   handler: (event: EngineStatusEvent) => void,
 ): Promise<UnlistenFn> {
