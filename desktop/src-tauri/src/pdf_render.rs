@@ -142,13 +142,21 @@ fn render_with_word(input: &Path, output: &Path) -> Result<(), String> {
 
 // Word for Mac is sandboxed and can only open files inside its own container without
 // asking the user, so the working copy is placed there (see TempDir::create).
+// Word's "open" returns nothing, so the document is taken as the active one afterwards
+// ("set docRef to open ..." fails with "docRef is not defined", as in 1.0.15). Like the
+// Windows script, Word is quit again only when this export was what started it.
 #[cfg(target_os = "macos")]
 const WORD_SCRIPT: &str = r#"
 on run argv
+  set inputPath to item 1 of argv
+  set outputPath to item 2 of argv
+  set wasRunning to application "Microsoft Word" is running
   tell application "Microsoft Word"
-    set docRef to open (POSIX file (item 1 of argv))
-    save as docRef file name (POSIX file (item 2 of argv)) file format format PDF
+    open (POSIX file inputPath)
+    set docRef to active document
+    save as docRef file name outputPath file format format PDF
     close docRef saving no
+    if not wasRunning and (count of documents) is 0 then quit
   end tell
 end run
 "#;
