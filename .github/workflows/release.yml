@@ -540,17 +540,6 @@ jobs:
           UV_LINK_MODE: copy
         run: uv sync --group dev --group models --group build
 
-      # Informational only (never fails the build): confirms whether uv's default cache
-      # linking was in fact the cause of the previous run's missing
-      # presidio_analyzer/conf/default_recognizers.yaml, in case UV_LINK_MODE=copy above
-      # isn't the whole story and this needs a second look.
-      - name: Debug presidio_analyzer conf file
-        working-directory: engine
-        run: |
-          f=".venv/lib/python${{ env.PYTHON_VERSION }}/site-packages/presidio_analyzer/conf/default_recognizers.yaml"
-          ls -la "$f" || echo "::warning::$f not found"
-          file "$f" || true
-
       - name: Install desktop dependencies
         working-directory: desktop
         run: npm ci
@@ -561,20 +550,6 @@ jobs:
       - name: Build engine sidecar
         working-directory: engine
         run: uv run python build/build_sidecar.py --target-triple "$RELEASE_TARGET" --clean
-
-      # Diagnostic only, never fails the job: the last two attempts to fix the missing
-      # presidio_analyzer/conf/default_recognizers.yaml (UV_LINK_MODE=copy, then an explicit
-      # --add-data) both left the exact same file missing from the staged bundle, so this
-      # inspects the PyInstaller dist output directly (before staging) and the staged bundle,
-      # to find out whether --add-data ever wrote anything there at all.
-      - name: Debug presidio_analyzer bundle contents
-        if: always()
-        working-directory: engine
-        run: |
-          echo "--- PyInstaller dist output ---"
-          find build/dist/anonymizer-engine/_internal/presidio_analyzer -maxdepth 3 2>&1 || echo "not found in dist output"
-          echo "--- Staged Tauri bundle ---"
-          find ../desktop/src-tauri/binaries/_internal/presidio_analyzer -maxdepth 3 2>&1 || echo "not found in staged bundle"
 
       # Unsigned build (Michal's decision for v1): no Apple Developer Program (99 USD/yr)
       # certificate, so Gatekeeper shows the "unknown developer" prompt and users open the
@@ -594,11 +569,25 @@ jobs:
           releaseBody: ${{ needs.release-metadata.outputs.body }}
           releaseDraft: true
           prerelease: ${{ needs.release-metadata.outputs.prerelease }}
-          args: --target ${{ env.RELEASE_TARGET }} --bundles dmg
+          # "app" is the bundle the updater installs: without it Tauri makes no .app.tar.gz,
+          # and latest.json for 1.0.15 listed only Windows, so Macs never saw an update.
+          args: --target ${{ env.RELEASE_TARGET }} --bundles app,dmg
           retryAttempts: 2
           uploadUpdaterJson: true
           uploadUpdaterSignatures: true
           releaseAssetNamePattern: "[name]_[version]_[platform]_[arch][setup][ext]"
+
+      # Mounts the finished DMG and runs the engine and OCR from the Poufnik.app inside it -
+      # exactly what users download, which build_sidecar.py's own smoke tests can only
+      # imitate. 1.0.15 shipped a macOS app whose engine could not start and whose Tesseract
+      # could not load; this step catches both.
+      - name: Smoke-test engine inside the DMG
+        working-directory: engine
+        run: |
+          shopt -s nullglob
+          dmgs=(../desktop/src-tauri/target/${RELEASE_TARGET}/release/bundle/dmg/*.dmg)
+          if [ ${#dmgs[@]} -ne 1 ]; then echo "::error::Expected exactly one DMG, found ${#dmgs[@]}"; exit 1; fi
+          uv run python build/smoke_app_bundle.py "${dmgs[0]}"
 
       - name: Generate SHA256 checksums
         run: uv run --python ${{ env.PYTHON_VERSION }} --no-project python .github/scripts/sha256_artifacts.py --output "$CHECKSUM_NAME"
