@@ -98,6 +98,7 @@ def detect_all(
     entities = _merge_entities(regex_entities, dictionary_entities, ner_entities)
     entities = [entity for entity in entities if not _is_not_a_name(entity)]
     entities = _merge_law_firm_owner_names(text, _extend_trailing_initials(text, entities))
+    entities = _merge_hyphenated_names(text, entities)
     entities = _merge_postal_address_clusters(text, entities)
     entities = _propagate_repeated_names(text, entities)
     entities, groups = consolidate_entity_groups(entities, text, tokens)
@@ -147,8 +148,15 @@ def _corroborate_dictionary_and_ner(
         key = (ner_entity.start, ner_entity.end, ner_entity.category)
         dictionary_entity = dictionary_by_span.get(key)
         if dictionary_entity is None:
-            merged.append(ner_entity)
-            continue
+            # Dictionary spans outrank NER in _merge_entities, so a dictionary match on
+            # part of a NER name ("Janem" in "Janem Kowalczykiem") used to win and leave
+            # the rest of the name in the output. The full NER span takes its place.
+            parts = _dictionary_parts_of(ner_entity, dictionary_entities)
+            if not parts:
+                merged.append(ner_entity)
+                continue
+            used_dictionary_spans.update((part.start, part.end, part.category) for part in parts)
+            dictionary_entity = max(parts, key=lambda part: part.confidence)
         used_dictionary_spans.add(key)
         corroborated_by = list(dict.fromkeys([*ner_entity.corroborated_by, "dictionary"]))
         merged.append(
@@ -169,6 +177,21 @@ def _corroborate_dictionary_and_ner(
         if (entity.start, entity.end, entity.category) not in used_dictionary_spans
     )
     return merged
+
+
+def _dictionary_parts_of(
+    ner_entity: DetectedEntity,
+    dictionary_entities: list[DetectedEntity],
+) -> list[DetectedEntity]:
+    if ner_entity.category is not EntityCategory.PERSON:
+        return []
+    return [
+        entity
+        for entity in dictionary_entities
+        if entity.category is EntityCategory.PERSON
+        and ner_entity.start <= entity.start
+        and entity.end <= ner_entity.end
+    ]
 
 
 def _overlaps(left: DetectedEntity, right: DetectedEntity) -> bool:
@@ -237,6 +260,30 @@ def _extend_trailing_initials(text: str, entities: list[DetectedEntity]) -> list
             )
         result.append(entity)
     return result
+
+
+def _merge_hyphenated_names(text: str, entities: list[DetectedEntity]) -> list[DetectedEntity]:
+    """Join "Anna Wiśniewska" + "-" + "Nowak" into one person with a double surname."""
+    ordered = sorted(entities, key=lambda entity: (entity.start, entity.end))
+    merged: list[DetectedEntity] = []
+    for entity in ordered:
+        previous = merged[-1] if merged else None
+        if (
+            previous is not None
+            and previous.category is EntityCategory.PERSON
+            and entity.category is EntityCategory.PERSON
+            and text[previous.end : entity.start] in {"-", "–"}
+        ):
+            merged[-1] = previous.model_copy(
+                update={
+                    "end": entity.end,
+                    "text": text[previous.start : entity.end],
+                    "confidence": max(previous.confidence, entity.confidence),
+                }
+            )
+            continue
+        merged.append(entity)
+    return merged
 
 
 def _propagate_repeated_names(text: str, entities: list[DetectedEntity]) -> list[DetectedEntity]:

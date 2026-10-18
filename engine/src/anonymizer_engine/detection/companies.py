@@ -57,6 +57,7 @@ _COMPANY_NAME_BEFORE_ID_RE = re.compile(
     rf"(?:\s+{_JOINED_NAME_PART}){{0,3}}"
     r"\s*(?:,|\(|$)",
 )
+_POSTAL_CODE_BEFORE_RE = re.compile(r"\b\d{2}-\d{3}\s*$")
 _TRAILING_CONTEXT_RE = re.compile(
     r"^\s*(?:,|\(|-|–)?\s*(?:NIP|KRS|REGON|z\s+siedzibą|wpisan[ay]\s+do|"
     r"reprezentowan[ay]\s+przez|zwan[ay]\s+dalej)",
@@ -216,6 +217,9 @@ def detect_companies(
                 break
             if not company_root(text[start:end]):
                 continue
+            # "ul. Portowa 7, 80-100 Gdańsk, NIP ..." - the town of the address, not a name.
+            if _POSTAL_CODE_BEFORE_RE.search(text[max(0, start - 8) : start]):
+                break
             entities.append(_company_entity(text, start, end, confidence=0.8))
             break
 

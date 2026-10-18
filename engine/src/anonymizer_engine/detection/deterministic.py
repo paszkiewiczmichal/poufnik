@@ -556,7 +556,16 @@ def _detect_gps(text: str) -> Iterable[DetectedEntity]:
 
 def _detect_money(text: str) -> Iterable[DetectedEntity]:
     for match in _MONEY_RE.finditer(text):
-        if not _context_near(text, match.start(), match.end(), _CURRENCY_RE, radius=10):
+        # The currency must sit in the same line and table cell: in a table the "zł" of
+        # one row is within reach of the next row's "Lp." number, which is not an amount.
+        cell_start, cell_end = _cell_bounds(text, match.start(), match.end())
+        if not _context_near(
+            text[cell_start:cell_end],
+            match.start() - cell_start,
+            match.end() - cell_start,
+            _CURRENCY_RE,
+            radius=10,
+        ):
             continue
         yield _entity(
             EntityCategory.MONEY,
@@ -632,6 +641,12 @@ def _nearest_identifier_label_before(text: str, start: int, radius: int = 18) ->
 def _has_conflicting_identifier_label(text: str, start: int, expected: str) -> bool:
     label = _nearest_identifier_label_before(text, start)
     return label is not None and label != expected
+
+
+def _cell_bounds(text: str, start: int, end: int) -> tuple[int, int]:
+    cell_start = max(text.rfind("\n", 0, start), text.rfind("\t", 0, start)) + 1
+    breaks = [index for index in (text.find("\n", end), text.find("\t", end)) if index != -1]
+    return cell_start, min(breaks, default=len(text))
 
 
 def _context_near(

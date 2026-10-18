@@ -274,3 +274,15 @@ def test_detect_deterministic_processes_one_mb_under_two_seconds() -> None:
         EntityCategory.PESEL,
         EntityCategory.NIP,
     ]
+
+
+def test_table_row_numbers_next_to_amounts_are_not_money() -> None:
+    text = "Lp.\tOsoba\tKwota\n1\tJan\t12 300,00 zł\n2\tAnna\t8 450,00 zł\n3\tTomasz\t2 000,00 zł"
+
+    amounts = [
+        text[entity.start : entity.end]
+        for entity in detect_deterministic(text)
+        if entity.category is EntityCategory.MONEY
+    ]
+
+    assert amounts == ["12 300,00", "8 450,00", "2 000,00"]

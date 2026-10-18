@@ -89,6 +89,8 @@ _NEGATIVE_PERSON_WORDS = {
     "miejski",
     "miejska",
     "data",
+    "dane",
+    "danych",
     "ul",
     "ulicy",
     "rodo",
@@ -154,6 +156,8 @@ _SURNAME_SUFFIX_REPLACEMENTS = (
     ("ą", "a"),
     ("owi", ""),
     ("owie", ""),
+    # Instrumental of surnames ending in -k/-g: "Kowalczykiem", "Nowakiem".
+    ("iem", ""),
     ("ach", ""),
     ("ów", ""),
     ("em", ""),

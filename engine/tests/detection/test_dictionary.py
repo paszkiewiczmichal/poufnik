@@ -346,3 +346,19 @@ def _is_sentence_start(text: str, start: int) -> bool:
 
 def _person_texts(entities: list[DetectedEntity]) -> list[str]:
     return [entity.text for entity in entities if entity.category is EntityCategory.PERSON]
+
+
+def test_instrumental_surname_ending_in_iem_is_found() -> None:
+    text = "Umowa zawarta z Janem Kowalczykiem w Krakowie."
+
+    spans = [text[entity.start : entity.end] for entity in detect_dictionary(text, None)]
+
+    assert "Kowalczykiem" in " ".join(spans)
+
+
+def test_dane_after_a_signature_line_is_not_a_person() -> None:
+    # "Dane" is in the first-name database; after a dotted signature line it is not seen
+    # as a sentence start, so only the negative word list keeps it out.
+    text = "Podpis ………………\n\nDane Zleceniodawcy zweryfikowano na podstawie dowodu."
+
+    assert detect_dictionary(text, None) == []

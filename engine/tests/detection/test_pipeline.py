@@ -316,3 +316,34 @@ def test_every_repeat_of_a_detected_name_is_marked() -> None:
     found = _found(text, [("ACME", EntityCategory.COMPANY)])
 
     assert found == [("ACME", EntityCategory.COMPANY)] * 3
+
+
+def test_dictionary_match_on_part_of_a_ner_name_keeps_the_whole_name() -> None:
+    # The dictionary knows "Anna" but not the surname; its shorter span used to win over
+    # NER's full name and leave the surname in the anonymized document.
+    text = "Umowę podpisała Anna Qwertyńska, zamieszkała w Łodzi."
+
+    found = _found(text, [("Anna Qwertyńska", EntityCategory.PERSON)])
+
+    assert ("Anna Qwertyńska", EntityCategory.PERSON) in found
+    assert ("Anna", EntityCategory.PERSON) not in found
+
+
+def test_double_barrelled_surname_is_one_person() -> None:
+    text = "reprezentowaną przez Annę Wiśniewską-Nowak (PESEL 79110218364)."
+
+    found = _found(
+        text,
+        [("Annę Wiśniewską", EntityCategory.PERSON), ("Nowak", EntityCategory.PERSON)],
+    )
+
+    assert ("Annę Wiśniewską-Nowak", EntityCategory.PERSON) in found
+    assert ("Nowak", EntityCategory.PERSON) not in found
+
+
+def test_town_after_postal_code_before_nip_is_not_a_company() -> None:
+    text = "z siedzibą w Gdańsku, ul. Portowa 7, 80-100 Gdańsk, NIP 527-100-00-26."
+
+    found = _found(text, [])
+
+    assert ("Gdańsk", EntityCategory.COMPANY) not in found
