@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import io
 import json
 import os
 import platform
@@ -22,6 +23,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
+import uuid
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -33,6 +35,13 @@ DIST_ROOT = ENGINE_ROOT / "build" / "dist"
 WORK_ROOT = ENGINE_ROOT / "build" / "pyinstaller"
 SPEC_ROOT = ENGINE_ROOT / "build" / "spec"
 SIDECAR_NAME = "anonymizer-engine"
+# On macOS the sidecar is NOT a Tauri externalBin: Tauri would put it in Contents/MacOS,
+# and a PyInstaller bootloader running from Contents/MacOS assumes a PyInstaller-made .app
+# and looks for libpython in Contents/Frameworks, which Tauri never creates. So on macOS
+# the whole onedir (executable + _internal) is staged as one resource directory,
+# Contents/Resources/binaries/engine/, and spawned by path (see tauri.macos.conf.json and
+# lib.rs). It stays outside Contents/Frameworks also because codesign rejects data files there.
+MACOS_ENGINE_DIR = "engine"
 TESSDATA_FAST_BASE = "https://github.com/tesseract-ocr/tessdata_fast/raw/main"
 # osd: page orientation detection, so sideways or upside-down scans are read upright.
 REQUIRED_TESSDATA = ("pol.traineddata", "eng.traineddata", "osd.traineddata")
@@ -64,12 +73,13 @@ def main() -> None:
     run_pyinstaller(clean=args.clean)
     prune_unused_pyinstaller_data()
     staged_exe = stage_pyinstaller_output(binaries_dir, target_triple, suffix)
+    support_dir = staged_exe.parent / "_internal" if is_macos() else binaries_dir / "_internal"
     tesseract_exe = stage_tesseract(
         binaries_dir=binaries_dir,
         tesseract_bin=args.tesseract_bin,
         tessdata_dir=args.tessdata_dir,
     )
-    verify_packaged_resources(binaries_dir)
+    verify_packaged_resources(support_dir)
 
     if not args.no_smoke:
         smoke_test(staged_exe, tesseract_exe)
@@ -79,7 +89,7 @@ def main() -> None:
             suffix=suffix,
         )
 
-    support_size = directory_size(binaries_dir / "_internal")
+    support_size = directory_size(support_dir)
     tesseract_size = directory_size(binaries_dir / "tesseract")
     print(
         json.dumps(
@@ -245,6 +255,10 @@ def presidio_analyzer_conf_args() -> list[str]:
     return ["--add-data", f"{conf_dir}{os.pathsep}presidio_analyzer/conf"]
 
 
+def is_macos() -> bool:
+    return platform.system() == "Darwin"
+
+
 def stage_pyinstaller_output(binaries_dir: Path, target_triple: str, suffix: str) -> Path:
     app_dir = DIST_ROOT / SIDECAR_NAME
     source_exe = app_dir / f"{SIDECAR_NAME}{suffix}"
@@ -259,11 +273,19 @@ def stage_pyinstaller_output(binaries_dir: Path, target_triple: str, suffix: str
         if old.is_file():
             old.unlink()
 
-    target_exe = binaries_dir / f"{SIDECAR_NAME}-{target_triple}{suffix}"
+    if is_macos():
+        engine_dir = binaries_dir / MACOS_ENGINE_DIR
+        if engine_dir.exists():
+            shutil.rmtree(engine_dir)
+        engine_dir.mkdir()
+        target_exe = engine_dir / SIDECAR_NAME
+        target_support = engine_dir / "_internal"
+    else:
+        target_exe = binaries_dir / f"{SIDECAR_NAME}-{target_triple}{suffix}"
+        target_support = binaries_dir / "_internal"
     shutil.copy2(source_exe, target_exe)
     target_exe.chmod(target_exe.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
-    target_support = binaries_dir / "_internal"
     if target_support.exists():
         shutil.rmtree(target_support)
     shutil.copytree(source_support, target_support)
@@ -275,9 +297,15 @@ def stage_pyinstaller_output(binaries_dir: Path, target_triple: str, suffix: str
     # the OS can't resolve ".." through a directory that isn't there, even though the final,
     # normalized target (presidio_analyzer/conf/...) is staged correctly right next to it
     # (confirmed present via a CI debug step; this was the actual bug, not a missing conf
-    # file). An empty placeholder directory is enough for that traversal to succeed.
-    (target_support / "presidio_analyzer" / "recognizer_registry").mkdir(
-        parents=True, exist_ok=True
+    # file). The directory needs a file in it: Tauri bundles resources file by file, so an
+    # empty directory silently disappears from the installed app (that is how 1.0.15 for
+    # macOS shipped without it, although this staging step had already created it). Windows
+    # never noticed, because it normalizes ".." lexically without looking at the disk.
+    placeholder_dir = target_support / "presidio_analyzer" / "recognizer_registry"
+    placeholder_dir.mkdir(parents=True, exist_ok=True)
+    (placeholder_dir / "README-poufnik.txt").write_text(
+        "Placeholder so presidio_analyzer can resolve ../conf from here.\n",
+        encoding="utf-8",
     )
     return target_exe
 
@@ -307,6 +335,11 @@ def stage_tesseract(
     target_tessdata.mkdir(parents=True, exist_ok=True)
     copy_tessdata(source_tessdata, target_tessdata)
     ensure_required_tessdata(target_tessdata)
+    # Homebrew installs its files read-only and copy2 keeps that mode, which breaks every
+    # later step that rewrites them in place: Tauri overwriting resources on a rebuild,
+    # and codesign when the bundle is signed with a Developer ID.
+    for path in walk_files(target_root):
+        path.chmod(path.stat().st_mode | stat.S_IWUSR)
     return target_exe
 
 
@@ -394,20 +427,24 @@ def copy_macos_tesseract(source_exe: Path, target_root: Path) -> Path:
     target_exe = copy_posix_tesseract(source_exe, target_root)
     lib_dir = target_root / "lib"
     lib_dir.mkdir()
-    copied: dict[Path, Path] = {}
+    copied: dict[str, Path] = {}
 
-    def copy_dependency(dep: Path) -> None:
-        dep = dep.resolve()
-        if dep in copied or is_macos_system_library(dep):
+    def copy_dependency(reference: str, resolved: Path) -> None:
+        # Copy under the name the load command uses (often a symlink such as
+        # libzstd.1.dylib -> libzstd.1.5.7.dylib), because rewrite_macos_dependencies
+        # points every reference at <prefix>/<that name>. Copying under the resolved file
+        # name is how 1.0.15 for macOS shipped a Tesseract that could not load libzstd.
+        name = Path(reference).name
+        if name in copied:
             return
-        target = lib_dir / dep.name
-        shutil.copy2(dep, target)
-        copied[dep] = target
-        for child in macos_dependencies(dep):
-            copy_dependency(child)
+        target = lib_dir / name
+        shutil.copy2(resolved.resolve(), target)
+        copied[name] = target
+        for child_reference, child in macos_dependencies(resolved.resolve()):
+            copy_dependency(child_reference, child)
 
-    for dep in macos_dependencies(source_exe):
-        copy_dependency(dep)
+    for reference, resolved in macos_dependencies(source_exe):
+        copy_dependency(reference, resolved)
 
     for copied_path in copied.values():
         subprocess.run(
@@ -420,38 +457,82 @@ def copy_macos_tesseract(source_exe: Path, target_root: Path) -> Path:
     return target_exe
 
 
-def macos_dependencies(binary: Path) -> list[Path]:
+def macos_dependencies(binary: Path) -> list[tuple[str, Path]]:
+    """Non-system libraries a Mach-O binary loads, as (load command name, file on disk).
+
+    Homebrew libraries also load each other through @rpath/ and @loader_path/ (libwebpmux
+    -> @rpath/libsharpyuv.0.dylib), so those are resolved too instead of being skipped.
+    """
     result = subprocess.run(
         ["otool", "-L", str(binary)],
         check=True,
         capture_output=True,
         text=True,
     )
-    deps: list[Path] = []
+    deps: list[tuple[str, Path]] = []
     for line in result.stdout.splitlines()[1:]:
-        value = line.strip().split(" ", 1)[0]
-        if value.startswith("@"):
+        reference = line.strip().split(" ", 1)[0]
+        resolved = resolve_macos_reference(binary, reference)
+        if resolved is None or is_macos_system_library(resolved):
             continue
-        dep = Path(value)
-        if dep.exists() and not is_macos_system_library(dep):
-            deps.append(dep)
+        if resolved.resolve() == binary.resolve():
+            continue  # a dylib's own install name
+        deps.append((reference, resolved))
     return deps
 
 
+def resolve_macos_reference(binary: Path, reference: str) -> Path | None:
+    loader_dir = binary.resolve().parent
+    if reference.startswith("@loader_path/"):
+        candidates = [loader_dir / reference.removeprefix("@loader_path/")]
+    elif reference.startswith("@rpath/"):
+        name = reference.removeprefix("@rpath/")
+        candidates = [
+            Path(rpath.replace("@loader_path", str(loader_dir))) / name
+            for rpath in macos_rpaths(binary)
+            if not rpath.startswith("@executable_path")
+        ]
+    elif reference.startswith("@"):
+        return None
+    else:
+        candidates = [Path(reference)]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def macos_rpaths(binary: Path) -> list[str]:
+    result = subprocess.run(
+        ["otool", "-l", str(binary)], check=True, capture_output=True, text=True
+    )
+    rpaths: list[str] = []
+    lines = result.stdout.splitlines()
+    for index, line in enumerate(lines):
+        if line.strip() == "cmd LC_RPATH":
+            for following in lines[index + 1 : index + 4]:
+                parts = following.strip().split(" ")
+                if parts[0] == "path" and len(parts) > 1:
+                    rpaths.append(parts[1])
+                    break
+    return rpaths
+
+
 def rewrite_macos_dependencies(binary: Path, prefix: str) -> None:
-    for dep in macos_dependencies(binary):
-        subprocess.run(
-            ["install_name_tool", "-change", str(dep), f"{prefix}/{dep.name}", str(binary)],
-            check=True,
-        )
+    for reference, _resolved in macos_dependencies(binary):
+        new_reference = f"{prefix}/{Path(reference).name}"
+        if reference != new_reference:
+            subprocess.run(
+                ["install_name_tool", "-change", reference, new_reference, str(binary)],
+                check=True,
+            )
     # install_name_tool invalidates whatever signature the binary had (its own message
     # says so - "changes being made to the file will invalidate the code signature").
     # A binary with an invalidated/broken signature fails to launch under macOS's
     # arm64 code-signing enforcement, which is stricter than "no signature at all" -
     # nothing downstream ever re-signed these, so the bundled Tesseract silently stopped
     # working (or, if the engine eagerly touches Tesseract at startup, could take the
-    # whole sidecar down with it) on real end-user Macs. The CI smoke test never caught
-    # this because it only exercises /v1/health and /v1/analyze on plain text, never OCR.
+    # whole sidecar down with it) on real end-user Macs. smoke_test_ocr now runs it.
     codesign_adhoc(binary)
 
 
@@ -488,8 +569,7 @@ def ensure_required_tessdata(target_tessdata: Path) -> None:
             raise RuntimeError(f"Could not download required tessdata {filename}: {exc}") from exc
 
 
-def verify_packaged_resources(binaries_dir: Path) -> None:
-    support_dir = binaries_dir / "_internal"
+def verify_packaged_resources(support_dir: Path) -> None:
     for source, destination in REQUIRED_PACKAGED_RESOURCES:
         target = support_dir / destination / source.name
         if not target.exists():
@@ -517,16 +597,29 @@ def smoke_test_tauri_resource_layout(
     staged_exe: Path,
     suffix: str,
 ) -> None:
+    """Run the sidecar from a copy of the layout the installed app really has.
+
+    Copies go through copy_files_like_tauri, which drops empty directories the same way
+    Tauri's resource bundling does, and on macOS the copy lives under a real
+    Poufnik.app/Contents tree, so bootloader quirks that depend on the .app path show up
+    here instead of on a user's Mac.
+    """
     with tempfile.TemporaryDirectory(prefix="anonymizer-tauri-layout-") as temp_dir:
-        resource_dir = Path(temp_dir)
-        sidecar_exe = resource_dir / f"{SIDECAR_NAME}{suffix}"
-        shutil.copy2(staged_exe, sidecar_exe)
+        if is_macos():
+            resource_dir = Path(temp_dir) / "Poufnik.app" / "Contents" / "Resources"
+            (resource_dir.parent / "MacOS").mkdir(parents=True)
+            engine_dir = resource_dir / "binaries" / MACOS_ENGINE_DIR
+            copy_files_like_tauri(staged_exe.parent, engine_dir)
+            sidecar_exe = engine_dir / SIDECAR_NAME
+        else:
+            resource_dir = Path(temp_dir)
+            sidecar_exe = resource_dir / f"{SIDECAR_NAME}{suffix}"
+            shutil.copy2(staged_exe, sidecar_exe)
+            copy_files_like_tauri(binaries_dir / "_internal", resource_dir / "_internal")
         sidecar_exe.chmod(sidecar_exe.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
-        shutil.copytree(binaries_dir / "_internal", resource_dir / "_internal")
         resource_binaries_dir = resource_dir / "binaries"
-        resource_binaries_dir.mkdir()
-        shutil.copytree(binaries_dir / "tesseract", resource_binaries_dir / "tesseract")
+        copy_files_like_tauri(binaries_dir / "tesseract", resource_binaries_dir / "tesseract")
 
         tesseract_name = "tesseract.exe" if suffix == ".exe" else "tesseract"
         smoke_test_process(
@@ -534,6 +627,16 @@ def smoke_test_tauri_resource_layout(
             resource_binaries_dir / "tesseract" / tesseract_name,
             cwd=resource_binaries_dir,
         )
+
+
+def copy_files_like_tauri(source: Path, target: Path) -> None:
+    # Tauri bundles a resource directory file by file, so empty directories never reach
+    # the installed app; copytree would keep them and hide that difference.
+    for path in source.rglob("*"):
+        if path.is_file():
+            destination = target / path.relative_to(source)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(path, destination)
 
 
 def smoke_test_process(sidecar_exe: Path, tesseract_exe: Path, *, cwd: Path) -> None:
@@ -572,6 +675,7 @@ def smoke_test_process(sidecar_exe: Path, tesseract_exe: Path, *, cwd: Path) -> 
                 f"Smoke analyze missed expected categories {sorted(missing_categories)}: "
                 f"{analyze}\n{chr(10).join(stderr_lines)}"
             )
+        smoke_test_ocr(port, token, stderr_lines)
     finally:
         process.terminate()
         try:
@@ -581,6 +685,47 @@ def smoke_test_process(sidecar_exe: Path, tesseract_exe: Path, *, cwd: Path) -> 
             process.wait(timeout=10)
         if process.returncode not in {0, -15, 1}:
             print("\n".join(stderr_lines), file=sys.stderr)
+
+
+def smoke_test_ocr(port: int, token: str, stderr_lines: list[str]) -> None:
+    # Runs the bundled Tesseract for real: text-only checks never load it, which is how
+    # a Tesseract missing one of its dylibs reached users.
+    from PIL import Image, ImageDraw, ImageFont
+
+    image = Image.new("RGB", (1400, 220), "white")
+    font = ImageFont.load_default(size=48)
+    ImageDraw.Draw(image).text((40, 70), "PESEL 44051401359", fill="black", font=font)
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+
+    boundary = uuid.uuid4().hex
+    body = (
+        (
+            f'--{boundary}\r\nContent-Disposition: form-data; name="file"; '
+            f'filename="smoke.png"\r\nContent-Type: image/png\r\n\r\n'
+        ).encode()
+        + buffer.getvalue()
+        + f"\r\n--{boundary}--\r\n".encode()
+    )
+    request = urllib.request.Request(
+        f"http://127.0.0.1:{port}/v1/documents/process",
+        data=body,
+        headers={
+            "X-Api-Key": token,
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=300) as response:
+            result = response.read().decode("utf-8")
+    except urllib.error.HTTPError as error:
+        raise RuntimeError(
+            f"Smoke OCR failed with HTTP {error.code}: {error.read().decode('utf-8', 'replace')}"
+            f"\n{chr(10).join(stderr_lines)}"
+        ) from error
+    if "44051401359" not in result:
+        raise RuntimeError(f"Smoke OCR did not read the PESEL from the test image: {result[:2000]}")
 
 
 def start_stream_reader(

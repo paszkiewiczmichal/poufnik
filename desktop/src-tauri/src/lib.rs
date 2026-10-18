@@ -94,6 +94,16 @@ enum EngineSpawnMode {
         args: Vec<String>,
         cwd: PathBuf,
     },
+    // macOS: the PyInstaller onedir bundled as a resource directory (binaries/engine),
+    // because as a Tauri externalBin it would land in Contents/MacOS, where the PyInstaller
+    // bootloader looks for its runtime in Contents/Frameworks instead of next to itself.
+    BundledExecutable {
+        program: PathBuf,
+        args: Vec<String>,
+        cwd: PathBuf,
+        tesseract_path: PathBuf,
+        tessdata_dir: PathBuf,
+    },
     TauriSidecar {
         name: String,
         args: Vec<String>,
@@ -286,6 +296,21 @@ async fn spawn_engine_process(
             .current_dir(cwd)
             .spawn()
             .map_err(|error| format!("Nie udalo sie uruchomic engine w trybie dev: {error}")),
+        EngineSpawnMode::BundledExecutable {
+            program,
+            args,
+            cwd,
+            tesseract_path,
+            tessdata_dir,
+        } => app
+            .shell()
+            .command(program)
+            .args(args)
+            .current_dir(cwd)
+            .env("ANONYMIZER_TESSERACT_PATH", tesseract_path)
+            .env("TESSDATA_PREFIX", tessdata_dir)
+            .spawn()
+            .map_err(|error| format!("Nie udalo sie uruchomic engine: {error}")),
         EngineSpawnMode::TauriSidecar {
             name,
             args,
@@ -310,19 +335,31 @@ fn resolve_spawn_mode(app: &AppHandle) -> Result<EngineSpawnMode, String> {
     let force_dev = env::var("ANONYMIZER_ENGINE_COMMAND").is_ok();
     if force_sidecar || (!cfg!(debug_assertions) && !force_dev) {
         let binaries_dir = bundled_binaries_dir(app)?;
+        let args = vec![
+            "--mode".into(),
+            "sidecar".into(),
+            "--port".into(),
+            "0".into(),
+        ];
+        let tesseract_path = bundled_tesseract_path(&binaries_dir);
+        let tessdata_dir = binaries_dir.join("tesseract").join("tessdata");
+        if cfg!(target_os = "macos") {
+            return Ok(EngineSpawnMode::BundledExecutable {
+                program: binaries_dir.join("engine").join("anonymizer-engine"),
+                args,
+                cwd: binaries_dir,
+                tesseract_path,
+                tessdata_dir,
+            });
+        }
         let name = env::var("ANONYMIZER_ENGINE_SIDECAR_NAME")
             .unwrap_or_else(|_| "anonymizer-engine".to_string());
         return Ok(EngineSpawnMode::TauriSidecar {
             name,
-            args: vec![
-                "--mode".into(),
-                "sidecar".into(),
-                "--port".into(),
-                "0".into(),
-            ],
-            cwd: binaries_dir.clone(),
-            tesseract_path: bundled_tesseract_path(&binaries_dir),
-            tessdata_dir: binaries_dir.join("tesseract").join("tessdata"),
+            args,
+            cwd: binaries_dir,
+            tesseract_path,
+            tessdata_dir,
         });
     }
 
