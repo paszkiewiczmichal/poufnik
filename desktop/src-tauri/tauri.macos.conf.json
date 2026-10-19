@@ -5,6 +5,10 @@
     "resources": {
       "binaries/_internal": null,
       "binaries/engine": "binaries/engine"
+    },
+    "macOS": {
+      "hardenedRuntime": true,
+      "entitlements": "Entitlements.plist"
     }
   }
 }

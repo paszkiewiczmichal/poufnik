@@ -25,6 +25,7 @@ import urllib.error
 import urllib.request
 import uuid
 from collections.abc import Iterable
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -42,6 +43,11 @@ SIDECAR_NAME = "anonymizer-engine"
 # Contents/Resources/binaries/engine/, and spawned by path (see tauri.macos.conf.json and
 # lib.rs). It stays outside Contents/Frameworks also because codesign rejects data files there.
 MACOS_ENGINE_DIR = "engine"
+ENGINE_ENTITLEMENTS = ENGINE_ROOT / "build" / "engine.entitlements.plist"
+_MACHO_MAGICS = {
+    bytes.fromhex(magic)
+    for magic in ("feedface", "feedfacf", "cefaedfe", "cffaedfe", "cafebabe", "bebafeca")
+}
 TESSDATA_FAST_BASE = "https://github.com/tesseract-ocr/tessdata_fast/raw/main"
 # osd: page orientation detection, so sideways or upside-down scans are read upright.
 REQUIRED_TESSDATA = ("pol.traineddata", "eng.traineddata", "osd.traineddata")
@@ -80,6 +86,13 @@ def main() -> None:
         tessdata_dir=args.tessdata_dir,
     )
     verify_packaged_resources(support_dir)
+    signing_identity = os.environ.get("APPLE_SIGNING_IDENTITY", "").strip()
+    if is_macos() and signing_identity:
+        sign_macos_binaries(
+            [staged_exe.parent, binaries_dir / "tesseract"],
+            entry_points={staged_exe: ENGINE_ENTITLEMENTS, tesseract_exe: None},
+            identity=signing_identity,
+        )
 
     if not args.no_smoke:
         smoke_test(staged_exe, tesseract_exe)
@@ -534,6 +547,47 @@ def rewrite_macos_dependencies(binary: Path, prefix: str) -> None:
     # working (or, if the engine eagerly touches Tesseract at startup, could take the
     # whole sidecar down with it) on real end-user Macs. smoke_test_ocr now runs it.
     codesign_adhoc(binary)
+
+
+def sign_macos_binaries(
+    roots: list[Path],
+    *,
+    entry_points: dict[Path, Path | None],
+    identity: str,
+) -> None:
+    """Sign every Mach-O file under roots with a Developer ID, for notarization.
+
+    Tauri signs only the app's own executable, not code shipped as resources, and the
+    notary service rejects the whole app if any binary inside lacks a Developer ID
+    signature, the hardened runtime or a secure timestamp. Libraries are signed first and
+    the executables that load them last, each executable with its entitlements.
+    """
+    entry = {path.resolve(): entitlements for path, entitlements in entry_points.items()}
+    libraries = [
+        path
+        for root in roots
+        for path in walk_files(root)
+        if is_macho(path) and path.resolve() not in entry
+    ]
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        list(pool.map(lambda path: codesign_developer_id(path, identity, None), libraries))
+    for path, entitlements in entry.items():
+        codesign_developer_id(path, identity, entitlements)
+    print(f"Signed {len(libraries) + len(entry)} binaries with {identity!r}")
+
+
+def codesign_developer_id(binary: Path, identity: str, entitlements: Path | None) -> None:
+    command = ["codesign", "--force", "--timestamp", "--options", "runtime", "--sign", identity]
+    if entitlements is not None:
+        command += ["--entitlements", str(entitlements)]
+    subprocess.run([*command, str(binary)], check=True, capture_output=True, text=True)
+
+
+def is_macho(path: Path) -> bool:
+    if path.is_symlink():
+        return False
+    with path.open("rb") as handle:
+        return handle.read(4) in _MACHO_MAGICS
 
 
 def codesign_adhoc(binary: Path) -> None:
