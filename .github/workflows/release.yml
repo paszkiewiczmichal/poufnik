@@ -474,12 +474,14 @@ jobs:
           - os: macos-14
             arch: arm64
             target: aarch64-apple-darwin
+            asset_arch: aarch64
           # macos-13 was fully retired 2025-12-08 (GitHub deprecated the whole macOS 13
           # image); macos-15-intel is the current label for a hosted Intel runner, kept
           # available until August 2027 per GitHub's Apple-silicon migration plan.
           - os: macos-15-intel
             arch: x86_64
             target: x86_64-apple-darwin
+            asset_arch: x64
     runs-on: ${{ matrix.os }}
     env:
       RELEASE_TARGET: ${{ matrix.target }}
@@ -547,16 +549,57 @@ jobs:
       - name: Configure updater signing key
         run: uv run --python ${{ env.PYTHON_VERSION }} --no-project python .github/scripts/configure_updater_key.py
 
+      # Developer ID signing and notarization switch on by themselves once the Apple secrets
+      # exist; without them the build stays ad-hoc signed, as before. The certificate goes
+      # into a temporary keychain before the sidecar build, because build_sidecar.py signs
+      # every engine and Tesseract binary itself (Tauri signs only the app's own executable).
+      # Only APPLE_SIGNING_IDENTITY reaches Tauri, not APPLE_CERTIFICATE, so Tauri signs from
+      # this keychain instead of importing the same certificate into a second one.
+      - name: Import Apple signing certificate
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_PRIVATE_KEY: ${{ secrets.APPLE_API_PRIVATE_KEY }}
+        run: |
+          if [ -z "$APPLE_CERTIFICATE" ]; then
+            echo "::notice::No Apple certificate configured; building ad-hoc signed."
+            exit 0
+          fi
+          keychain="$RUNNER_TEMP/poufnik-signing.keychain-db"
+          keychain_password="$(uuidgen)"
+          printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$RUNNER_TEMP/certificate.p12" -k "$keychain" \
+            -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          rm "$RUNNER_TEMP/certificate.p12"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain" > /dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          security find-identity -v -p codesigning "$keychain"
+          echo "APPLE_SIGNING_IDENTITY=$APPLE_SIGNING_IDENTITY" >> "$GITHUB_ENV"
+          if [ -n "$APPLE_API_PRIVATE_KEY" ]; then
+            key_path="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY}.p8"
+            printf '%s\n' "$APPLE_API_PRIVATE_KEY" > "$key_path"
+            {
+              echo "APPLE_API_ISSUER=$APPLE_API_ISSUER"
+              echo "APPLE_API_KEY=$APPLE_API_KEY"
+              echo "APPLE_API_KEY_PATH=$key_path"
+            } >> "$GITHUB_ENV"
+          else
+            echo "::warning::Apple certificate without an App Store Connect API key: signed, not notarized."
+          fi
+
       - name: Build engine sidecar
         working-directory: engine
         run: uv run python build/build_sidecar.py --target-triple "$RELEASE_TARGET" --clean
 
-      # Unsigned build (Michal's decision for v1): no Apple Developer Program (99 USD/yr)
-      # certificate, so Gatekeeper shows the "unknown developer" prompt and users open the
-      # app via Ustawienia -> Prywatnosc i bezpieczenstwo -> "Otworz mimo to". Tauri's
-      # bundler still ad-hoc-codesigns automatically (codesign --sign -), which is required
-      # for the binary to launch at all on Apple Silicon - that needs no secrets or Apple
-      # account. Paid signing + notarization planned for a real v2.0.
+      # With APPLE_SIGNING_IDENTITY set (previous step) Tauri signs the app with the hardened
+      # runtime and Entitlements.plist, and with APPLE_API_* it also notarizes and staples
+      # it. Without them it ad-hoc signs, which Apple Silicon needs to launch anything.
       - name: Build Tauri installer
         id: tauri
         uses: tauri-apps/tauri-action@v1
@@ -588,6 +631,44 @@ jobs:
           dmgs=(../desktop/src-tauri/target/${RELEASE_TARGET}/release/bundle/dmg/*.dmg)
           if [ ${#dmgs[@]} -ne 1 ]; then echo "::error::Expected exactly one DMG, found ${#dmgs[@]}"; exit 1; fi
           uv run python build/smoke_app_bundle.py "${dmgs[0]}"
+
+      # The DMG itself is signed, notarized and stapled too, so Gatekeeper accepts the
+      # download before the app inside is even looked at. Stapling changes the file, so the
+      # copy tauri-action already attached to the draft release is replaced.
+      - name: Notarize DMG
+        if: env.APPLE_API_KEY_PATH != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          shopt -s nullglob
+          dmgs=(desktop/src-tauri/target/${RELEASE_TARGET}/release/bundle/dmg/*.dmg)
+          if [ ${#dmgs[@]} -ne 1 ]; then echo "::error::Expected exactly one DMG, found ${#dmgs[@]}"; exit 1; fi
+          dmg="${dmgs[0]}"
+          codesign --force --timestamp --sign "$APPLE_SIGNING_IDENTITY" "$dmg"
+          xcrun notarytool submit "$dmg" --key "$APPLE_API_KEY_PATH" --key-id "$APPLE_API_KEY" \
+            --issuer "$APPLE_API_ISSUER" --wait --timeout 60m
+          xcrun stapler staple "$dmg"
+          asset=$(gh release view "$GITHUB_REF_NAME" --json assets --jq '.assets[].name' \
+            | grep "_darwin_${{ matrix.asset_arch }}\.dmg$")
+          cp "$dmg" "$RUNNER_TEMP/$asset"
+          gh release upload "$GITHUB_REF_NAME" "$RUNNER_TEMP/$asset" --clobber
+
+      - name: Verify signature and Gatekeeper
+        if: env.APPLE_SIGNING_IDENTITY != ''
+        run: |
+          dmg=$(ls desktop/src-tauri/target/${RELEASE_TARGET}/release/bundle/dmg/*.dmg)
+          mount_point=$(mktemp -d)
+          hdiutil attach "$dmg" -nobrowse -readonly -mountpoint "$mount_point" > /dev/null
+          app="$mount_point/Poufnik.app"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          codesign -dvv "$app" 2>&1 | grep -E "Authority|TeamIdentifier|Runtime|flags"
+          if [ -n "${APPLE_API_KEY_PATH:-}" ]; then
+            spctl --assess --type execute --verbose=4 "$app"
+            xcrun stapler validate "$app"
+            xcrun stapler validate "$dmg"
+            spctl --assess --type open --context context:primary-signature --verbose=4 "$dmg"
+          fi
+          hdiutil detach "$mount_point" -force > /dev/null
 
       - name: Generate SHA256 checksums
         run: uv run --python ${{ env.PYTHON_VERSION }} --no-project python .github/scripts/sha256_artifacts.py --output "$CHECKSUM_NAME"
