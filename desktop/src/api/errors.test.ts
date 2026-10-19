@@ -64,6 +64,10 @@ describe("toUserMessage", () => {
     expect(fallbackOnEngineRefusal(apiError({ status: 422, detail: "Invalid offset_map." }))).toBeNull();
   });
 
+  it("falls back to a simplified file when the in-place export hits an engine error", () => {
+    expect(fallbackOnEngineRefusal(apiError({ status: 500 }))).toBeNull();
+  });
+
   it("does not hide failures that a simplified file would hit too", () => {
     const tooLarge = apiError({ status: 413 });
     expect(() => fallbackOnEngineRefusal(tooLarge)).toThrow(tooLarge);

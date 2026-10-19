@@ -22,10 +22,14 @@ export function toUserMessage(error: unknown): string {
   return texts.errors.generic;
 }
 
-// The engine refuses an in-place export it cannot do safely (400/422). The caller then
-// falls back to a simplified file built from the anonymized text instead of failing.
+// The engine refuses an in-place export it cannot do safely (400/422), or an unexpected
+// document trips it up (5xx). The caller then falls back to a simplified file built only
+// from the anonymized text, which cannot contain an original value, instead of failing.
 export function fallbackOnEngineRefusal(error: unknown): null {
-  if (error instanceof ApiError && (error.status === 400 || error.status === 422)) {
+  if (
+    error instanceof ApiError &&
+    (error.status === 400 || error.status === 422 || error.status >= 500)
+  ) {
     return null;
   }
   throw error;
