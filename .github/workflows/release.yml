@@ -19,6 +19,7 @@ jobs:
     outputs:
       body: ${{ steps.changelog.outputs.body }}
       prerelease: ${{ steps.tag.outputs.prerelease }}
+      mas: ${{ steps.mas.outputs.enabled }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,6 +33,21 @@ jobs:
             echo "prerelease=true" >> "$GITHUB_OUTPUT"
           else
             echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # The Mac App Store job runs only once its certificate and provisioning profile exist
+      # (a job's own `if` cannot read secrets).
+      - name: Mac App Store secrets
+        id: mas
+        env:
+          MAS_CERTIFICATE: ${{ secrets.MAS_CERTIFICATE }}
+          MAS_PROVISIONING_PROFILE: ${{ secrets.MAS_PROVISIONING_PROFILE }}
+        run: |
+          if [ -n "$MAS_CERTIFICATE" ] && [ -n "$MAS_PROVISIONING_PROFILE" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::No Mac App Store certificate or provisioning profile; skipping the App Store build."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Install uv
@@ -699,3 +715,165 @@ jobs:
         with:
           name: checksums-macos-${{ matrix.arch }}
           path: ${{ env.CHECKSUM_NAME }}
+
+  # Mac App Store: sandboxed build without the self-updater and without PDF through Word,
+  # signed "Apple Distribution", packaged as a .pkg signed "Mac Installer Distribution" and
+  # uploaded to App Store Connect. Uploading only adds a build there; submitting
+  # it for review stays a manual step. Apple Silicon only: the PyInstaller engine is not a universal binary,
+  # and the App Store accepts one build per version (Intel Macs keep the DMG).
+  build-macos-mas:
+    name: build-macos-mas
+    needs:
+      - release-metadata
+      - test-engine
+      - test-desktop
+    if: needs.release-metadata.outputs.mas == 'true'
+    runs-on: macos-14
+    env:
+      RELEASE_TARGET: aarch64-apple-darwin
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Prepare release version
+        run: uv run --python ${{ env.PYTHON_VERSION }} --no-project python .github/scripts/prepare_release_version.py "${{ github.ref_name }}"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ env.RELEASE_TARGET }}
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri -> target
+          shared-key: macos-mas
+
+      - name: Install Tesseract
+        run: brew install tesseract
+
+      - name: Install engine dependencies
+        working-directory: engine
+        env:
+          UV_LINK_MODE: copy
+        run: uv sync --group dev --group models --group build
+
+      - name: Install desktop dependencies
+        working-directory: desktop
+        run: npm ci
+
+      # One .p12 holds both identities ("Apple Distribution" for the app, "3rd Party Mac
+      # Developer Installer" for the .pkg); their names are read from the keychain.
+      - name: Import App Store certificates and profile
+        env:
+          MAS_CERTIFICATE: ${{ secrets.MAS_CERTIFICATE }}
+          MAS_CERTIFICATE_PASSWORD: ${{ secrets.MAS_CERTIFICATE_PASSWORD }}
+          MAS_PROVISIONING_PROFILE: ${{ secrets.MAS_PROVISIONING_PROFILE }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_PRIVATE_KEY: ${{ secrets.APPLE_API_PRIVATE_KEY }}
+        run: |
+          keychain="$RUNNER_TEMP/poufnik-mas.keychain-db"
+          keychain_password="$(uuidgen)"
+          printf '%s' "$MAS_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/mas.p12"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$RUNNER_TEMP/mas.p12" -k "$keychain" -P "$MAS_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/productbuild -T /usr/bin/security
+          rm "$RUNNER_TEMP/mas.p12"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain" > /dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          # Apple Distribution certificates chain to the WWDR G3 intermediate, which the
+          # runner image does not necessarily carry; codesign needs it to build the chain.
+          curl -fsSL https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer -o "$RUNNER_TEMP/AppleWWDRCAG3.cer"
+          security import "$RUNNER_TEMP/AppleWWDRCAG3.cer" -k "$keychain" > /dev/null || true
+          identities="$(security find-identity "$keychain")"
+          app_identity="$(printf '%s\n' "$identities" | sed -n 's/.*"\(Apple Distribution: .*\)".*/\1/p' | head -1)"
+          installer_identity="$(printf '%s\n' "$identities" \
+            | sed -En 's/.*"((3rd Party Mac Developer Installer|Mac Installer Distribution): .*)".*/\1/p' | head -1)"
+          if [ -z "$app_identity" ] || [ -z "$installer_identity" ]; then
+            echo "::error::MAS_CERTIFICATE must hold both Apple Distribution and Mac Installer Distribution identities."
+            exit 1
+          fi
+          echo "Signing: $app_identity / $installer_identity"
+          printf '%s' "$MAS_PROVISIONING_PROFILE" | base64 --decode > "$RUNNER_TEMP/poufnik.provisionprofile"
+          keys_dir="$RUNNER_TEMP/private_keys"
+          mkdir -p "$keys_dir"
+          printf '%s\n' "$APPLE_API_PRIVATE_KEY" > "$keys_dir/AuthKey_${APPLE_API_KEY}.p8"
+          {
+            echo "MAS_APP_IDENTITY=$app_identity"
+            echo "MAS_INSTALLER_IDENTITY=$installer_identity"
+            echo "API_PRIVATE_KEYS_DIR=$keys_dir"
+          } >> "$GITHUB_ENV"
+
+      # Unsigned for distribution here (ad-hoc, smoke-tested); package_mas.py signs every
+      # engine and Tesseract binary for the sandbox afterwards.
+      - name: Build engine sidecar
+        working-directory: engine
+        run: uv run python build/build_sidecar.py --target-triple "$RELEASE_TARGET" --clean
+
+      - name: Build Tauri app (Mac App Store)
+        working-directory: desktop
+        env:
+          VITE_POUFNIK_DISTRIBUTION: mas
+        run: |
+          npx tauri build --target "$RELEASE_TARGET" --features mas \
+            --config src-tauri/tauri.mas.conf.json --bundles app --no-sign
+
+      - name: Verify the frontend was built for the Mac App Store channel
+        run: |
+          mas=$( (grep -l "poufnik-channel-mas" desktop/dist/assets/*.js || true) | wc -l )
+          if [ "$mas" -lt 1 ]; then
+            echo "Frontend bundle is not a Mac App Store build."
+            exit 1
+          fi
+          echo "Frontend bundle is a Mac App Store build."
+
+      - name: Smoke-test engine inside the app
+        working-directory: engine
+        run: uv run python build/smoke_app_bundle.py "../desktop/src-tauri/target/${RELEASE_TARGET}/release/bundle/macos/Poufnik.app"
+
+      - name: Sign and package for the App Store
+        run: |
+          python3 desktop/scripts/package_mas.py \
+            --app "desktop/src-tauri/target/${RELEASE_TARGET}/release/bundle/macos/Poufnik.app" \
+            --out-dir "$RUNNER_TEMP/mas" \
+            --app-identity "$MAS_APP_IDENTITY" \
+            --installer-identity "$MAS_INSTALLER_IDENTITY" \
+            --provisioning-profile "$RUNNER_TEMP/poufnik.provisionprofile"
+          echo "MAS_PKG=$(ls "$RUNNER_TEMP"/mas/*.pkg)" >> "$GITHUB_ENV"
+
+      - name: Upload .pkg workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: poufnik-mas-${{ github.ref_name }}
+          path: ${{ env.MAS_PKG }}
+          if-no-files-found: error
+
+      # Pre-releases (tags with "-") stop here; a release build goes to App Store Connect,
+      # where it waits until it is attached to a version and submitted for review by hand.
+      - name: Validate and upload to App Store Connect
+        if: needs.release-metadata.outputs.prerelease != 'true'
+        env:
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          xcrun altool --validate-app -f "$MAS_PKG" -t macos --apiKey "$APPLE_API_KEY" --apiIssuer "$APPLE_API_ISSUER"
+          xcrun altool --upload-app -f "$MAS_PKG" -t macos --apiKey "$APPLE_API_KEY" --apiIssuer "$APPLE_API_ISSUER"
