@@ -53,6 +53,7 @@ import {
   getUpdateConsent,
   installUpdate,
   saveUpdateConsent,
+  IS_MAC_APP_STORE,
   UPDATES_MANAGED_BY_STORE,
   type UpdateConsent,
 } from "./tauri/updater";
@@ -927,7 +928,9 @@ function App() {
         setExportNotice(
           format === "docx" || !sourceFile
             ? texts.generation.exportSimplifiedLayout
-            : texts.generation.exportPdfWithoutWord,
+            : IS_MAC_APP_STORE
+              ? texts.generation.exportPdfSandboxed
+              : texts.generation.exportPdfWithoutWord,
         );
       } else if (sourceIsPdf) {
         setExportNotice(
@@ -1608,7 +1611,9 @@ function App() {
                 <section className="settings-section">
                   <h3>{texts.updates.sectionTitle}</h3>
                   {UPDATES_MANAGED_BY_STORE ? (
-                    <p className="muted">{texts.updates.managedByStore}</p>
+                    <p className="muted">
+                      {IS_MAC_APP_STORE ? texts.updates.managedByAppStore : texts.updates.managedByStore}
+                    </p>
                   ) : (
                     <>
                       <label className="checkbox-row">

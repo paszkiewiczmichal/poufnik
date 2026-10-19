@@ -10,13 +10,16 @@ export type UpdateCheckResult =
 export const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 // Kanal dystrybucji zapisany w buildzie (main.tsx wystawia go jako data-channel, a CI sprawdza
-// ten literal w bundlu). W wersji ze Sklepu Microsoft aktualizacje dostarcza Sklep - wlasny
-// updater z GitHuba nie moze pobierac i instalowac plikow poza Sklepem.
+// ten literal w bundlu). W wersjach ze Sklepu Microsoft i z Mac App Store aktualizacje
+// dostarcza sklep - wlasny updater z GitHuba nie moze pobierac i instalowac plikow poza nim.
 export const DISTRIBUTION_CHANNEL =
   import.meta.env.VITE_POUFNIK_DISTRIBUTION === "store"
     ? "poufnik-channel-store"
-    : "poufnik-channel-direct";
-export const UPDATES_MANAGED_BY_STORE = DISTRIBUTION_CHANNEL === "poufnik-channel-store";
+    : import.meta.env.VITE_POUFNIK_DISTRIBUTION === "mas"
+      ? "poufnik-channel-mas"
+      : "poufnik-channel-direct";
+export const IS_MAC_APP_STORE = DISTRIBUTION_CHANNEL === "poufnik-channel-mas";
+export const UPDATES_MANAGED_BY_STORE = DISTRIBUTION_CHANNEL !== "poufnik-channel-direct";
 
 const CONSENT_KEY = "anonymizer.updates.consent";
 const LAST_CHECK_KEY = "anonymizer.updates.lastCheckAt";

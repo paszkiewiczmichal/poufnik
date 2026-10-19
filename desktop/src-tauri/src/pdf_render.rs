@@ -1,6 +1,8 @@
 //! Renders an (already anonymized) DOCX to PDF with the office suite installed on the
 //! computer: Microsoft Word when present (its own layout engine gives a PDF identical to
 //! what the user sees in Word), otherwise an installed LibreOffice. Nothing is bundled.
+// The Mac App Store build never renders through an office program (detect_renderer below).
+#![cfg_attr(feature = "mas", allow(dead_code))]
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -55,6 +57,15 @@ fn render(renderer: PdfRenderer, docx: &[u8]) -> Result<Vec<u8>, String> {
 }
 
 // ------------------------------------------------------------------ detection
+// The App Sandbox lets the app neither send Apple Events to Word nor run LibreOffice outside
+// its own sandbox (and a sandboxed Word could not open the app's temporary file anyway), so
+// the Mac App Store build always falls back to the simplified PDF.
+#[cfg(feature = "mas")]
+fn detect_renderer() -> Option<PdfRenderer> {
+    None
+}
+
+#[cfg(not(feature = "mas"))]
 fn detect_renderer() -> Option<PdfRenderer> {
     if word_installed() {
         return Some(PdfRenderer::Word);

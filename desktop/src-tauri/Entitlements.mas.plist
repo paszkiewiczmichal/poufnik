@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Mac App Store build (desktop/scripts/package_mas.py adds the application and team
+	     identifiers from the provisioning profile). -->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<!-- The engine listens on 127.0.0.1 (port 0) and so does the browser sign-in callback. -->
+	<key>com.apple.security.network.server</key>
+	<true/>
+	<!-- Requests to the engine on 127.0.0.1 and to account.lawtern.com. -->
+	<key>com.apple.security.network.client</key>
+	<true/>
+	<!-- Documents chosen in the open/save dialogs or dropped on the window. -->
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
+</dict>
+</plist>

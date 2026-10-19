@@ -75,6 +75,7 @@ export const texts = {
     settings: "Ustawienia",
     sectionTitle: "Aktualizacje.",
     managedByStore: "Aktualizacje tej wersji dostarcza Microsoft Store.",
+    managedByAppStore: "Aktualizacje tej wersji dostarcza App Store.",
     consentTitle: "Sprawdzanie aktualizacji.",
     consentBody:
       "Poufnik może raz dziennie sprawdzać, czy dostępna jest nowsza wersja. Wymaga to połączenia z internetem, ale dotyczy wyłącznie numeru wersji aplikacji.",
@@ -410,6 +411,8 @@ export const texts = {
       "PDF utworzono w LibreOffice - jego wygląd może minimalnie różnić się od tego w Microsoft Word.",
     exportPdfWithoutWord:
       "Na tym komputerze nie ma Microsoft Word, więc PDF ma uproszczony układ. Aby uzyskać PDF wyglądający jak oryginał, wyeksportuj DOCX i w Wordzie wybierz Zapisz jako PDF.",
+    exportPdfSandboxed:
+      "Ta wersja Poufnika nie tworzy PDF przez Microsoft Word, więc PDF ma uproszczony układ. Aby uzyskać PDF wyglądający jak oryginał, wyeksportuj DOCX i w Wordzie wybierz Zapisz jako PDF.",
     noticesTitle: "Co Poufnik zmienił w pliku",
     notices: {
       tracked_changes_accepted:

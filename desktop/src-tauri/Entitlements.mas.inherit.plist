@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Every executable inside the Mac App Store app (the engine and Tesseract) runs in the
+	     app's own sandbox. Apple allows no other entitlement next to inherit; none is needed,
+	     because without the hardened runtime nothing restricts the engine's executable memory
+	     or the libraries it loads (all signed by the same team). -->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<key>com.apple.security.inherit</key>
+	<true/>
+</dict>
+</plist>

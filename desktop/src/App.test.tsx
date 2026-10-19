@@ -41,7 +41,7 @@ const mocks = vi.hoisted(() => {
     getRegistrationUrl: vi.fn(),
     getStoredBasicChoice: vi.fn(),
     getUpdateConsent: vi.fn(),
-    storeChannel: { managed: false },
+    storeChannel: { managed: false, appStore: false },
     installUpdate: vi.fn(),
     isSupportedDocumentName: vi.fn(),
     listenToDroppedFiles: vi.fn(),
@@ -160,6 +160,9 @@ vi.mock("./tauri/updater", () => ({
   get UPDATES_MANAGED_BY_STORE() {
     return mocks.storeChannel.managed;
   },
+  get IS_MAC_APP_STORE() {
+    return mocks.storeChannel.appStore;
+  },
 }));
 
 vi.mock("./tauri/external", () => ({
@@ -201,6 +204,7 @@ describe("App engine health", () => {
     mocks.getStoredBasicChoice.mockReturnValue(true);
     mocks.getUpdateConsent.mockReturnValue(false);
     mocks.storeChannel.managed = false;
+    mocks.storeChannel.appStore = false;
     mocks.health.mockResolvedValue({
       models_loaded: false,
       status: "degraded",
@@ -411,6 +415,21 @@ describe("App engine health", () => {
 
     expect(await screen.findByText(texts.updates.managedByStore)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: texts.updates.checkNow })).not.toBeInTheDocument();
+    expect(mocks.checkForUpdate).not.toHaveBeenCalled();
+  });
+
+  it("in the Mac App Store build names the App Store as the source of updates", async () => {
+    mocks.storeChannel.managed = true;
+    mocks.storeChannel.appStore = true;
+    mocks.getUpdateConsent.mockReturnValue(null);
+    mocks.checkForUpdate.mockClear();
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: texts.updates.settings }));
+
+    expect(await screen.findByText(texts.updates.managedByAppStore)).toBeInTheDocument();
+    expect(screen.queryByText(texts.updates.consentTitle)).not.toBeInTheDocument();
     expect(mocks.checkForUpdate).not.toHaveBeenCalled();
   });
 

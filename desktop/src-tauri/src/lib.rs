@@ -502,7 +502,10 @@ fn shutdown_engine(state: &SharedEngineState) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let engine_state = SharedEngineState::default();
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(not(feature = "mas"))]
+    let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+    builder
         .manage(engine_state.clone())
         .manage(browser_login::BrowserLoginState::default())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
@@ -514,7 +517,6 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_clipboard_manager::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             get_engine_status,

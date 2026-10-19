@@ -12,6 +12,11 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
+[features]
+# Mac App Store build: no GitHub self-updater (the App Store updates the app) and no PDF
+# through Word or LibreOffice, which a sandboxed app cannot drive (see pdf_render.rs).
+mas = []
+
 [dependencies]
 tauri = { version = "2", features = [] }
 serde = { version = "1", features = ["derive"] }
