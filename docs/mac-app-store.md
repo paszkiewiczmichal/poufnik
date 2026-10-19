@@ -11,7 +11,7 @@ z GitHuba (DMG z aktualizatorem, podpis Developer ID) zostaje bez zmian.
 | Piaskownica (App Sandbox) | nie | tak |
 | PDF z dokumentu Worda | przez Worda (wygląd oryginału) | uproszczony układ + komunikat |
 | Procesory | Apple Silicon i Intel | tylko Apple Silicon |
-| Minimalny macOS | jak dotąd | 14 |
+| Minimalny macOS | 14.8.5 (Apple Silicon), 15.0 (Intel) | 14.8.5 |
 
 - **PDF przez Worda** w piaskownicy jest niemożliwy: aplikacja nie może sterować Wordem
   (Apple Events) ani uruchamiać LibreOffice, a Word – sam w piaskownicy – i tak nie otworzy
@@ -29,7 +29,7 @@ z GitHuba (DMG z aktualizatorem, podpis Developer ID) zostaje bez zmian.
 - Rust: funkcja `mas` (`desktop/src-tauri/Cargo.toml`) – bez wtyczki aktualizatora,
   `pdf_render.rs` nie szuka Worda ani LibreOffice.
 - Konfiguracja Tauri: `desktop/src-tauri/tauri.mas.conf.json` (bez artefaktów aktualizatora,
-  kategoria Business, macOS 14, CSP bez adresu aktualizacji).
+  kategoria Business, macOS 14.8.5, CSP bez adresu aktualizacji).
 - Uprawnienia: `Entitlements.mas.plist` (aplikacja: piaskownica, sieć klient/serwer –
   silnik i logowanie przez przeglądarkę na 127.0.0.1, pliki wybrane przez użytkownika)
   i `Entitlements.mas.inherit.plist` (silnik i Tesseract: piaskownica + `inherit`; Apple

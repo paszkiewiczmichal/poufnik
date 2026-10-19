@@ -494,6 +494,9 @@ jobs:
             arch: arm64
             target: aarch64-apple-darwin
             asset_arch: aarch64
+            # The oldest macOS every bundled binary loads on (Homebrew's Tesseract);
+            # smoke_app_bundle.py fails the build when a binary needs more.
+            minimum_macos: "14.8.5"
           # macos-13 was fully retired 2025-12-08 (GitHub deprecated the whole macOS 13
           # image); macos-15-intel is the current label for a hosted Intel runner, kept
           # available until August 2027 per GitHub's Apple-silicon migration plan.
@@ -501,6 +504,7 @@ jobs:
             arch: x86_64
             target: x86_64-apple-darwin
             asset_arch: x64
+            minimum_macos: "15.0"
     runs-on: ${{ matrix.os }}
     env:
       RELEASE_TARGET: ${{ matrix.target }}
@@ -615,6 +619,20 @@ jobs:
       - name: Build engine sidecar
         working-directory: engine
         run: uv run python build/build_sidecar.py --target-triple "$RELEASE_TARGET" --clean
+
+      # Info.plist's LSMinimumSystemVersion for this architecture; Homebrew's bottles for
+      # the Intel runner need a newer macOS than those for Apple Silicon.
+      - name: Set minimum macOS
+        env:
+          MINIMUM_MACOS: ${{ matrix.minimum_macos }}
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib
+          path = pathlib.Path("desktop/src-tauri/tauri.macos.conf.json")
+          config = json.loads(path.read_text())
+          config["bundle"]["macOS"]["minimumSystemVersion"] = os.environ["MINIMUM_MACOS"]
+          path.write_text(json.dumps(config, indent=2) + "\n")
+          PY
 
       # With APPLE_SIGNING_IDENTITY set (previous step) Tauri signs the app with the hardened
       # runtime and Entitlements.plist, and with APPLE_API_* it also notarizes and staples
