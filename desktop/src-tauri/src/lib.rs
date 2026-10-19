@@ -537,11 +537,21 @@ pub fn run() {
                 Ok(())
             }
         })
-        .on_window_event(move |_window, event| {
-            if matches!(event, tauri::WindowEvent::CloseRequested { .. }) {
-                shutdown_engine(&engine_state);
+        .on_window_event({
+            let engine_state = engine_state.clone();
+            move |_window, event| {
+                if matches!(event, tauri::WindowEvent::CloseRequested { .. }) {
+                    shutdown_engine(&engine_state);
+                }
             }
         })
-        .run(tauri::generate_context!())
-        .expect("error while running Tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building Tauri application")
+        // Quitting from the menu or with Cmd+Q closes no window first; without this the
+        // engine kept running after the app was gone.
+        .run(move |_app, event| {
+            if matches!(event, tauri::RunEvent::Exit) {
+                shutdown_engine(&engine_state);
+            }
+        });
 }
