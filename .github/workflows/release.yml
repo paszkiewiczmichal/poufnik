@@ -635,8 +635,9 @@ jobs:
           PY
 
       # With APPLE_SIGNING_IDENTITY set (previous step) Tauri signs the app with the hardened
-      # runtime and Entitlements.plist, and with APPLE_API_* it also notarizes and staples
-      # it. Without them it ad-hoc signs, which Apple Silicon needs to launch anything.
+      # runtime and Entitlements.plist, and with APPLE_API_* it also notarizes it and tries
+      # to staple it (see "Staple app inside the DMG"). Without them it ad-hoc signs, which
+      # Apple Silicon needs to launch anything.
       - name: Build Tauri installer
         id: tauri
         uses: tauri-apps/tauri-action@v1
@@ -656,6 +657,31 @@ jobs:
           uploadUpdaterJson: true
           uploadUpdaterSignatures: true
           releaseAssetNamePattern: "[name]_[version]_[platform]_[arch][setup][ext]"
+
+      # Tauri staples the notarized app once, right after notarization, and ignores the
+      # result, so when Apple's ticket service does not answer in time the app goes into the
+      # DMG without its ticket. Staples it again inside the DMG, with retries, through a
+      # shadow file; "Notarize DMG" then re-signs and uploads the rewritten image.
+      - name: Staple app inside the DMG
+        if: env.APPLE_API_KEY_PATH != ''
+        run: |
+          shopt -s nullglob
+          dmgs=(desktop/src-tauri/target/${RELEASE_TARGET}/release/bundle/dmg/*.dmg)
+          if [ ${#dmgs[@]} -ne 1 ]; then echo "::error::Expected exactly one DMG, found ${#dmgs[@]}"; exit 1; fi
+          dmg="${dmgs[0]}"
+          shadow="$RUNNER_TEMP/dmg.shadow"
+          mount_point=$(mktemp -d)
+          hdiutil attach "$dmg" -nobrowse -shadow "$shadow" -mountpoint "$mount_point" > /dev/null
+          app="$mount_point/Poufnik.app"
+          for attempt in 1 2 3 4 5 6; do
+            xcrun stapler staple "$app" && xcrun stapler validate "$app" && break
+            if [ "$attempt" -eq 6 ]; then hdiutil detach "$mount_point" -force > /dev/null; exit 1; fi
+            sleep 30
+          done
+          hdiutil detach "$mount_point" > /dev/null
+          hdiutil convert "$dmg" -shadow "$shadow" -format UDZO -o "$RUNNER_TEMP/stapled.dmg" > /dev/null
+          mv -f "$RUNNER_TEMP/stapled.dmg" "$dmg"
+          rm -f "$shadow"
 
       # Mounts the finished DMG and runs the engine and OCR from the Poufnik.app inside it -
       # exactly what users download, which build_sidecar.py's own smoke tests can only
