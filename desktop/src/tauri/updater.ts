@@ -19,7 +19,8 @@ export const DISTRIBUTION_CHANNEL =
       ? "poufnik-channel-mas"
       : "poufnik-channel-direct";
 export const IS_MAC_APP_STORE = DISTRIBUTION_CHANNEL === "poufnik-channel-mas";
-export const UPDATES_MANAGED_BY_STORE = DISTRIBUTION_CHANNEL !== "poufnik-channel-direct";
+export const UPDATES_MANAGED_BY_STORE =
+  DISTRIBUTION_CHANNEL === "poufnik-channel-store" || IS_MAC_APP_STORE;
 
 const CONSENT_KEY = "anonymizer.updates.consent";
 const LAST_CHECK_KEY = "anonymizer.updates.lastCheckAt";
