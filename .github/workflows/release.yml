@@ -20,6 +20,7 @@ jobs:
       body: ${{ steps.changelog.outputs.body }}
       prerelease: ${{ steps.tag.outputs.prerelease }}
       mas: ${{ steps.mas.outputs.enabled }}
+      apple_notarization: ${{ steps.apple.outputs.enabled }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -47,6 +48,19 @@ jobs:
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           else
             echo "::notice::No Mac App Store certificate or provisioning profile; skipping the App Store build."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # notarize-macos-x64 needs the Developer ID certificate and the App Store Connect API key.
+      - name: Apple notarization secrets
+        id: apple
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_API_PRIVATE_KEY: ${{ secrets.APPLE_API_PRIVATE_KEY }}
+        run: |
+          if [ -n "$APPLE_CERTIFICATE" ] && [ -n "$APPLE_API_PRIVATE_KEY" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
             echo "enabled=false" >> "$GITHUB_OUTPUT"
           fi
 
@@ -329,6 +343,13 @@ jobs:
     needs:
       - build-windows-installer
       - build-macos-installer
+      - notarize-macos-x64
+    # notarize-macos-x64 is skipped without the Apple secrets; the checksums are still needed.
+    if: >-
+      !cancelled()
+      && needs.build-windows-installer.result == 'success'
+      && needs.build-macos-installer.result == 'success'
+      && (needs.notarize-macos-x64.result == 'success' || needs.notarize-macos-x64.result == 'skipped')
     steps:
       # Taken from the digests GitHub computes for the files in the release, so the names are
       # the ones users download (the per-job files list local build names such as
@@ -497,6 +518,7 @@ jobs:
             # The oldest macOS every bundled binary loads on (Homebrew's Tesseract);
             # smoke_app_bundle.py fails the build when a binary needs more.
             minimum_macos: "14.8.5"
+            staple: true
           # macos-13 was fully retired 2025-12-08 (GitHub deprecated the whole macOS 13
           # image); macos-15-intel is the current label for a hosted Intel runner, kept
           # available until August 2027 per GitHub's Apple-silicon migration plan.
@@ -505,6 +527,9 @@ jobs:
             target: x86_64-apple-darwin
             asset_arch: x64
             minimum_macos: "15.0"
+            # Apple's ticket service is not reliably reachable from this runner; the DMG is
+            # stapled, notarized and replaced in the release by notarize-macos-x64 instead.
+            staple: false
     runs-on: ${{ matrix.os }}
     env:
       RELEASE_TARGET: ${{ matrix.target }}
@@ -663,7 +688,7 @@ jobs:
       # DMG without its ticket. Staples it again inside the DMG, with retries, through a
       # shadow file; "Notarize DMG" then re-signs and uploads the rewritten image.
       - name: Staple app inside the DMG
-        if: env.APPLE_API_KEY_PATH != ''
+        if: env.APPLE_API_KEY_PATH != '' && matrix.staple
         run: |
           shopt -s nullglob
           dmgs=(desktop/src-tauri/target/${RELEASE_TARGET}/release/bundle/dmg/*.dmg)
@@ -699,7 +724,7 @@ jobs:
       # download before the app inside is even looked at. Stapling changes the file, so the
       # copy tauri-action already attached to the draft release is replaced.
       - name: Notarize DMG
-        if: env.APPLE_API_KEY_PATH != ''
+        if: env.APPLE_API_KEY_PATH != '' && matrix.staple
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -710,7 +735,6 @@ jobs:
           codesign --force --timestamp --sign "$APPLE_SIGNING_IDENTITY" "$dmg"
           xcrun notarytool submit "$dmg" --key "$APPLE_API_KEY_PATH" --key-id "$APPLE_API_KEY" \
             --issuer "$APPLE_API_ISSUER" --wait --timeout 60m
-          # Apple's ticket service often drops the connection from the Intel runner.
           for attempt in 1 2 3 4 5 6; do
             xcrun stapler staple "$dmg" && break
             [ "$attempt" -eq 6 ] && exit 1
@@ -730,9 +754,8 @@ jobs:
           app="$mount_point/Poufnik.app"
           codesign --verify --deep --strict --verbose=2 "$app"
           codesign -dvv "$app" 2>&1 | grep -E "Authority|TeamIdentifier|Runtime|flags"
-          if [ -n "${APPLE_API_KEY_PATH:-}" ]; then
+          if [ -n "${APPLE_API_KEY_PATH:-}" ] && [ "${{ matrix.staple }}" = "true" ]; then
             spctl --assess --type execute --verbose=4 "$app"
-            # stapler asks Apple's servers and sometimes loses the connection (v1.0.18 Intel).
             for target in "$app" "$dmg"; do
               for attempt in 1 2 3 4 5; do
                 xcrun stapler validate "$target" && break
@@ -764,6 +787,19 @@ jobs:
         with:
           name: checksums-macos-${{ matrix.arch }}
           path: ${{ env.CHECKSUM_NAME }}
+
+  # The Intel DMG from build-macos-installer, finished on Apple Silicon.
+  notarize-macos-x64:
+    name: notarize-macos-x64
+    needs:
+      - release-metadata
+      - build-macos-installer
+    if: needs.release-metadata.outputs.apple_notarization == 'true'
+    uses: ./.github/workflows/notarize-macos-dmg.yml
+    with:
+      tag: ${{ github.ref_name }}
+      asset_arch: x64
+    secrets: inherit
 
   # Mac App Store: sandboxed build without the self-updater and without PDF through Word,
   # signed "Apple Distribution", packaged as a .pkg signed "Mac Installer Distribution" and
