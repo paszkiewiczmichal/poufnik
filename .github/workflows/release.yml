@@ -710,7 +710,12 @@ jobs:
           codesign --force --timestamp --sign "$APPLE_SIGNING_IDENTITY" "$dmg"
           xcrun notarytool submit "$dmg" --key "$APPLE_API_KEY_PATH" --key-id "$APPLE_API_KEY" \
             --issuer "$APPLE_API_ISSUER" --wait --timeout 60m
-          xcrun stapler staple "$dmg"
+          # Apple's ticket service often drops the connection from the Intel runner.
+          for attempt in 1 2 3 4 5 6; do
+            xcrun stapler staple "$dmg" && break
+            [ "$attempt" -eq 6 ] && exit 1
+            sleep 30
+          done
           asset=$(gh release view "$GITHUB_REF_NAME" --json assets --jq '.assets[].name' \
             | grep "_darwin_${{ matrix.asset_arch }}\.dmg$")
           cp "$dmg" "$RUNNER_TEMP/$asset"
