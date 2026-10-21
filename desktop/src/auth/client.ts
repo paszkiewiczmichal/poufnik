@@ -37,6 +37,12 @@ export function getRegistrationUrl(baseUrl = getAccountsBaseUrl()): string {
   return `${baseUrl}/register`;
 }
 
+// The account panel page where the account is deleted (RODO art. 17). Linked from Settings,
+// because the App Store requires account deletion to be reachable from inside the app.
+export function getAccountDeletionUrl(baseUrl = getAccountsBaseUrl()): string {
+  return `${baseUrl}/panel/dane`;
+}
+
 export function getPasswordResetUrl(baseUrl = getAccountsBaseUrl()): string {
   return `${baseUrl}/reset-password`;
 }

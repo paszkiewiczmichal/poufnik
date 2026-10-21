@@ -4,7 +4,12 @@ import type { Update } from "@tauri-apps/plugin-updater";
 import "./App.css";
 import { createAnonymizerApiClient } from "./api/client";
 import { fallbackOnEngineRefusal, toUserMessage } from "./api/errors";
-import { AccountsClientError, loginToAccounts, refreshAccountsToken } from "./auth/client";
+import {
+  AccountsClientError,
+  getAccountDeletionUrl,
+  loginToAccounts,
+  refreshAccountsToken,
+} from "./auth/client";
 import { getAccountsPublicKeyPem } from "./auth/publicKey";
 import {
   clearStoredAuthToken,
@@ -1091,6 +1096,12 @@ function App() {
     void loginWithBrowser("register");
   }, [loginWithBrowser]);
 
+  const openAccountDeletion = useCallback(() => {
+    void openExternalUrl(getAccountDeletionUrl()).catch(() => {
+      // Bez przeglądarki strona nadal jest dostępna pod adresem z opisu w Ustawieniach.
+    });
+  }, []);
+
   const openKancelariaSite = useCallback(() => {
     void openExternalUrl(texts.footer.kancelariaHref).catch(() => {
       // Link informacyjny - niepowodzenie otwarcia przeglądarki nie blokuje pracy.
@@ -1607,6 +1618,7 @@ function App() {
                   onLogin={login}
                   onRegister={openRegistration}
                   onLogout={() => void logout()}
+                  onDeleteAccount={openAccountDeletion}
                 />
                 <section className="settings-section">
                   <h3>{texts.updates.sectionTitle}</h3>

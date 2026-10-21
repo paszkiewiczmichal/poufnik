@@ -105,6 +105,9 @@ export const texts = {
     emailUnavailable: "-",
     tier: "Warstwa",
     logout: "Wyloguj się",
+    deleteAccount: "Usuń konto",
+    deleteAccountNote:
+      "Konto usuwasz w panelu konta Lawtern, który otworzy się w przeglądarce. Dokumenty i ustawienia zapisane na tym komputerze pozostają bez zmian.",
     note: "Konto obsługuje wyłącznie funkcje dodatkowe. Treść dokumentów jest przetwarzana lokalnie i nie jest przesyłana na serwery.",
     version: "Wersja aplikacji",
   },

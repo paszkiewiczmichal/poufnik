@@ -12,6 +12,7 @@ function renderSettings(props: Partial<Parameters<typeof AccountSettings>[0]> = 
     onLogin: vi.fn().mockResolvedValue(undefined),
     onRegister: vi.fn(),
     onLogout: vi.fn(),
+    onDeleteAccount: vi.fn(),
   };
   render(
     <AccountSettings
@@ -112,6 +113,21 @@ describe("AccountSettings - authenticated (Early Bird)", () => {
 
     expect(screen.getByText("michal@example.com")).toBeInTheDocument();
     expect(screen.queryByLabelText(texts.account.email)).not.toBeInTheDocument();
+  });
+
+  it("offers account deletion through the account panel", () => {
+    const handlers = renderSettings({ authState: authenticatedState });
+
+    fireEvent.click(screen.getByRole("button", { name: texts.account.deleteAccount }));
+
+    expect(handlers.onDeleteAccount).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(texts.account.deleteAccountNote)).toBeInTheDocument();
+  });
+
+  it("does not offer account deletion before logging in", () => {
+    renderSettings();
+
+    expect(screen.queryByRole("button", { name: texts.account.deleteAccount })).not.toBeInTheDocument();
   });
 
   it("calls onLogout", () => {

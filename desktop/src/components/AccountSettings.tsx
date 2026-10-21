@@ -10,6 +10,7 @@ interface AccountSettingsProps {
   onLogin: (credentials: LoginCredentials) => Promise<void>;
   onRegister: () => void;
   onLogout: () => void;
+  onDeleteAccount: () => void;
 }
 
 export function AccountSettings({
@@ -19,6 +20,7 @@ export function AccountSettings({
   onLogin,
   onRegister,
   onLogout,
+  onDeleteAccount,
 }: AccountSettingsProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -46,9 +48,17 @@ export function AccountSettings({
                 >
                   {texts.account.logout}
                 </button>
+                <button
+                  className="secondary-button secondary-button--compact"
+                  type="button"
+                  onClick={onDeleteAccount}
+                >
+                  {texts.account.deleteAccount}
+                </button>
               </div>
             </div>
             <p className="muted">{texts.account.note}</p>
+            <p className="muted">{texts.account.deleteAccountNote}</p>
             <p className="muted">{texts.common.connectivity}</p>
           </>
         ) : (
