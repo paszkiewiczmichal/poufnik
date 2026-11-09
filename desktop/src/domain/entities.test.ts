@@ -9,6 +9,7 @@ import {
   groupId,
   nextStatusForGroup,
   normalizeEntitiesForUi,
+  rejectExcludedCategories,
   tokenPrefix,
 } from "./entities";
 
@@ -194,5 +195,19 @@ describe("tokenPrefix", () => {
     expect(tokenPrefix("PERSON")).toBe("OSOBA");
     expect(tokenPrefix("PESEL")).toBe("PESEL");
     expect(tokenPrefix("CUSTOM")).toBe("DANE");
+  });
+});
+
+describe("rejectExcludedCategories", () => {
+  it("unmarks only the categories the user excluded and keeps the rest marked", () => {
+    const entities = [
+      { start: 0, end: 3, text: "Jan", category: "PERSON", confidence: 0.9, validation: "not_applicable" },
+      { start: 5, end: 15, text: "2026-11-09", category: "DATE", confidence: 0.9, validation: "not_applicable" },
+    ] as ApiDetectedEntity[];
+
+    const result = rejectExcludedCategories(entities, ["DATE"]);
+
+    expect(result.map((entity) => entity.status)).toEqual([undefined, "rejected"]);
+    expect(entities[1].status).toBeUndefined(); // the input is not modified
   });
 });

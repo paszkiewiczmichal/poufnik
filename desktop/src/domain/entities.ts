@@ -156,3 +156,14 @@ export function tokenPrefix(category: EntityCategory): string {
 function entityId(entity: ApiDetectedEntity, index: number): string {
   return `${entity.start}-${entity.end}-${entity.category}-${index}`;
 }
+
+// Categories the user turned off in Settings stay visible in review, but start unmarked.
+export function rejectExcludedCategories(
+  entities: ApiDetectedEntity[],
+  excluded: EntityCategory[],
+): ApiDetectedEntity[] {
+  const off = new Set<EntityCategory>(excluded);
+  return entities.map((entity) =>
+    off.has(entity.category) ? { ...entity, status: "rejected" } : entity,
+  );
+}

@@ -29,6 +29,7 @@ import { BatchPanel } from "./components/BatchPanel";
 import { CustomRulesPanel } from "./components/CustomRulesPanel";
 import { DocumentWorkspace, type WorkspaceView } from "./components/DocumentWorkspace";
 import { EngineError } from "./components/EngineError";
+import { ExcludedCategoriesSettings } from "./components/ExcludedCategoriesSettings";
 import { StartScreen } from "./components/StartScreen";
 import { TierGate } from "./components/TierGate";
 import {
@@ -39,12 +40,14 @@ import {
 import { enabledCustomRulePayloads } from "./domain/customRules";
 import { poufnikFileName } from "./domain/batchExport";
 import { blocksForExport } from "./domain/documentSegments";
+import { rejectExcludedCategories } from "./domain/entities";
 import { getPdfRenderer, renderDocxToPdf } from "./tauri/pdf";
 import { texts } from "./i18n";
 import { useAppStore } from "./store/useAppStore";
 import { getAppVersion } from "./tauri/app";
 import { copyText, readClipboardText } from "./tauri/clipboard";
 import { loadCustomRegexRules, saveCustomRegexRules } from "./tauri/customRules";
+import { loadExcludedCategories, saveExcludedCategories } from "./tauri/excludedCategories";
 import { getEngineEndpoint, getEngineStatus, listenToEngineStatus } from "./tauri/engine";
 import {
   getDocumentHistoryEnabled,
@@ -154,7 +157,6 @@ function App() {
     setProcessingError,
     setProcessedDocument,
     restoreDocumentSession,
-    toggleCategory,
     setAnonymizationLoading,
     setAnonymizationError,
     setAnonymizationResult,
@@ -187,6 +189,9 @@ function App() {
   const [historyMessage, setHistoryMessage] = useState<string | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [customRules, setCustomRulesState] = useState<CustomRegexRule[]>([]);
+  const [excludedCategories, setExcludedCategoriesState] = useState<EntityCategory[]>(
+    loadExcludedCategories,
+  );
   const [batchItems, setBatchItems] = useState<BatchQueueItem[]>([]);
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchMessage, setBatchMessage] = useState<string | null>(null);
@@ -210,32 +215,39 @@ function App() {
     }
   }, []);
 
-  const applyCustomRulesToDocument = useCallback(
+  // Applies what the user set up for every document: their own detection rules (Early Bird)
+  // and the categories they never want anonymized.
+  const applyUserSettingsToDocument = useCallback(
     async (
       client: ReturnType<typeof createAnonymizerApiClient>,
       response: DocumentProcessResponse,
     ): Promise<DocumentProcessResponse> => {
-      if (productTier !== "early_bird") {
+      const text = response.document.text;
+      let entities = response.entities;
+      let changed = false;
+      const rules: CustomRegexRulePayload[] =
+        productTier === "early_bird" ? enabledCustomRulePayloads(customRules) : [];
+      if (rules.length > 0) {
+        entities = (await client.analyze(text, rules)).entities;
+        changed = true;
+      }
+      if (entities.some((entity) => excludedCategories.includes(entity.category))) {
+        entities = rejectExcludedCategories(entities, excludedCategories);
+        changed = true;
+      }
+      if (!changed) {
         return response;
       }
-      const rules: CustomRegexRulePayload[] = enabledCustomRulePayloads(customRules);
-      if (rules.length === 0) {
-        return response;
-      }
-      const analyzed = await client.analyze(response.document.text, rules);
-      const anonymized = await client.anonymizeApiEntities(
-        response.document.text,
-        analyzed.entities,
-      );
+      const anonymized = await client.anonymizeApiEntities(text, entities);
       return {
         ...response,
-        entities: analyzed.entities,
+        entities,
         anonymized_text: anonymized.anonymized_text,
         replacement_map: anonymized.replacement_map,
         offset_map: anonymized.offset_map ?? [],
       };
     },
-    [customRules, productTier],
+    [customRules, excludedCategories, productTier],
   );
 
   const runUpdateCheck = useCallback(async (force = false) => {
@@ -329,6 +341,11 @@ function App() {
   const updateCustomRules = useCallback((rules: CustomRegexRule[]) => {
     setCustomRulesState(rules);
     saveCustomRegexRules(rules);
+  }, []);
+
+  const updateExcludedCategories = useCallback((categories: EntityCategory[]) => {
+    setExcludedCategoriesState(categories);
+    saveExcludedCategories(categories);
   }, []);
 
   const setHistoryEnabled = useCallback(
@@ -520,7 +537,7 @@ function App() {
 
       try {
         const client = createAnonymizerApiClient(endpoint);
-        const response = await applyCustomRulesToDocument(
+        const response = await applyUserSettingsToDocument(
           client,
           await client.processDocument(file, { forceOcr: uiState.forceOcr }),
         );
@@ -536,7 +553,7 @@ function App() {
     [
       setEngineReady,
       refreshEngineHealth,
-      applyCustomRulesToDocument,
+      applyUserSettingsToDocument,
       setProcessedDocument,
       setProcessing,
       setProcessingError,
@@ -665,7 +682,7 @@ function App() {
       await processBatchQueue(
         batchItems,
         async (item): Promise<BatchProcessSuccess> => {
-          const processed = await applyCustomRulesToDocument(
+          const processed = await applyUserSettingsToDocument(
             client,
             await client.processDocument(item.file, { forceOcr: uiState.forceOcr }),
           );
@@ -685,7 +702,7 @@ function App() {
       setBatchRunning(false);
     }
   }, [
-    applyCustomRulesToDocument,
+    applyUserSettingsToDocument,
     batchItems,
     batchRunning,
     patchBatchItem,
@@ -1440,7 +1457,6 @@ function App() {
                   document={document}
                   entities={entities}
                   entityGroups={entityGroups}
-                  hiddenCategories={uiState.hiddenCategories}
                   anonymization={anonymization}
                   prompts={prompts}
                   deanonymization={deanonymization}
@@ -1448,7 +1464,6 @@ function App() {
                   processingError={uiState.processingError}
                   view={workspaceView}
                   onViewChange={setWorkspaceView}
-                  onToggleCategory={toggleCategory}
                   onRedetect={redetect}
                   onNewDocument={startNewDocument}
                   onAnonymize={anonymizeDocument}
@@ -1619,6 +1634,10 @@ function App() {
                   onRegister={openRegistration}
                   onLogout={() => void logout()}
                   onDeleteAccount={openAccountDeletion}
+                />
+                <ExcludedCategoriesSettings
+                  excluded={excludedCategories}
+                  onChange={updateExcludedCategories}
                 />
                 <section className="settings-section">
                   <h3>{texts.updates.sectionTitle}</h3>

@@ -2,12 +2,11 @@ import { ENTITY_CATEGORY_ORDER } from "../domain/categories";
 import { countByCategory } from "../domain/entities";
 import { texts } from "../i18n";
 import { categoryDotClassName, categoryToneClassName } from "../ui/categoryPresentation";
-import type { DetectedEntity, EntityCategory } from "../types";
+import type { DetectedEntity, EntityCategory, EntityStatus } from "../types";
 
 interface CategoryLegendProps {
   entities: DetectedEntity[];
-  hiddenCategories: EntityCategory[];
-  onToggleCategory: (category: EntityCategory) => void;
+  onSetCategoryStatus: (category: EntityCategory, status: EntityStatus) => void;
   onRedetect: () => void;
   redetectDisabled: boolean;
   redetectLoading: boolean;
@@ -15,14 +14,16 @@ interface CategoryLegendProps {
 
 export function CategoryLegend({
   entities,
-  hiddenCategories,
-  onToggleCategory,
+  onSetCategoryStatus,
   onRedetect,
   redetectDisabled,
   redetectLoading,
 }: CategoryLegendProps) {
   const counts = countByCategory(entities);
-  const hidden = new Set(hiddenCategories);
+  // A category counts as anonymized while any of its items is still marked.
+  const anonymized = new Set(
+    entities.filter((entity) => entity.status === "accepted").map((entity) => entity.category),
+  );
   const total = entities.length;
   const present = ENTITY_CATEGORY_ORDER.filter(
     (category) => category !== "PUBLIC_INSTITUTION" && (counts[category] ?? 0) > 0,
@@ -32,18 +33,18 @@ export function CategoryLegend({
     <div className="legend" role="group" aria-label={texts.legend.title}>
       <span className="caps-label legend__label">{texts.review.showLabel}</span>
       {present.map((category) => {
-        const isHidden = hidden.has(category);
+        const isOn = anonymized.has(category);
         const count = counts[category] ?? 0;
         return (
           <label
-            className={`legend-chip ${isHidden ? "legend-chip--off" : "legend-chip--on"} ${categoryToneClassName(category)}`}
+            className={`legend-chip ${isOn ? "legend-chip--on" : "legend-chip--off"} ${categoryToneClassName(category)}`}
             key={category}
           >
             <input
               type="checkbox"
-              checked={!isHidden}
-              onChange={() => onToggleCategory(category)}
-              aria-label={`${isHidden ? texts.legend.showCategory : texts.legend.hideCategory}: ${
+              checked={isOn}
+              onChange={() => onSetCategoryStatus(category, isOn ? "rejected" : "accepted")}
+              aria-label={`${isOn ? texts.legend.excludeCategory : texts.legend.includeCategory}: ${
                 texts.categories[category]
               }`}
             />

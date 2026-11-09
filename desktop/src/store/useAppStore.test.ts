@@ -228,13 +228,31 @@ describe("restoreDocumentSession", () => {
   });
 });
 
-describe("toggleCategory", () => {
-  it("hides a category the first time and reveals it the second time", () => {
-    useAppStore.getState().toggleCategory("PERSON");
-    expect(useAppStore.getState().uiState.hiddenCategories).toEqual(["PERSON"]);
+describe("setCategoryStatus", () => {
+  it("unmarks every item of one category for anonymization and leaves the others", () => {
+    loadDocument();
+    const [first, second] = useAppStore.getState().entities;
+    useAppStore.getState().setEntityCategory(second.id, "DATE");
 
-    useAppStore.getState().toggleCategory("PERSON");
-    expect(useAppStore.getState().uiState.hiddenCategories).toEqual([]);
+    useAppStore.getState().setCategoryStatus("DATE", "rejected");
+
+    const state = useAppStore.getState();
+    expect(state.entities.find((entity) => entity.id === first.id)?.status).toBe("accepted");
+    expect(state.entities.find((entity) => entity.id === second.id)?.status).toBe("rejected");
+
+    useAppStore.getState().setCategoryStatus("DATE", "accepted");
+    expect(
+      useAppStore.getState().entities.find((entity) => entity.id === second.id)?.status,
+    ).toBe("accepted");
+  });
+
+  it("invalidates a finished result so the next export uses the new choice", () => {
+    loadDocument();
+    useAppStore.getState().setAnonymizationResult("[OSOBA_1]", { document_fingerprint: "fp", entries: [] }, []);
+
+    useAppStore.getState().setCategoryStatus("PERSON", "rejected");
+
+    expect(useAppStore.getState().anonymization.status).toBe("idle");
   });
 });
 

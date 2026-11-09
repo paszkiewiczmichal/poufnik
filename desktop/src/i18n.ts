@@ -328,7 +328,7 @@ export const texts = {
     title: "Sprawdź wykryte dane.",
     toReplace: "do zastąpienia",
     goToResult: "Przejdź do wyniku",
-    showLabel: "Pokaż",
+    showLabel: "Anonimizuj",
   },
   compare: {
     title: "Porównanie oryginału i wyniku.",
@@ -344,8 +344,8 @@ export const texts = {
   legend: {
     title: "Legenda",
     redetect: "Wykryj ponownie",
-    showCategory: "Pokaż podświetlenia",
-    hideCategory: "Ukryj podświetlenia",
+    includeCategory: "Anonimizuj kategorię",
+    excludeCategory: "Nie anonimizuj kategorii",
     total: "Łącznie",
   },
   corrections: {
@@ -465,6 +465,10 @@ export const texts = {
     result: "Tekst z przywróconymi danymi",
     warnings: "Ostrzeżenia",
     copyResult: "Kopiuj wynik",
+  },
+  excludedCategories: {
+    heading: "Kategorie do anonimizacji",
+    lead: "Odznaczone kategorie nie są anonimizowane w nowych dokumentach. Poufnik nadal je pokazuje w przeglądzie, ale bez zaznaczenia - w razie potrzeby możesz je zaznaczyć dla jednego dokumentu.",
   },
   settings: {
     title: "Ustawienia.",

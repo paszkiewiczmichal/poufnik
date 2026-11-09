@@ -42,7 +42,7 @@ interface AppStore {
   setProcessingError: (message: string) => void;
   setProcessedDocument: (response: DocumentProcessResponse, file: File) => void;
   restoreDocumentSession: (session: RestoredDocumentSession) => void;
-  toggleCategory: (category: EntityCategory) => void;
+  setCategoryStatus: (category: EntityCategory, status: EntityStatus) => void;
   setEntityStatus: (entityId: string, status: EntityStatus) => void;
   setEntityCategory: (entityId: string, category: EntityCategory) => void;
   assignEntityToGroup: (entityId: string, groupId: string) => void;
@@ -85,7 +85,6 @@ const initialUiState: UiState = {
   processingStep: "parsing",
   processingError: null,
   forceOcr: false,
-  hiddenCategories: [],
   selectedFileName: null,
   selectedFile: null,
 };
@@ -232,21 +231,12 @@ export const useAppStore = create<AppStore>((set) => ({
         selectedFile: null,
       },
     })),
-  toggleCategory: (category) =>
-    set((state) => {
-      const hidden = new Set(state.uiState.hiddenCategories);
-      if (hidden.has(category)) {
-        hidden.delete(category);
-      } else {
-        hidden.add(category);
-      }
-      return {
-        uiState: {
-          ...state.uiState,
-          hiddenCategories: [...hidden],
-        },
-      };
-    }),
+  setCategoryStatus: (category, status) =>
+    set((state) =>
+      updateEntities(state, (entity) =>
+        entity.category === category ? { ...entity, status } : entity,
+      ),
+    ),
   setEntityStatus: (entityId, status) =>
     set((state) => updateEntities(state, (entity) =>
       entity.id === entityId ? { ...entity, status } : entity,

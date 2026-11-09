@@ -2522,6 +2522,13 @@ button:disabled {
   font-size: var(--fs-sm);
 }
 
+.category-settings {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 2px var(--sp-4);
+  margin-top: var(--sp-3);
+}
+
 .settings-actions {
   display: flex;
   align-items: center;

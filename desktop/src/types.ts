@@ -76,7 +76,6 @@ export interface UiState {
   processingStep: ProcessingStep;
   processingError: string | null;
   forceOcr: boolean;
-  hiddenCategories: EntityCategory[];
   selectedFileName: string | null;
   selectedFile: File | null;
 }

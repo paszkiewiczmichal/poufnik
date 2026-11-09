@@ -30,7 +30,6 @@ interface DocumentWorkspaceProps {
   document: ProcessedDocument;
   entities: DetectedEntity[];
   entityGroups: EntityGroupSummary[];
-  hiddenCategories: EntityCategory[];
   anonymization: AnonymizationState;
   prompts: PromptState;
   deanonymization: DeanonymizationState;
@@ -39,7 +38,6 @@ interface DocumentWorkspaceProps {
   tier: "basic" | "early_bird";
   view: WorkspaceView;
   onViewChange: (view: WorkspaceView) => void;
-  onToggleCategory: (category: EntityCategory) => void;
   onRedetect: () => void;
   onNewDocument: () => void;
   onAnonymize: () => void;
@@ -63,7 +61,6 @@ export function DocumentWorkspace({
   document,
   entities,
   entityGroups,
-  hiddenCategories,
   anonymization,
   prompts,
   deanonymization,
@@ -72,7 +69,6 @@ export function DocumentWorkspace({
   tier,
   view,
   onViewChange,
-  onToggleCategory,
   onRedetect,
   onNewDocument,
   onAnonymize,
@@ -103,18 +99,17 @@ export function DocumentWorkspace({
     createGroupForEntity,
     addManualEntity,
     setEntityGroupStatus,
+    setCategoryStatus,
     mergeEntityGroups,
   } = useAppStore();
   const activeEntity = useMemo(
     () => entities.find((entity) => entity.id === activeEntityId) ?? null,
     [activeEntityId, entities],
   );
-  const documentHiddenCategories = useMemo(() => {
-    if (publicInstitutionsExpanded) {
-      return hiddenCategories;
-    }
-    return [...new Set([...hiddenCategories, "PUBLIC_INSTITUTION" as EntityCategory])];
-  }, [hiddenCategories, publicInstitutionsExpanded]);
+  const documentHiddenCategories = useMemo<EntityCategory[]>(
+    () => (publicInstitutionsExpanded ? [] : ["PUBLIC_INSTITUTION"]),
+    [publicInstitutionsExpanded],
+  );
   const markedCount = acceptedEntityCount(entities);
 
   const openEntityCorrection = (entityId: string, position: PopoverPosition) => {
@@ -167,8 +162,7 @@ export function DocumentWorkspace({
       {view === "document" && (
         <CategoryLegend
           entities={entities}
-          hiddenCategories={hiddenCategories}
-          onToggleCategory={onToggleCategory}
+          onSetCategoryStatus={setCategoryStatus}
           onRedetect={onRedetect}
           redetectDisabled={!canRedetect || processingStatus === "loading"}
           redetectLoading={processingStatus === "loading"}
