@@ -552,7 +552,9 @@ jobs:
         run: |
           $bundle = Get-ChildItem store-package -Filter "*.msixbundle" | Select-Object -First 1
           if (-not $bundle) { throw "No .msixbundle in the MSIX artifact." }
-          msstore publish store-package --inputFile $bundle.FullName --appId $env:STORE_PRODUCT_ID --noCommit
+          # The package file itself is the path argument; the CLI picks the MSIX publisher from
+          # its extension (.msix, .msixbundle, .msixupload).
+          msstore publish $bundle.FullName --appId $env:STORE_PRODUCT_ID --noCommit
           if ($LASTEXITCODE -ne 0) { throw "msstore publish failed." }
 
       # "What's new in this version" in the Polish listing comes from .github/store/release-notes-pl.txt.
