@@ -1,6 +1,3 @@
-Wersja 1.0.21
-- Konto można usunąć bezpośrednio z Ustawień.
-- Silnik aplikacji kończy pracę razem z aplikacją, także po zamknięciu z menu.
-- Eksport nie przerywa się przy nieoczekiwanym błędzie: dokument zapisuje się wtedy w prostym układzie.
-- Gdy silnik aplikacji nie wystartuje, widać to od razu, zamiast niekończącego się „Uruchamianie…”.
-- Dokładniejsze wykrywanie: nazwisko nie zostaje w tekście, mniej fałszywych trafień.
+Wersja 1.0.22
+- Odznaczenie kategorii w przeglądzie (np. „Data”) naprawdę wyłącza ją z anonimizacji w wyniku i w eksporcie.
+- Nowa sekcja w Ustawieniach: „Kategorie do anonimizacji”. Odznaczone kategorie nie są anonimizowane w nowych dokumentach, także w trybie seryjnym.
