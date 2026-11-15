@@ -38,7 +38,8 @@ permissions:
 jobs:
   notarize-dmg:
     name: notarize-dmg (${{ inputs.asset_arch }})
-    runs-on: macos-14
+    # macos-14 was retired by GitHub in November 2026.
+    runs-on: macos-15
     env:
       TAG: ${{ inputs.tag }}
       ASSET_ARCH: ${{ inputs.asset_arch }}
