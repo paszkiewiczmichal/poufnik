@@ -16,7 +16,9 @@ use tauri_plugin_shell::{
 
 mod browser_login;
 mod history;
+mod map_protect;
 mod pdf_render;
+mod shell_actions;
 #[cfg(target_os = "windows")]
 mod win_job;
 
@@ -508,15 +510,17 @@ pub fn run() {
     builder
         .manage(engine_state.clone())
         .manage(browser_login::BrowserLoginState::default())
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.set_focus();
-            }
+        .manage(shell_actions::ShellActionState::default())
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            shell_actions::handle_second_instance(app, &args);
         }))
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        // Ctrl+Alt+Shift+A / R: anonymize or restore the clipboard from any program.
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             get_engine_status,
@@ -529,12 +533,26 @@ pub fn run() {
             history::get_document_history_entry,
             history::delete_document_history_entry,
             history::clear_document_history,
+            map_protect::protect_map,
+            map_protect::unprotect_map,
             pdf_render::pdf_renderer,
             pdf_render::render_docx_to_pdf,
+            pdf_render::convert_to_docx,
+            pdf_render::convert_to_pdf,
+            shell_actions::take_shell_actions,
+            shell_actions::finish_shell_actions,
+            shell_actions::show_main_window_command,
         ])
         .setup({
             let engine_state = engine_state.clone();
             move |app| {
+                // The window is created hidden (tauri.conf.json): a launch from the Explorer
+                // context menu works in the background and never shows it.
+                let args: Vec<String> = std::env::args().collect();
+                match shell_actions::parse_shell_action(&args) {
+                    Some(request) => app.state::<shell_actions::ShellActionState>().push(request),
+                    None => shell_actions::show_main_window(app.handle()),
+                }
                 spawn_engine_supervisor(app.handle().clone(), engine_state.clone());
                 Ok(())
             }

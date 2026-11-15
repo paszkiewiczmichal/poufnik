@@ -1,1 +1,0 @@
-"""Bundled anonymization export resources."""

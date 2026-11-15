@@ -7,7 +7,9 @@ interface AccountSettingsProps {
   authState: AuthState;
   error: string | null;
   loading: boolean;
+  browserLoginLoading: boolean;
   onLogin: (credentials: LoginCredentials) => Promise<void>;
+  onLoginBrowser: () => void;
   onRegister: () => void;
   onLogout: () => void;
   onDeleteAccount: () => void;
@@ -17,7 +19,9 @@ export function AccountSettings({
   authState,
   error,
   loading,
+  browserLoginLoading,
   onLogin,
+  onLoginBrowser,
   onRegister,
   onLogout,
   onDeleteAccount,
@@ -97,6 +101,14 @@ export function AccountSettings({
               <div className="settings-actions">
                 <button className="primary-button" type="submit" disabled={loading}>
                   {loading ? texts.auth.loggingIn : texts.auth.login}
+                </button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={loading || browserLoginLoading}
+                  onClick={onLoginBrowser}
+                >
+                  {browserLoginLoading ? texts.auth.browserWaiting : texts.auth.loginBrowser}
                 </button>
                 <button className="secondary-button" type="button" onClick={onRegister}>
                   {texts.auth.createAccount}

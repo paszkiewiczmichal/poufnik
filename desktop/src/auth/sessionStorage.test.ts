@@ -71,6 +71,16 @@ describe("readStoredAuthToken (Tauri runtime)", () => {
     await expect(readStoredAuthToken()).resolves.toBe("tauri-token");
   });
 
+  it("keeps a session saved while the session file could not be written", async () => {
+    setTauriRuntime(true);
+    mkdir.mockRejectedValue(new Error("fs.mkdir not allowed"));
+    await saveStoredAuthToken("saved-before-fix");
+    exists.mockResolvedValue(false);
+
+    await expect(readStoredAuthToken()).resolves.toBe("saved-before-fix");
+    expect(readTextFile).not.toHaveBeenCalled();
+  });
+
   it("returns null when the session file does not exist", async () => {
     setTauriRuntime(true);
     exists.mockResolvedValue(false);

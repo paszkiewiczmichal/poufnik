@@ -56,6 +56,8 @@ const mocks = vi.hoisted(() => {
     pickDocumentFolderFiles: vi.fn(),
     pickOutputDirectory: vi.fn(),
     pickReplacementMapFile: vi.fn(),
+    pickRestorableFile: vi.fn(),
+    pickBrowserRestorableFile: vi.fn(),
     readClipboardText: vi.fn(),
     readStoredAuthToken: vi.fn(),
     refreshAccountsToken: vi.fn(),
@@ -76,6 +78,22 @@ const mocks = vi.hoisted(() => {
       list: vi.fn(),
     },
     verifyAuthToken: vi.fn(),
+    shell: {
+      takeShellActions: vi.fn(),
+      finishShellActions: vi.fn(),
+      listenToShellActions: vi.fn(),
+      notify: vi.fn(),
+      waitForEngine: vi.fn(),
+      writeOutputFile: vi.fn(),
+      pathExists: vi.fn(),
+      readTextFile: vi.fn(),
+      rememberReplacementMap: vi.fn(),
+      findReplacementMaps: vi.fn(),
+      removeExpiredMaps: vi.fn(),
+      deleteRememberedMaps: vi.fn(),
+      loadRememberMaps: vi.fn(),
+      saveRememberMaps: vi.fn(),
+    },
   };
 });
 
@@ -142,6 +160,8 @@ vi.mock("./tauri/files", () => ({
   pickDocumentFolderFiles: mocks.pickDocumentFolderFiles,
   pickOutputDirectory: mocks.pickOutputDirectory,
   pickReplacementMapFile: mocks.pickReplacementMapFile,
+  pickRestorableFile: mocks.pickRestorableFile,
+  pickBrowserRestorableFile: mocks.pickBrowserRestorableFile,
   saveBinaryFile: mocks.saveBinaryFile,
   saveJsonFile: mocks.saveJsonFile,
 }));
@@ -173,9 +193,22 @@ vi.mock("./tauri/app", () => ({
   getAppVersion: vi.fn(async () => "9.9.9"),
 }));
 
+vi.mock("./tauri/shellActions", () => mocks.shell);
+
 vi.mock("./tauri/pdf", () => ({
   getPdfRenderer: mocks.getPdfRenderer,
   renderDocxToPdf: mocks.renderDocxToPdf,
+  convertToDocx: vi.fn(async (file: File) => file),
+  convertToPdf: vi.fn(async () => {
+    throw new Error("no_renderer");
+  }),
+  NoPreviewConverterError: class NoPreviewConverterError extends Error {},
+}));
+
+// Global shortcuts exist only inside the desktop shell.
+vi.mock("@tauri-apps/plugin-global-shortcut", () => ({
+  register: vi.fn(async () => undefined),
+  unregister: vi.fn(async () => undefined),
 }));
 
 const endpoint: EngineEndpoint = {
@@ -249,6 +282,18 @@ describe("App engine health", () => {
     mocks.refreshAccountsToken.mockRejectedValue(new Error("offline"));
     mocks.saveStoredAuthToken.mockResolvedValue(undefined);
     mocks.verifyAuthToken.mockResolvedValue(earlyBirdSession);
+    mocks.shell.takeShellActions.mockResolvedValue([]);
+    mocks.shell.finishShellActions.mockResolvedValue(undefined);
+    mocks.shell.listenToShellActions.mockResolvedValue(() => undefined);
+    mocks.shell.notify.mockResolvedValue(undefined);
+    mocks.shell.waitForEngine.mockResolvedValue(endpoint);
+    mocks.shell.writeOutputFile.mockResolvedValue(undefined);
+    mocks.shell.pathExists.mockResolvedValue(false);
+    mocks.shell.rememberReplacementMap.mockResolvedValue(undefined);
+    mocks.shell.findReplacementMaps.mockResolvedValue([]);
+    mocks.shell.removeExpiredMaps.mockResolvedValue(0);
+    mocks.shell.deleteRememberedMaps.mockResolvedValue(0);
+    mocks.shell.loadRememberMaps.mockReturnValue(true);
   });
 
   afterEach(() => {
@@ -309,6 +354,143 @@ describe("App engine health", () => {
     expect(await screen.findByRole("heading", { name: texts.start.title })).toBeInTheDocument();
     expect(mocks.loginToAccounts).not.toHaveBeenCalled();
     expect(mocks.refreshAccountsToken).not.toHaveBeenCalled();
+  });
+
+  it("runs a context-menu action without an account", async () => {
+    mocks.shell.takeShellActions.mockResolvedValueOnce([
+      { action: "markdown", paths: [String.raw`C:\Akta\notatka.txt`] },
+    ]);
+    mocks.fileFromPath.mockResolvedValue(
+      new File(["Jan Kowalski"], "notatka.txt", { type: "text/plain" }),
+    );
+
+    render(<App />);
+
+    await waitFor(() => expect(mocks.shell.writeOutputFile).toHaveBeenCalled());
+    const [outputPath, contents] = mocks.shell.writeOutputFile.mock.calls[0];
+    expect(outputPath).toMatch(/^C:\\Akta\\.+_poufnik\.md$/);
+    expect(contents).toBe("Jan Kowalski");
+    expect(mocks.copyText).toHaveBeenCalledWith("Jan Kowalski");
+    await waitFor(() => expect(mocks.shell.finishShellActions).toHaveBeenCalled());
+    expect(mocks.loginToAccounts).not.toHaveBeenCalled();
+  });
+
+  it("restores an AI answer file from the start screen after the user picks the right map", async () => {
+    const answer = new File(["[OSOBA_1] mieszka przy [ADRES_1]."], "odpowiedz.txt", {
+      type: "text/plain",
+    });
+    mocks.pickRestorableFile.mockResolvedValue({ file: answer, path: String.raw`C:\Akta\odpowiedz.txt` });
+    const mapOf = (fingerprint: string, person: string, address: string) => ({
+      document_fingerprint: fingerprint,
+      entries: [
+        { token: "[OSOBA_1]", category: "PERSON", canonical_text: person },
+        { token: "[ADRES_1]", category: "ADDRESS", canonical_text: address },
+      ],
+    });
+    const nowak = mapOf("b", "Anna Nowak", "ul. Długa 1");
+    const kowalski = mapOf("a", "Jan Kowalski", "ul. Lipowa 8");
+    mocks.shell.findReplacementMaps.mockResolvedValue([
+      { map: nowak, sourceName: "pozew Nowak.docx", outputName: null, mapFileName: null, savedAt: 2 },
+      { map: kowalski, sourceName: "umowa Kowalski.docx", outputName: null, mapFileName: null, savedAt: 1 },
+    ]);
+    mocks.apiClient.deanonymize.mockImplementation(
+      async (text: string, map: { entries: { token: string; canonical_text: string }[] }) => ({
+        original_text: map.entries.reduce(
+          (result, entry) => result.split(entry.token).join(entry.canonical_text),
+          text,
+        ),
+        warnings: [],
+      }),
+    );
+    mocks.saveBinaryFile.mockResolvedValue("odpowiedz_przywrocone.txt");
+
+    render(<App />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: texts.deanonymization.fileButton }),
+    );
+
+    // Two clients' maps fit the tokens: nothing is written until the user chooses.
+    const choice = await screen.findByRole("button", { name: /umowa Kowalski\.docx/ });
+    expect(screen.getByRole("button", { name: /pozew Nowak\.docx/ })).toBeInTheDocument();
+    expect(mocks.saveBinaryFile).not.toHaveBeenCalled();
+    fireEvent.click(choice);
+
+    await waitFor(() => expect(mocks.saveBinaryFile).toHaveBeenCalled());
+    const [name, blob, extension] = mocks.saveBinaryFile.mock.calls[0];
+    expect(name).toBe("odpowiedz_przywrocone.txt");
+    expect(extension).toBe("txt");
+    expect(await (blob as Blob).text()).toBe("Jan Kowalski mieszka przy ul. Lipowa 8.");
+    expect(await screen.findByText(/Zapisano: odpowiedz_przywrocone\.txt/)).toBeInTheDocument();
+  });
+
+  it("warns in the window about tokens the map does not know when restoring a file", async () => {
+    const answer = new File(["[OSOBA_1] i [OSOBA_7], a także [OSOBA 1]."], "odpowiedz.txt", {
+      type: "text/plain",
+    });
+    mocks.pickRestorableFile.mockResolvedValue({ file: answer, path: String.raw`C:\Akta\odpowiedz.txt` });
+    const map = {
+      document_fingerprint: "a",
+      entries: [{ token: "[OSOBA_1]", category: "PERSON", canonical_text: "Jan Kowalski" }],
+    };
+    mocks.shell.findReplacementMaps.mockResolvedValue([
+      { map, sourceName: "umowa.docx", outputName: null, mapFileName: null, savedAt: 1 },
+    ]);
+    mocks.apiClient.deanonymize.mockImplementation(async (text: string) => ({
+      original_text: text.replace("[OSOBA_1]", "Jan Kowalski"),
+      warnings: ["Unknown anonymization token [OSOBA_7] at offset 14."],
+    }));
+    mocks.saveBinaryFile.mockResolvedValue("odpowiedz_przywrocone.txt");
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: texts.deanonymization.fileButton }));
+
+    expect(
+      await screen.findByText(/W pliku zostały 2 oznaczenia, których nie ma w mapie: \[OSOBA_7\], \[OSOBA 1\]\. Sprawdź je ręcznie\./),
+    ).toBeInTheDocument();
+  });
+
+  it("deletes the remembered maps after confirmation and shows how many went", async () => {
+    mocks.confirmSensitiveAction.mockResolvedValue(true);
+    mocks.shell.deleteRememberedMaps.mockResolvedValue(3);
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: texts.updates.settings }));
+    fireEvent.click(await screen.findByRole("button", { name: texts.rememberedMaps.deleteButton }));
+
+    expect(await screen.findByText(texts.rememberedMaps.deleted(3))).toBeInTheDocument();
+    expect(mocks.confirmSensitiveAction).toHaveBeenCalledWith(
+      texts.rememberedMaps.deleteConfirm,
+      texts.rememberedMaps.deleteButton,
+    );
+  });
+
+  it("does not delete the remembered maps when the user declines", async () => {
+    mocks.confirmSensitiveAction.mockResolvedValue(false);
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: texts.updates.settings }));
+    fireEvent.click(await screen.findByRole("button", { name: texts.rememberedMaps.deleteButton }));
+
+    await waitFor(() => expect(mocks.confirmSensitiveAction).toHaveBeenCalled());
+    expect(mocks.shell.deleteRememberedMaps).not.toHaveBeenCalled();
+  });
+
+  it("saves the choice not to remember maps", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: texts.updates.settings }));
+    fireEvent.click(await screen.findByRole("checkbox", { name: new RegExp(texts.rememberedMaps.enabled) }));
+
+    expect(mocks.shell.saveRememberMaps).toHaveBeenCalledWith(false);
+  });
+
+  it("offers login from the Basic sidebar and opens the account settings", async () => {
+    render(<App />);
+
+    await screen.findByRole("heading", { name: texts.start.title });
+    fireEvent.click(screen.getByRole("button", { name: texts.sidebar.login }));
+
+    expect(await screen.findByRole("button", { name: texts.auth.login })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: texts.sidebar.register })).toBeInTheDocument();
   });
 
   it("logs in and shows the Early Bird tier in settings", async () => {
@@ -643,10 +825,12 @@ describe("App engine health", () => {
 
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: /Wynik/ }));
+    // The "Dokument" tab draws the in-place PDF; the DOCX export must not use it.
+    await waitFor(() => expect(mocks.apiClient.exportPdfInPlace).toHaveBeenCalledTimes(1));
     fireEvent.click(await screen.findByRole("button", { name: texts.generation.exportDocx }));
 
     expect(await screen.findByText(texts.generation.exportDocxFromPdf)).toBeInTheDocument();
-    expect(mocks.apiClient.exportPdfInPlace).not.toHaveBeenCalled();
+    expect(mocks.apiClient.exportPdfInPlace).toHaveBeenCalledTimes(1);
   });
 
   it("shows the real app version fetched from Tauri, not a hardcoded one", async () => {
@@ -704,5 +888,29 @@ describe("App engine health", () => {
 
     expect(await screen.findByRole("heading", { name: texts.batch.title })).toBeInTheDocument();
     expect(screen.getByText(texts.batch.empty)).toBeInTheDocument();
+  });
+
+  it("gives the files of one case shared tokens, one file after another", async () => {
+    mocks.readStoredAuthToken.mockResolvedValue("valid-token");
+    mocks.pickDocumentFiles.mockResolvedValue([
+      new File(["a"], "pozew.txt", { type: "text/plain" }),
+      new File(["b"], "odpowiedz.txt", { type: "text/plain" }),
+    ]);
+    const mapAfter = (file: string) => ({ document_fingerprint: file, entries: [] });
+    mocks.apiClient.anonymizeApiEntities
+      .mockResolvedValueOnce({ anonymized_text: "1", replacement_map: mapAfter("first"), offset_map: [] })
+      .mockResolvedValueOnce({ anonymized_text: "2", replacement_map: mapAfter("second"), offset_map: [] });
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: texts.nav.batch }));
+    fireEvent.click(await screen.findByRole("button", { name: texts.batch.addFiles }));
+    await screen.findByText("odpowiedz.txt");
+    fireEvent.click(screen.getByRole("checkbox", { name: /Jedna sprawa/ }));
+    fireEvent.click(screen.getByRole("button", { name: texts.batch.run }));
+
+    await waitFor(() => expect(mocks.apiClient.anonymizeApiEntities).toHaveBeenCalledTimes(2));
+    const caseMaps = mocks.apiClient.anonymizeApiEntities.mock.calls.map((call) => call[3]);
+    // The first file starts the case, the second continues the first one's map.
+    expect(caseMaps).toEqual([null, mapAfter("first")]);
   });
 });

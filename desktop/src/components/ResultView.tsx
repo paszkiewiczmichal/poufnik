@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { ReactNode } from "react";
 
 import { texts } from "../i18n";
 import type {
@@ -12,15 +13,26 @@ import type {
 import { DeanonymizePanel } from "./DeanonymizePanel";
 import { PromptsPanel } from "./PromptsPanel";
 
-type ResultTab = "text" | "map" | "restore";
+type ResultTab = "document" | "text" | "map" | "restore";
 
 interface ResultViewProps {
   anonymization: AnonymizationState;
   prompts: PromptState;
   deanonymization: DeanonymizationState;
   onCopyDocument: () => void;
-  onSaveMap: () => void;
+  /** Saves the map; with a password it is encrypted (AES-256-GCM). */
+  onSaveMap: (password: string | null) => void;
   onExport: (format: ExportFormat) => void;
+  /** Source format the result can be saved in (xlsx, pptx, odt, ods, odp, png, jpg, heic). */
+  ownFormat?: string | null;
+  onExportOwnFormat?: () => void;
+  /** Saves the anonymization report for the case file. */
+  onSaveReport?: () => void;
+  fileRestore?: ReactNode;
+  /** Case controls (map of earlier documents of the same case), shown in the map tab. */
+  caseControls?: ReactNode;
+  /** "Przed" / "Po" drawn 1:1, for formats the window can draw (PDF, DOCX, pictures). */
+  documentPreview?: ReactNode;
   exportNotice?: string | null;
   documentNotices?: string[];
   onLoadPrompts: () => void;
@@ -39,6 +51,12 @@ export function ResultView({
   onCopyDocument,
   onSaveMap,
   onExport,
+  ownFormat = null,
+  onExportOwnFormat,
+  onSaveReport,
+  fileRestore,
+  caseControls,
+  documentPreview,
   exportNotice = null,
   documentNotices = [],
   onLoadPrompts,
@@ -49,8 +67,11 @@ export function ResultView({
   onLoadReplacementMap,
   onCopyDeanonymizedResult,
 }: ResultViewProps) {
-  const [activeTab, setActiveTab] = useState<ResultTab>("text");
+  const [activeTab, setActiveTab] = useState<ResultTab>(documentPreview ? "document" : "text");
   const [mapVisible, setMapVisible] = useState(false);
+  const [mapPassword, setMapPassword] = useState("");
+  const [mapPasswordRepeat, setMapPasswordRepeat] = useState("");
+  const passwordMismatch = mapPassword !== "" && mapPassword !== mapPasswordRepeat;
   const anonymizedText = anonymization.anonymizedText;
   const replacementMap = anonymization.replacementMap;
   const hasResult = Boolean(anonymizedText && replacementMap);
@@ -61,10 +82,66 @@ export function ResultView({
     .filter((notice): notice is string => Boolean(notice));
 
   const tabs: { id: ResultTab; label: string }[] = [
+    ...(documentPreview ? [{ id: "document" as const, label: texts.generation.tabDocument }] : []),
     { id: "text", label: texts.generation.tabText },
     { id: "map", label: texts.generation.tabMap },
     { id: "restore", label: texts.generation.tabRestore },
   ];
+
+  // What the engine changed besides the data (tracked changes accepted, comments removed...).
+  const noticesBlock =
+    visibleNotices.length > 0 ? (
+      <div className="status-note document-notices">
+        <span className="caps-label">{texts.generation.noticesTitle}</span>
+        <ul>
+          {visibleNotices.map((notice) => (
+            <li key={notice}>{notice}</li>
+          ))}
+        </ul>
+      </div>
+    ) : null;
+
+  // Saving is offered next to the 1:1 preview and next to the text.
+  const exportButtons = (
+    <>
+      {ownFormat && onExportOwnFormat ? (
+        <button
+          className="ghost-button ghost-button--compact"
+          type="button"
+          disabled={!hasResult}
+          onClick={onExportOwnFormat}
+        >
+          {texts.generation.exportOwnFormat(ownFormat)}
+        </button>
+      ) : null}
+      <button
+        className="ghost-button ghost-button--compact"
+        type="button"
+        disabled={!hasResult}
+        onClick={() => onExport("docx")}
+      >
+        {texts.generation.exportDocx}
+      </button>
+      <button
+        className="ghost-button ghost-button--compact"
+        type="button"
+        disabled={!hasResult}
+        onClick={() => onExport("pdf")}
+      >
+        {texts.generation.exportPdf}
+      </button>
+      {onSaveReport ? (
+        <button
+          className="ghost-button ghost-button--compact"
+          type="button"
+          disabled={!hasResult}
+          onClick={onSaveReport}
+        >
+          {texts.generation.report}
+        </button>
+      ) : null}
+    </>
+  );
 
   const selectTab = (tab: ResultTab) => {
     setActiveTab(tab);
@@ -109,6 +186,22 @@ export function ResultView({
         ))}
       </div>
 
+      {activeTab === "document" && (
+        <div className="card">
+          <div className="card__header">
+            <span className="caps-label">{texts.generation.documentHeader}</span>
+            <div className="toolbar">{exportButtons}</div>
+          </div>
+          {exportNotice ? (
+            <p className="status-note" role="status">
+              {exportNotice}
+            </p>
+          ) : null}
+          {noticesBlock}
+          {documentPreview}
+        </div>
+      )}
+
       {activeTab === "text" && (
         <div className="result-grid">
           <div className="card">
@@ -123,22 +216,7 @@ export function ResultView({
                 >
                   {texts.generation.copyDocument}
                 </button>
-                <button
-                  className="ghost-button ghost-button--compact"
-                  type="button"
-                  disabled={!hasResult}
-                  onClick={() => onExport("docx")}
-                >
-                  {texts.generation.exportDocx}
-                </button>
-                <button
-                  className="ghost-button ghost-button--compact"
-                  type="button"
-                  disabled={!hasResult}
-                  onClick={() => onExport("pdf")}
-                >
-                  {texts.generation.exportPdf}
-                </button>
+                {exportButtons}
               </div>
             </div>
             {exportNotice ? (
@@ -146,16 +224,7 @@ export function ResultView({
                 {exportNotice}
               </p>
             ) : null}
-            {visibleNotices.length > 0 ? (
-              <div className="status-note document-notices">
-                <span className="caps-label">{texts.generation.noticesTitle}</span>
-                <ul>
-                  {visibleNotices.map((notice) => (
-                    <li key={notice}>{notice}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
+            {noticesBlock}
             <pre className="result-text">{anonymizedText}</pre>
           </div>
 
@@ -185,12 +254,39 @@ export function ResultView({
               <button
                 className="ghost-button ghost-button--compact"
                 type="button"
-                onClick={onSaveMap}
+                disabled={passwordMismatch}
+                onClick={() => onSaveMap(mapPassword || null)}
               >
-                {texts.generation.saveMap}
+                {mapPassword ? texts.generation.saveMapEncrypted : texts.generation.saveMap}
               </button>
             </div>
+            <div className="map-password">
+              <label className="field">
+                <span>{texts.generation.mapPassword}</span>
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  value={mapPassword}
+                  onChange={(event) => setMapPassword(event.target.value)}
+                />
+              </label>
+              {mapPassword ? (
+                <label className="field">
+                  <span>{texts.generation.mapPasswordRepeat}</span>
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    value={mapPasswordRepeat}
+                    onChange={(event) => setMapPasswordRepeat(event.target.value)}
+                  />
+                </label>
+              ) : null}
+              <p className="muted">
+                {passwordMismatch ? texts.generation.mapPasswordMismatch : texts.generation.mapPasswordNote}
+              </p>
+            </div>
           </div>
+          {caseControls}
           {mapVisible ? (
             <ReplacementMapTable replacementMap={replacementMap} />
           ) : (
@@ -227,6 +323,7 @@ export function ResultView({
           onCopyResult={onCopyDeanonymizedResult}
         />
       )}
+      {activeTab === "restore" && fileRestore}
     </section>
   );
 }

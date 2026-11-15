@@ -1,3 +1,5 @@
+import type { ReportRequest } from "../domain/report";
+import { loadProfile, loadReplacementMode } from "../tauri/replacementMode";
 import type {
   AnalyzeResponse,
   AnonymizeResponse,
@@ -22,6 +24,8 @@ export interface ApiProblem {
   detail?: string;
   errors?: unknown;
 }
+
+export type InPlaceKind = "xlsx" | "pptx" | "odt" | "ods" | "odp" | "image";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -56,11 +60,18 @@ export interface AnonymizerApiClient {
     file: File,
     options: { forceOcr: boolean; language?: string },
   ): Promise<DocumentProcessResponse>;
-  anonymize(text: string, entities: DetectedEntity[], language?: string): Promise<AnonymizeResponse>;
+  /** ``caseMap``: map of the case's earlier documents; shared values keep their tokens. */
+  anonymize(
+    text: string,
+    entities: DetectedEntity[],
+    language?: string,
+    caseMap?: ReplacementMap | null,
+  ): Promise<AnonymizeResponse>;
   anonymizeApiEntities(
     text: string,
     entities: ApiDetectedEntity[],
     language?: string,
+    caseMap?: ReplacementMap | null,
   ): Promise<AnonymizeResponse>;
   deanonymize(text: string, replacementMap: ReplacementMap): Promise<DeanonymizeResponse>;
   listPrompts(): Promise<PromptTemplate[]>;
@@ -75,6 +86,22 @@ export interface AnonymizerApiClient {
     offsetMap: OffsetMapEntry[];
     anonymizedText: string;
   }): Promise<Blob>;
+  /** The same file without metadata; content untouched. Codes say what was removed. */
+  cleanMetadata(file: File): Promise<{ blob: Blob; removed: string[]; notices: string[] }>;
+  /** Puts the original values back into an anonymized DOCX, keeping its layout. */
+  restoreDocxInPlace(options: { file: File; replacementMap: ReplacementMap }): Promise<ExportedBlob>;
+  /**
+   * Anonymizes a spreadsheet, presentation, OpenDocument file or picture in place and returns
+   * it in its own format (``kind`` = engine endpoint: xlsx, pptx, odt, ods, odp or image).
+   */
+  exportInPlace(options: {
+    kind: InPlaceKind;
+    file: File;
+    offsetMap: OffsetMapEntry[];
+    anonymizedText: string;
+  }): Promise<Blob>;
+  /** Report for the case file (PDF): tokens, categories and decisions, no document value. */
+  buildReport(request: ReportRequest): Promise<Blob>;
   /** Anonymizes the original PDF in place; ``ocr`` = the text was recognized by OCR. */
   exportPdfInPlace(options: {
     file: File;
@@ -82,6 +109,29 @@ export interface AnonymizerApiClient {
     anonymizedText: string;
     ocr: boolean;
   }): Promise<Blob>;
+}
+
+/** Fictional-data mode (Settings) travels with each request; tokens are the default. */
+function modeField(): { mode?: "pseudonyms" } {
+  return loadReplacementMode() === "pseudonyms" ? { mode: "pseudonyms" } : {};
+}
+
+/** A file from the engine; ``notices`` lists what an in-place export did besides the text. */
+export type ExportedBlob = Blob & { notices?: string[]; warnings?: string[] };
+
+/** X-Poufnik-Warnings: a percent-encoded JSON array of strings; absent or garbage = none. */
+export function parseWarningsHeader(value: string | null | undefined): string[] {
+  if (!value) {
+    return [];
+  }
+  try {
+    const parsed: unknown = JSON.parse(decodeURIComponent(value));
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === "string")
+      : [];
+  } catch {
+    return [];
+  }
 }
 
 export function createAnonymizerApiClient(
@@ -117,7 +167,17 @@ export function createAnonymizerApiClient(
       throw new ApiError(response, await readProblem(response));
     }
 
-    return response.blob();
+    // Notices of an in-place export (e.g. pictures painted over) travel with the file.
+    const blob: ExportedBlob = await response.blob();
+    const notices = response.headers?.get?.("X-Poufnik-Notices");
+    if (notices) {
+      blob.notices = notices.split(",").filter((code) => code.length > 0);
+    }
+    const warnings = parseWarningsHeader(response.headers?.get?.("X-Poufnik-Warnings"));
+    if (warnings.length > 0) {
+      blob.warnings = warnings;
+    }
+    return blob;
   };
 
   return {
@@ -130,6 +190,7 @@ export function createAnonymizerApiClient(
           text,
           language,
           custom_rules: customRules,
+          ...(loadProfile() === "judgment" ? { profile: "judgment" } : {}),
         }),
       }),
     processDocument: (file, options) => {
@@ -137,13 +198,19 @@ export function createAnonymizerApiClient(
       form.append("file", file, file.name);
       form.append("force_ocr", String(options.forceOcr));
       form.append("language", options.language ?? "pl");
+      if (loadReplacementMode() === "pseudonyms") {
+        form.append("mode", "pseudonyms");
+      }
+      if (loadProfile() === "judgment") {
+        form.append("profile", "judgment");
+      }
 
       return requestJson<DocumentProcessResponse>("/v1/documents/process", {
         method: "POST",
         body: form,
       });
     },
-    anonymize: (text, entities, language = "pl") =>
+    anonymize: (text, entities, language = "pl", caseMap = null) =>
       requestJson<AnonymizeResponse>("/v1/anonymize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -151,9 +218,11 @@ export function createAnonymizerApiClient(
           text,
           language,
           entities: entities.map(toApiEntity),
+          ...(caseMap ? { case_map: caseMap } : {}),
+          ...modeField(),
         }),
       }),
-    anonymizeApiEntities: (text, entities, language = "pl") =>
+    anonymizeApiEntities: (text, entities, language = "pl", caseMap = null) =>
       requestJson<AnonymizeResponse>("/v1/anonymize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -161,6 +230,8 @@ export function createAnonymizerApiClient(
           text,
           language,
           entities,
+          ...(caseMap ? { case_map: caseMap } : {}),
+          ...modeField(),
         }),
       }),
     deanonymize: (text, replacementMap) =>
@@ -183,8 +254,49 @@ export function createAnonymizerApiClient(
           blocks,
         }),
       }),
+    buildReport: (request) =>
+      requestBlob("/v1/report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
+      }),
     exportDocxInPlace: ({ file, offsetMap, anonymizedText }) =>
       requestBlob("/v1/export/docx", {
+        method: "POST",
+        body: inPlaceExportForm(file, offsetMap, anonymizedText),
+      }),
+    cleanMetadata: async (file) => {
+      const form = new FormData();
+      form.append("file", file, file.name);
+      const response = await fetcher(`${endpoint.baseUrl}/v1/metadata/clean`, {
+        method: "POST",
+        headers: { "X-Api-Key": endpoint.token },
+        body: form,
+      });
+      if (!response.ok) {
+        throw new ApiError(response, await readProblem(response));
+      }
+      const codes = (name: string) =>
+        (response.headers.get(name) ?? "").split(",").filter((code) => code.length > 0);
+      return {
+        blob: await response.blob(),
+        removed: codes("X-Poufnik-Removed"),
+        notices: codes("X-Poufnik-Notices"),
+      };
+    },
+    restoreDocxInPlace: ({ file, replacementMap }) => {
+      // The map goes as a file part: plain multipart fields are capped at 1 MB.
+      const form = new FormData();
+      form.append("file", file, file.name);
+      form.append(
+        "replacement_map",
+        new Blob([JSON.stringify(replacementMap)], { type: "application/json" }),
+        "replacement_map.json",
+      );
+      return requestBlob("/v1/restore/docx", { method: "POST", body: form });
+    },
+    exportInPlace: ({ kind, file, offsetMap, anonymizedText }) =>
+      requestBlob(`/v1/export/${kind}`, {
         method: "POST",
         body: inPlaceExportForm(file, offsetMap, anonymizedText),
       }),

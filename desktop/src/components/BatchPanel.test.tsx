@@ -98,10 +98,13 @@ describe("BatchPanel", () => {
     expect(screen.getByText("Plik uszkodzony")).toBeInTheDocument();
   });
 
-  it("shows the file size for a queued item without an error", () => {
+  it("shows the file size next to the name, not in the detections column", () => {
     renderPanel({ items: [makeItem({ status: "queued", size: 4096 })] });
 
-    expect(screen.getByText(texts.batch.fileSize(4096))).toBeInTheDocument();
+    const row = screen.getByRole("listitem");
+    expect(row.querySelector(".batch-item__name")).toHaveTextContent(texts.batch.fileSize(4096));
+    expect(row.querySelector(".batch-item__meta")).toHaveTextContent(texts.batch.noDetectionsYet);
+    expect(row.querySelector(".batch-item__meta")).not.toHaveTextContent("KB");
   });
 
   it("enables run only when there is a non-done item and not disabled/running", () => {

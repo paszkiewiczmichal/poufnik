@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Update } from "@tauri-apps/plugin-updater";
 
 import "./App.css";
 import { createAnonymizerApiClient } from "./api/client";
-import { fallbackOnEngineRefusal, toUserMessage } from "./api/errors";
+import { toUserMessage } from "./api/errors";
 import {
   AccountsClientError,
   getAccountDeletionUrl,
@@ -30,6 +30,13 @@ import { CustomRulesPanel } from "./components/CustomRulesPanel";
 import { DocumentWorkspace, type WorkspaceView } from "./components/DocumentWorkspace";
 import { EngineError } from "./components/EngineError";
 import { ExcludedCategoriesSettings } from "./components/ExcludedCategoriesSettings";
+import { ReplacementModeSettings } from "./components/ReplacementModeSettings";
+import {
+  loadProfile,
+  loadReplacementMode,
+  saveProfile,
+  saveReplacementMode,
+} from "./tauri/replacementMode";
 import { StartScreen } from "./components/StartScreen";
 import { TierGate } from "./components/TierGate";
 import {
@@ -39,9 +46,42 @@ import {
 } from "./domain/batchProcessing";
 import { enabledCustomRulePayloads } from "./domain/customRules";
 import { poufnikFileName } from "./domain/batchExport";
-import { blocksForExport } from "./domain/documentSegments";
+import {
+  buildAnonymizedExport,
+  buildOwnFormatExport,
+  ownExportFormat,
+  type AnonymizedExportPlatform,
+} from "./domain/anonymizedExport";
 import { rejectExcludedCategories } from "./domain/entities";
-import { getPdfRenderer, renderDocxToPdf } from "./tauri/pdf";
+import {
+  filenameOf,
+  isRestorableFileName,
+  restorableText,
+  restoreFileContents,
+  restoredFileName,
+  runShellAction,
+  type ShellActionOutcome,
+} from "./domain/shellActions";
+import { chooseReplacementMap, parseReplacementMap, type MapCandidate } from "./domain/mapLinking";
+import { decryptMap, encryptMap, isEncryptedMap } from "./domain/mapCrypto";
+import { originalPreviewKind, previewKind } from "./domain/preview";
+import { buildReportRequest, sha256Hex } from "./domain/report";
+import { DocumentPreviewPair, type PreviewFile } from "./components/DocumentPreviewPair";
+import { MapPasswordForm } from "./components/MapPasswordForm";
+import { anonymizeClipboard, restoreClipboard } from "./domain/clipboardActions";
+import { restoreWarningMessage } from "./domain/restoreWarnings";
+import {
+  loadHotkeysEnabled,
+  registerClipboardShortcuts,
+  saveHotkeysEnabled,
+} from "./tauri/hotkeys";
+import {
+  FileRestorePanel,
+  IDLE_FILE_RESTORE,
+  type FileRestoreState,
+} from "./components/FileRestorePanel";
+import { convertToDocx, getPdfRenderer, renderDocxToPdf } from "./tauri/pdf";
+import { CONVERTED_NOTICE, prepareDocument } from "./domain/legacyFormats";
 import { texts } from "./i18n";
 import { useAppStore } from "./store/useAppStore";
 import { getAppVersion } from "./tauri/app";
@@ -73,6 +113,8 @@ import {
   listenToDroppedFiles,
   pickBrowserDocumentFiles,
   pickReplacementMapFile,
+  pickRestorableFile,
+  pickBrowserRestorableFile,
   pickBrowserDocumentFile,
   pickDocumentFile,
   pickDocumentFiles,
@@ -82,6 +124,22 @@ import {
   saveJsonFile,
 } from "./tauri/files";
 import { openExternalUrl } from "./tauri/external";
+import {
+  deleteRememberedMaps,
+  finishShellActions,
+  findReplacementMaps,
+  listenToShellActions,
+  loadRememberMaps,
+  notify,
+  pathExists,
+  readTextFile,
+  rememberReplacementMap,
+  removeExpiredMaps,
+  saveRememberMaps,
+  takeShellActions,
+  waitForEngine,
+  writeOutputFile,
+} from "./tauri/shellActions";
 import { FileIcon } from "./ui/icons";
 import type {
   CustomRegexRule,
@@ -132,8 +190,11 @@ declare global {
   }
 }
 
-// Silnik zgłasza, że PDF udało się wczytać, ale nie da się go wyeksportować w miejscu.
-const PDF_LAYOUT_UNAVAILABLE = "pdf_layout_export_unavailable";
+const EXPORT_PLATFORM: AnonymizedExportPlatform = {
+  getPdfRenderer,
+  renderDocxToPdf,
+  isMacAppStore: IS_MAC_APP_STORE,
+};
 
 // Limit uzgodniony z copy i audytem bezpieczeństwa (W4/S6).
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
@@ -194,6 +255,36 @@ function App() {
   );
   const [batchItems, setBatchItems] = useState<BatchQueueItem[]>([]);
   const [batchRunning, setBatchRunning] = useState(false);
+  const [replacementMode, setReplacementMode] = useState(() => loadReplacementMode());
+  const [profile, setProfile] = useState(() => loadProfile());
+  const [hotkeysEnabled, setHotkeysEnabled] = useState(() => loadHotkeysEnabled());
+  const [rememberMaps, setRememberMaps] = useState(() => loadRememberMaps());
+  const [rememberedMapsNote, setRememberedMapsNote] = useState<string | null>(null);
+  // Remembered maps older than 30 days go away at every start.
+  useEffect(() => {
+    void removeExpiredMaps().catch(() => undefined);
+  }, []);
+  const deleteAllRememberedMaps = useCallback(async () => {
+    const confirmed = await confirmSensitiveAction(
+      texts.rememberedMaps.deleteConfirm,
+      texts.rememberedMaps.deleteButton,
+    );
+    if (!confirmed) {
+      return;
+    }
+    try {
+      setRememberedMapsNote(texts.rememberedMaps.deleted(await deleteRememberedMaps()));
+    } catch {
+      setRememberedMapsNote(texts.rememberedMaps.deleteFailed);
+    }
+  }, []);
+  // "Jedna sprawa" in batch mode: all files share their tokens.
+  const [batchSharedCase, setBatchSharedCase] = useState(false);
+  // Map of the case being worked on in the window: every new document continues it.
+  const [caseMap, setCaseMap] = useState<ReplacementMap | null>(null);
+  const [lockedCaseMap, setLockedCaseMap] = useState<{ json: string; error: string | null } | null>(
+    null,
+  );
   const [batchMessage, setBatchMessage] = useState<string | null>(null);
   const [batchError, setBatchError] = useState<string | null>(null);
   const [authState, setAuthState] = useState<AuthState>({ status: "loading" });
@@ -537,11 +628,37 @@ function App() {
 
       try {
         const client = createAnonymizerApiClient(endpoint);
-        const response = await applyUserSettingsToDocument(
+        // DOC and RTF are opened as DOCX (converted by Word or LibreOffice).
+        const prepared = await prepareDocument(file, convertToDocx);
+        let response = await applyUserSettingsToDocument(
           client,
-          await client.processDocument(file, { forceOcr: uiState.forceOcr }),
+          await client.processDocument(prepared.file, { forceOcr: uiState.forceOcr }),
         );
-        setProcessedDocument(response, file);
+        if (prepared.converted) {
+          response = {
+            ...response,
+            document: {
+              ...response.document,
+              notices: [...(response.document.notices ?? []), CONVERTED_NOTICE],
+            },
+          };
+        }
+        if (caseMap) {
+          const inCase = await client.anonymizeApiEntities(
+            response.document.text,
+            response.entities,
+            "pl",
+            caseMap,
+          );
+          response = {
+            ...response,
+            anonymized_text: inCase.anonymized_text,
+            replacement_map: inCase.replacement_map,
+            offset_map: inCase.offset_map ?? [],
+          };
+          setCaseMap(inCase.replacement_map);
+        }
+        setProcessedDocument(response, prepared.file);
         setScreen("flow");
         setWorkspaceView("document");
       } catch (error) {
@@ -554,6 +671,7 @@ function App() {
       setEngineReady,
       refreshEngineHealth,
       applyUserSettingsToDocument,
+      caseMap,
       setProcessedDocument,
       setProcessing,
       setProcessingError,
@@ -623,6 +741,91 @@ function App() {
     }
   }, [refreshEngineHealth, setEngineReady, uiState.endpoint]);
 
+  // Explorer context menu (Poufnik → Anonimizuj / OCR / Markdown / Przywróć dane / Usuń
+  // metadane). Open to everyone, with or without an account. Runs in the background with the
+  // user's settings; each finished file is reported by a notification. It waits only until
+  // the saved session is read, so an account's custom rules apply.
+  const shellQueueRunning = useRef(false);
+  const runShellQueue = useCallback(async () => {
+    if (shellQueueRunning.current || authState.status === "loading") {
+      return;
+    }
+    shellQueueRunning.current = true;
+    try {
+      for (;;) {
+        const requests = await takeShellActions();
+        if (requests.length === 0) {
+          break;
+        }
+        let endpoint: EngineEndpoint;
+        try {
+          endpoint = await waitForEngine();
+        } catch (error) {
+          await notify(texts.shellActions.title, toUserMessage(error));
+          continue;
+        }
+        const deps = {
+          client: createAnonymizerApiClient(endpoint),
+          readDocument: async (path: string) => {
+            const file = await fileFromPath(path);
+            if (file.size > MAX_UPLOAD_BYTES) {
+              throw new Error(texts.errors.payloadTooLarge);
+            }
+            return (await prepareDocument(file, convertToDocx)).file;
+          },
+          readText: (path: string) => readTextFile(path),
+          writeFile: writeOutputFile,
+          exists: (path: string) => pathExists(path),
+          copyText,
+          applyUserSettings: applyUserSettingsToDocument,
+          exportPlatform: EXPORT_PLATFORM,
+          rememberMap: rememberReplacementMap,
+          findMaps: findReplacementMaps,
+        };
+        for (const request of requests) {
+          for (const path of request.paths) {
+            const name = filenameOf(path);
+            let outcome: ShellActionOutcome;
+            // Restore and metadata check their own file types; the rest need a document.
+            const ownTypes = request.action === "restore" || request.action === "metadata";
+            if (!ownTypes && !isSupportedDocumentName(name)) {
+              outcome = { ok: false, reason: "unsupported" };
+            } else {
+              try {
+                outcome = await runShellAction(request.action, path, deps);
+              } catch (error) {
+                outcome = { ok: false, reason: "error", message: toUserMessage(error) };
+              }
+            }
+            await notify(texts.shellActions.title, shellOutcomeMessage(request.action, name, outcome));
+          }
+        }
+      }
+    } finally {
+      shellQueueRunning.current = false;
+      await finishShellActions().catch(() => undefined);
+    }
+  }, [applyUserSettingsToDocument, authState.status]);
+
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+    let active = true;
+    void runShellQueue();
+    listenToShellActions(() => void runShellQueue())
+      .then((dispose) => {
+        if (active) {
+          unlisten = dispose;
+        } else {
+          dispose();
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+      unlisten?.();
+    };
+  }, [runShellQueue]);
+
   const appendBatchFiles = useCallback((files: File[]) => {
     const supported = files.filter(
       (file) => isSupportedDocumentName(file.name) && file.size <= MAX_UPLOAD_BYTES,
@@ -679,13 +882,43 @@ function App() {
     setBatchError(null);
     try {
       const client = createAnonymizerApiClient(endpoint);
+      // A second run (a retried or an added file) continues the case of the files already
+      // done: their maps grow one from another, so the largest one holds them all.
+      let sharedMap: ReplacementMap | null = batchSharedCase
+        ? batchItems.reduce<ReplacementMap | null>(
+            (largest, item) =>
+              item.status === "done" &&
+              item.replacementMap &&
+              item.replacementMap.entries.length > (largest?.entries.length ?? -1)
+                ? item.replacementMap
+                : largest,
+            null,
+          )
+        : null;
       await processBatchQueue(
         batchItems,
         async (item): Promise<BatchProcessSuccess> => {
-          const processed = await applyUserSettingsToDocument(
+          const prepared = await prepareDocument(item.file, convertToDocx);
+          let processed = await applyUserSettingsToDocument(
             client,
-            await client.processDocument(item.file, { forceOcr: uiState.forceOcr }),
+            await client.processDocument(prepared.file, { forceOcr: uiState.forceOcr }),
           );
+          if (batchSharedCase) {
+            const inCase = await client.anonymizeApiEntities(
+              processed.document.text,
+              processed.entities,
+              "pl",
+              sharedMap,
+            );
+            sharedMap = inCase.replacement_map;
+            processed = {
+              ...processed,
+              anonymized_text: inCase.anonymized_text,
+              replacement_map: inCase.replacement_map,
+              offset_map: inCase.offset_map ?? [],
+            };
+          }
+          rememberMapQuietly(processed.replacement_map, item.file.name);
           return {
             document: processed.document,
             anonymizedText: processed.anonymized_text,
@@ -694,6 +927,8 @@ function App() {
           };
         },
         patchBatchItem,
+        // One case: files one after another, so the map grows in a fixed order.
+        batchSharedCase ? 1 : undefined,
       );
       setBatchMessage(texts.batch.done);
     } catch (error) {
@@ -705,6 +940,7 @@ function App() {
     applyUserSettingsToDocument,
     batchItems,
     batchRunning,
+    batchSharedCase,
     patchBatchItem,
     productTier,
     resolveEndpoint,
@@ -758,12 +994,16 @@ function App() {
     setAnonymizationLoading();
     try {
       const client = createAnonymizerApiClient(endpoint);
-      const result = await client.anonymize(document.text, entities);
+      const result = await client.anonymize(document.text, entities, "pl", caseMap);
+      if (caseMap) {
+        setCaseMap(result.replacement_map);
+      }
       setAnonymizationResult(
         result.anonymized_text,
         result.replacement_map,
         result.offset_map ?? [],
       );
+      rememberMapQuietly(result.replacement_map, uiState.selectedFileName);
       if (productTier === "early_bird") {
         try {
           const saved = await saveDocumentHistoryEntryIfEnabled({
@@ -796,6 +1036,8 @@ function App() {
     productTier,
     screen,
     loadHistoryEntries,
+    uiState.selectedFileName,
+    caseMap,
   ]);
 
   const openHistoryEntry = useCallback(
@@ -858,22 +1100,36 @@ function App() {
     }
   }, [anonymization.anonymizedText]);
 
-  const saveReplacementMap = useCallback(async () => {
-    if (!anonymization.replacementMap) {
-      return;
-    }
-    const confirmed = await confirmSensitiveAction(
-      texts.generation.mapWarning,
-      texts.generation.mapWarningTitle,
-    );
-    if (!confirmed) {
-      return;
-    }
-    await saveJsonFile(
-      poufnikFileName(uiState.selectedFileName, "json", "map", anonymization.replacementMap),
-      JSON.stringify(anonymization.replacementMap, null, 2),
-    );
-  }, [anonymization.replacementMap, uiState.selectedFileName]);
+  const saveReplacementMap = useCallback(
+    async (password: string | null) => {
+      if (!anonymization.replacementMap) {
+        return;
+      }
+      const name = poufnikFileName(
+        uiState.selectedFileName,
+        "json",
+        "map",
+        anonymization.replacementMap,
+      );
+      if (password) {
+        // Encrypted: readable only with the password, so no warning is needed.
+        await saveJsonFile(
+          name.replace(/\.json$/, "_zaszyfrowana.json"),
+          await encryptMap(anonymization.replacementMap, password),
+        );
+        return;
+      }
+      const confirmed = await confirmSensitiveAction(
+        texts.generation.mapWarning,
+        texts.generation.mapWarningTitle,
+      );
+      if (!confirmed) {
+        return;
+      }
+      await saveJsonFile(name, JSON.stringify(anonymization.replacementMap, null, 2));
+    },
+    [anonymization.replacementMap, uiState.selectedFileName],
+  );
 
   // Builds the exported file; returns null when there is nothing to export (the error is
   // already shown). Shared by the export buttons and the E2E hook.
@@ -888,87 +1144,26 @@ function App() {
         return null;
       }
       setExportNotice(null);
-      const client = createAnonymizerApiClient(endpoint);
-      const anonymizedText = anonymization.anonymizedText;
-      // Built only from the anonymized text, so it cannot contain an original value.
-      const exportSimplified = async (target: ExportFormat, notice: string | null) => {
-        const blob = await client.exportDocument({
-          anonymizedText,
-          format: target,
-          blocks: blocksForExport(anonymizedText),
-        });
-        if (notice) {
-          setExportNotice(notice);
-        }
-        return blob;
-      };
-      const sourceIsDocx = document?.format === "docx";
-      const sourceFile = uiState.selectedFile;
-      const renderer = format === "pdf" && sourceIsDocx && sourceFile ? await getPdfRenderer() : null;
-      if (sourceIsDocx && sourceFile && (format === "docx" || renderer)) {
-        // Same file, same offsets: the engine edits the original XML and keeps the layout.
-        const docx = await client
-          .exportDocxInPlace({
-            file: sourceFile,
-            offsetMap: anonymization.offsetMap,
-            anonymizedText: anonymization.anonymizedText,
-          })
-          .catch(fallbackOnEngineRefusal);
-        if (!docx) {
-          return exportSimplified(format, texts.generation.exportFaithfulFailed);
-        }
-        if (format === "docx") {
-          return docx;
-        }
-        // The installed office suite lays out the anonymized DOCX exactly as it would the
-        // original, so the PDF looks like the source document.
-        const pdf = await renderDocxToPdf(docx).catch((error: unknown) => {
-          // The desktop command rejects with a Polish message naming the program.
-          throw new Error(typeof error === "string" ? error : texts.errors.pdfRenderFailed);
-        });
-        if (renderer === "libreoffice") {
-          setExportNotice(texts.generation.exportPdfLibreOffice);
-        }
-        return pdf;
-      }
-      const sourceIsPdf = document?.format === "pdf";
-      const pdfLayoutKnown = !document?.notices?.includes(PDF_LAYOUT_UNAVAILABLE);
-      if (format === "pdf" && sourceIsPdf && sourceFile && pdfLayoutKnown) {
-        // Glyphs of the values are removed from the original PDF (scans: painted over).
-        const pdf = await client
-          .exportPdfInPlace({
-            file: sourceFile,
-            offsetMap: anonymization.offsetMap,
-            anonymizedText: anonymization.anonymizedText,
-            ocr: document?.source === "ocr",
-          })
-          .catch(fallbackOnEngineRefusal);
-        return pdf ?? exportSimplified(format, texts.generation.exportFaithfulFailed);
-      }
-      const blob = await exportSimplified(format, null);
-      if (sourceIsDocx) {
-        setExportNotice(
-          format === "docx" || !sourceFile
-            ? texts.generation.exportSimplifiedLayout
-            : IS_MAC_APP_STORE
-              ? texts.generation.exportPdfSandboxed
-              : texts.generation.exportPdfWithoutWord,
-        );
-      } else if (sourceIsPdf) {
-        setExportNotice(
-          format === "docx"
-            ? texts.generation.exportDocxFromPdf
-            : texts.generation.exportSimplifiedLayout,
-        );
+      const { blob, notice } = await buildAnonymizedExport(
+        createAnonymizerApiClient(endpoint),
+        {
+          document,
+          sourceFile: uiState.selectedFile,
+          anonymizedText: anonymization.anonymizedText,
+          offsetMap: anonymization.offsetMap,
+        },
+        format,
+        EXPORT_PLATFORM,
+      );
+      if (notice) {
+        setExportNotice(notice);
       }
       return blob;
     },
     [
       anonymization.anonymizedText,
       anonymization.offsetMap,
-      document?.format,
-      document?.notices,
-      document?.source,
+      document,
       resolveEndpoint,
       setAnonymizationError,
       uiState.selectedFile,
@@ -992,6 +1187,162 @@ function App() {
     },
     [buildExportFile, anonymization.replacementMap, setAnonymizationError, uiState.selectedFileName],
   );
+
+  // "Dokument" tab of the result: the original and the anonymized file drawn 1:1. The
+  // anonymized file is built exactly as "Eksportuj" saves it.
+  const resultPreviewKind = previewKind(document?.format);
+  const loadAnonymizedPreview = useCallback(async (): Promise<PreviewFile | null> => {
+    if (!anonymization.anonymizedText || !resultPreviewKind) {
+      return null;
+    }
+    const endpoint = await resolveEndpoint();
+    if (!endpoint) {
+      throw new Error(texts.errors.noEngine);
+    }
+    const client = createAnonymizerApiClient(endpoint);
+    const source = {
+      document,
+      sourceFile: uiState.selectedFile,
+      anonymizedText: anonymization.anonymizedText,
+      offsetMap: anonymization.offsetMap,
+    };
+    if (resultPreviewKind === "image") {
+      // A picture the engine cannot redact in place comes back as a simplified PDF.
+      const { blob, notice } = await buildOwnFormatExport(client, source);
+      return { blob, kind: blob.type === "application/pdf" ? "pdf" : "image", notice };
+    }
+    if (resultPreviewKind === "office") {
+      // The file "Eksportuj" saves, in its own format; Office or LibreOffice draws it. When
+      // the engine could not keep the format, the simplified DOCX is drawn by docx-preview.
+      const { blob, notice, extension } = await buildOwnFormatExport(client, source);
+      return extension === "docx"
+        ? { blob, kind: "docx", notice }
+        : { blob, kind: "office", notice, format: extension };
+    }
+    const format: ExportFormat = resultPreviewKind === "docx" ? "docx" : "pdf";
+    const { blob, notice } = await buildAnonymizedExport(client, source, format, EXPORT_PLATFORM);
+    return { blob, kind: format, notice };
+  }, [
+    anonymization.anonymizedText,
+    anonymization.offsetMap,
+    document,
+    resolveEndpoint,
+    resultPreviewKind,
+    uiState.selectedFile,
+  ]);
+  const originalKind = originalPreviewKind(uiState.selectedFile, document?.format);
+  const documentPreview =
+    resultPreviewKind && anonymization.anonymizedText ? (
+      <DocumentPreviewPair
+        original={
+          uiState.selectedFile && originalKind
+            ? { file: uiState.selectedFile, kind: originalKind, format: document?.format }
+            : null
+        }
+        loadAnonymized={loadAnonymizedPreview}
+        version={anonymization.anonymizedText}
+        shownNotice={exportNotice}
+      />
+    ) : undefined;
+
+  // Report for the case file: what was anonymized and how, without any value from the text.
+  const saveReport = useCallback(async () => {
+    if (!anonymization.anonymizedText || !anonymization.replacementMap || !document) {
+      return;
+    }
+    try {
+      const endpoint = await resolveEndpoint();
+      if (!endpoint) {
+        setAnonymizationError(texts.errors.noEngine);
+        return;
+      }
+      const extension = document.format === "pdf" ? "pdf" : document.format;
+      const request = buildReportRequest({
+        documentName: poufnikFileName(
+          uiState.selectedFileName ?? document.filename,
+          extension,
+          "result",
+          anonymization.replacementMap,
+        ),
+        documentFormat: document.format,
+        pageCount: document.page_count,
+        sourceSha256: uiState.selectedFile ? await sha256Hex(uiState.selectedFile) : null,
+        appVersion,
+        offsetMap: anonymization.offsetMap,
+        entities,
+        excludedCategories,
+        notices: (document.notices ?? [])
+          .map((code) => texts.generation.notices[code])
+          .filter((notice): notice is string => Boolean(notice)),
+        mode: anonymization.offsetMap.some((entry) => entry.label)
+          ? texts.replacementMode.reportMode
+          : undefined,
+      });
+      const blob = await createAnonymizerApiClient(endpoint).buildReport(request);
+      const stem = request.document_name.replace(/\.[^.]+$/, "");
+      const saved = await saveBinaryFile(`${stem}_raport.pdf`, blob, "pdf");
+      if (saved) {
+        setExportNotice(texts.generation.reportSaved(saved));
+      }
+    } catch (error) {
+      setAnonymizationError(toUserMessage(error));
+    }
+  }, [
+    anonymization.anonymizedText,
+    anonymization.offsetMap,
+    anonymization.replacementMap,
+    appVersion,
+    document,
+    entities,
+    excludedCategories,
+    resolveEndpoint,
+    setAnonymizationError,
+    uiState.selectedFile,
+    uiState.selectedFileName,
+  ]);
+
+  // Spreadsheets, presentations, OpenDocument files and pictures, saved in their own format.
+  const exportOwnFormat = useCallback(async () => {
+    if (!anonymization.anonymizedText) {
+      return;
+    }
+    try {
+      const endpoint = await resolveEndpoint();
+      if (!endpoint) {
+        setAnonymizationError(texts.errors.noEngine);
+        return;
+      }
+      setExportNotice(null);
+      const { blob, notice, extension } = await buildOwnFormatExport(
+        createAnonymizerApiClient(endpoint),
+        {
+          document,
+          sourceFile: uiState.selectedFile,
+          anonymizedText: anonymization.anonymizedText,
+          offsetMap: anonymization.offsetMap,
+        },
+      );
+      if (notice) {
+        setExportNotice(notice);
+      }
+      await saveBinaryFile(
+        poufnikFileName(uiState.selectedFileName, extension, "result", anonymization.replacementMap),
+        blob,
+        extension,
+      );
+    } catch (error) {
+      setAnonymizationError(toUserMessage(error));
+    }
+  }, [
+    anonymization.anonymizedText,
+    anonymization.offsetMap,
+    anonymization.replacementMap,
+    document,
+    resolveEndpoint,
+    setAnonymizationError,
+    uiState.selectedFile,
+    uiState.selectedFileName,
+  ]);
 
   const loadPrompts = useCallback(async () => {
     const endpoint = await resolveEndpoint();
@@ -1027,7 +1378,14 @@ function App() {
     try {
       const client = createAnonymizerApiClient(endpoint);
       const result = await client.deanonymize(deanonymization.input, replacementMap);
-      setDeanonymizationResult(result.original_text, result.warnings ?? []);
+      // The engine's own (English) warnings become one plain-Polish note.
+      const warning = restoreWarningMessage(
+        deanonymization.input,
+        replacementMap,
+        result.warnings ?? [],
+        "text",
+      );
+      setDeanonymizationResult(result.original_text, warning ? [warning] : []);
     } catch (error) {
       setDeanonymizationError(toUserMessage(error));
     }
@@ -1040,17 +1398,311 @@ function App() {
     setDeanonymizationResult,
   ]);
 
+  // "Przywróć dane w pliku": a DOCX/PDF/TXT/MD file that came back from an AI chat gets the
+  // original data back in its own format. The map is picked automatically (mapLinking.ts):
+  // the one loaded by the user, then maps linked by file name, then by tokens; when several
+  // fit with different data the user chooses.
+  const [fileRestore, setFileRestore] = useState<FileRestoreState>(IDLE_FILE_RESTORE);
+  const pendingFileRestore = useRef<{ file: File; text: string; endpoint: EngineEndpoint } | null>(
+    null,
+  );
+
+  const finishFileRestore = useCallback(async (candidate: MapCandidate) => {
+    const pending = pendingFileRestore.current;
+    pendingFileRestore.current = null;
+    if (!pending) {
+      return;
+    }
+    setFileRestore({ status: "loading", message: null, choices: [] });
+    try {
+      const { file, text, endpoint } = pending;
+      const { contents, notice } = await restoreFileContents(createAnonymizerApiClient(endpoint), {
+        name: file.name,
+        file,
+        text,
+        map: candidate.map,
+      });
+      const blob =
+        typeof contents === "string"
+          ? new Blob([contents], { type: "text/plain;charset=utf-8" })
+          : contents;
+      const extension = file.name.split(".").pop()?.toLowerCase() ?? "txt";
+      const saved = await saveBinaryFile(restoredFileName(file.name), blob, extension);
+      setFileRestore({
+        status: saved ? "done" : "idle",
+        message: saved
+          ? [texts.deanonymization.fileSaved(saved), notice].filter(Boolean).join(" ")
+          : texts.deanonymization.fileCancelled,
+        choices: [],
+      });
+    } catch (error) {
+      setFileRestore({ status: "error", message: toUserMessage(error), choices: [] });
+    }
+  }, []);
+
+  const restoreFileFromAi = useCallback(async () => {
+    let picked: { file: File; path: string | null } | null = null;
+    try {
+      picked = await pickRestorableFile();
+    } catch {
+      picked = await pickBrowserRestorableFile().catch(() => null);
+    }
+    if (!picked) {
+      return;
+    }
+    const { file, path } = picked;
+    const fail = (message: string) => setFileRestore({ status: "error", message, choices: [] });
+    if (!isRestorableFileName(file.name)) {
+      fail(texts.deanonymization.fileUnsupported);
+      return;
+    }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      fail(texts.errors.payloadTooLarge);
+      return;
+    }
+    const endpoint = await resolveEndpoint();
+    if (!endpoint) {
+      fail(texts.errors.noEngine);
+      return;
+    }
+    setFileRestore({ status: "loading", message: null, choices: [] });
+    try {
+      const text = await restorableText(createAnonymizerApiClient(endpoint), file);
+      const loaded = deanonymization.replacementMap;
+      const candidates: MapCandidate[] = [];
+      if (loaded) {
+        candidates.push({
+          map: loaded,
+          sourceName: deanonymization.mapSource === "session" ? uiState.selectedFileName : null,
+          outputName: null,
+          mapFileName: null,
+          savedAt: null,
+        });
+      }
+      candidates.push(...(await findReplacementMaps(path).catch(() => [] as MapCandidate[])));
+      // A map the user loaded on purpose is used whenever it knows the file's tokens.
+      const choice =
+        deanonymization.mapSource === "file" && loaded
+          ? chooseReplacementMap(file.name, text, candidates.slice(0, 1))
+          : chooseReplacementMap(file.name, text, candidates);
+      pendingFileRestore.current = { file, text, endpoint };
+      if (choice.kind === "found") {
+        await finishFileRestore(choice.candidate);
+      } else if (choice.kind === "ambiguous") {
+        setFileRestore({ status: "choose", message: null, choices: choice.candidates });
+      } else {
+        pendingFileRestore.current = null;
+        fail(texts.deanonymization.fileNoMap);
+      }
+    } catch (error) {
+      pendingFileRestore.current = null;
+      fail(toUserMessage(error));
+    }
+  }, [
+    deanonymization.mapSource,
+    deanonymization.replacementMap,
+    finishFileRestore,
+    resolveEndpoint,
+    uiState.selectedFileName,
+  ]);
+
+  const cancelFileRestoreChoice = useCallback(() => {
+    pendingFileRestore.current = null;
+    setFileRestore(IDLE_FILE_RESTORE);
+  }, []);
+
+  // An encrypted map waits here for its password (mapCrypto.ts).
+  const [lockedMap, setLockedMap] = useState<{ json: string; error: string | null } | null>(
+    null,
+  );
   const loadReplacementMap = useCallback(async () => {
     try {
       const json = await pickReplacementMapFile();
       if (!json) {
         return;
       }
-      setDeanonymizationMap(JSON.parse(json) as ReplacementMap, "file");
+      if (isEncryptedMap(json)) {
+        setLockedMap({ json, error: null });
+        return;
+      }
+      setLockedMap(null);
+      setDeanonymizationMap(parseReplacementMap(json), "file");
     } catch (error) {
       setDeanonymizationError(toUserMessage(error));
     }
   }, [setDeanonymizationError, setDeanonymizationMap]);
+
+  const unlockMap = useCallback(
+    async (password: string) => {
+      if (!lockedMap) {
+        return;
+      }
+      try {
+        setDeanonymizationMap(await decryptMap(lockedMap.json, password), "file");
+        setLockedMap(null);
+      } catch (error) {
+        setLockedMap({ json: lockedMap.json, error: toUserMessage(error) });
+      }
+    },
+    [lockedMap, setDeanonymizationMap],
+  );
+
+  // A case: the map of earlier documents is continued by this and every next document.
+  const applyCaseMap = useCallback(
+    async (map: ReplacementMap) => {
+      setCaseMap(map);
+      setLockedCaseMap(null);
+      if (!document || !anonymization.anonymizedText) {
+        return;
+      }
+      const endpoint = await resolveEndpoint();
+      if (!endpoint) {
+        setAnonymizationError(texts.errors.noEngine);
+        return;
+      }
+      try {
+        const result = await createAnonymizerApiClient(endpoint).anonymize(
+          document.text,
+          entities,
+          "pl",
+          map,
+        );
+        setAnonymizationResult(result.anonymized_text, result.replacement_map, result.offset_map ?? []);
+        setCaseMap(result.replacement_map);
+        rememberMapQuietly(result.replacement_map, uiState.selectedFileName);
+      } catch (error) {
+        setAnonymizationError(toUserMessage(error));
+      }
+    },
+    [
+      anonymization.anonymizedText,
+      document,
+      entities,
+      resolveEndpoint,
+      setAnonymizationError,
+      setAnonymizationResult,
+      uiState.selectedFileName,
+    ],
+  );
+
+  const loadCaseMap = useCallback(async () => {
+    try {
+      const json = await pickReplacementMapFile();
+      if (!json) {
+        return;
+      }
+      if (isEncryptedMap(json)) {
+        setLockedCaseMap({ json, error: null });
+        return;
+      }
+      await applyCaseMap(parseReplacementMap(json));
+    } catch (error) {
+      setAnonymizationError(toUserMessage(error));
+    }
+  }, [setAnonymizationError, applyCaseMap]);
+
+  const unlockCaseMap = useCallback(
+    async (password: string) => {
+      if (!lockedCaseMap) {
+        return;
+      }
+      try {
+        await applyCaseMap(await decryptMap(lockedCaseMap.json, password));
+      } catch (error) {
+        setLockedCaseMap({ json: lockedCaseMap.json, error: toUserMessage(error) });
+      }
+    },
+    [lockedCaseMap, applyCaseMap],
+  );
+
+  const caseControls = (
+    <div className="case-controls">
+      <h4>{texts.generation.caseTitle}</h4>
+      <p className="muted">
+        {caseMap ? texts.generation.caseActive(caseMap.entries.length) : texts.generation.caseLead}
+      </p>
+      <div className="toolbar">
+        {caseMap ? (
+          <button className="ghost-button ghost-button--compact" type="button" onClick={() => setCaseMap(null)}>
+            {texts.generation.caseEnd}
+          </button>
+        ) : (
+          <button
+            className="secondary-button secondary-button--compact"
+            type="button"
+            onClick={() => void loadCaseMap()}
+          >
+            {texts.generation.caseLoad}
+          </button>
+        )}
+      </div>
+      {lockedCaseMap ? (
+        <MapPasswordForm error={lockedCaseMap.error} onUnlock={(password) => void unlockCaseMap(password)} />
+      ) : null}
+    </div>
+  );
+
+  // Ctrl+Alt+Shift+P / R from any program: anonymize or restore the clipboard.
+  const runClipboardAction = useCallback(
+    async (action: "anonymize" | "restore") => {
+      try {
+        const endpoint = await waitForEngine();
+        const deps = {
+          client: createAnonymizerApiClient(endpoint),
+          readText: readClipboardText,
+          writeText: copyText,
+          excludedCategories,
+          customRules:
+            productTier === "early_bird" ? enabledCustomRulePayloads(customRules) : [],
+          rememberMap: rememberReplacementMap,
+          findMaps: () => findReplacementMaps(null),
+        };
+        const outcome =
+          action === "anonymize" ? await anonymizeClipboard(deps) : await restoreClipboard(deps);
+        const message = outcome.ok
+          ? action === "anonymize"
+            ? texts.hotkeys.anonymized(outcome.replaced)
+            : [texts.hotkeys.restored, outcome.warning].filter(Boolean).join(" ")
+          : {
+              empty: texts.hotkeys.empty,
+              nothing_found: texts.hotkeys.nothingFound,
+              no_map: texts.hotkeys.noMap,
+              ambiguous_map: texts.hotkeys.ambiguousMap,
+            }[outcome.reason];
+        await notify(texts.shellActions.title, message);
+      } catch (error) {
+        await notify(texts.shellActions.title, texts.hotkeys.failed(toUserMessage(error)));
+      }
+    },
+    [customRules, excludedCategories, productTier],
+  );
+
+  // The shortcuts are registered once; a key press runs the current settings through the ref.
+  const clipboardActionRef = useRef(runClipboardAction);
+  clipboardActionRef.current = runClipboardAction;
+  useEffect(() => {
+    if (!hotkeysEnabled) {
+      return;
+    }
+    return registerClipboardShortcuts({
+      onAnonymize: () => void clipboardActionRef.current("anonymize"),
+      onRestore: () => void clipboardActionRef.current("restore"),
+    });
+  }, [hotkeysEnabled]);
+
+  const fileRestorePanel = (
+    <FileRestorePanel
+      state={fileRestore}
+      disabled={uiState.engineStatus !== "ready"}
+      onChooseFile={() => void restoreFileFromAi()}
+      onChooseMap={(candidate) => void finishFileRestore(candidate)}
+      onCancelChoice={cancelFileRestoreChoice}
+      onLoadMap={() => void loadReplacementMap()}
+      mapLoaded={deanonymization.mapSource === "file"}
+      lockedMap={lockedMap ? { error: lockedMap.error } : null}
+      onUnlockMap={(password) => void unlockMap(password)}
+    />
+  );
 
   const copyDeanonymizedResult = useCallback(async () => {
     if (deanonymization.result) {
@@ -1100,6 +1752,7 @@ function App() {
   );
 
   const logout = useCallback(async () => {
+    setCaseMap(null); // the next person at this computer does not continue someone's case
     await clearStoredAuthToken();
     saveStoredBasicChoice(true);
     setAuthError(null);
@@ -1432,6 +2085,13 @@ function App() {
                 <button
                   className="app-sidebar__account-link"
                   type="button"
+                  onClick={() => setScreen("settings")}
+                >
+                  {texts.sidebar.login}
+                </button>
+                <button
+                  className="app-sidebar__account-link"
+                  type="button"
                   onClick={openRegistration}
                 >
                   {texts.sidebar.register}
@@ -1448,6 +2108,15 @@ function App() {
             </div>
           ) : null}
 
+          {caseMap ? (
+            <div className="case-banner" role="status">
+              <span>{texts.generation.caseBanner(caseMap.entries.length)}</span>
+              <button className="ghost-button ghost-button--compact" type="button" onClick={() => setCaseMap(null)}>
+                {texts.generation.caseEnd}
+              </button>
+            </div>
+          ) : null}
+
           <div className="app-main__scroll">
             {screen === "flow" ? (
               uiState.engineStatus === "failed" ? (
@@ -1460,6 +2129,10 @@ function App() {
                   anonymization={anonymization}
                   prompts={prompts}
                   deanonymization={deanonymization}
+                  fileRestore={fileRestorePanel}
+                  documentPreview={documentPreview}
+                  caseControls={caseControls}
+                  onSaveReport={() => void saveReport()}
                   processingStatus={uiState.processingStatus}
                   processingError={uiState.processingError}
                   view={workspaceView}
@@ -1470,6 +2143,8 @@ function App() {
                   onCopyDocument={copyAnonymizedDocument}
                   onSaveMap={saveReplacementMap}
                   onExport={exportDocument}
+                  ownFormat={ownExportFormat(document)}
+                  onExportOwnFormat={() => void exportOwnFormat()}
                   exportNotice={exportNotice}
                   documentNotices={document?.notices ?? []}
                   onLoadPrompts={loadPrompts}
@@ -1493,6 +2168,7 @@ function App() {
                   fileName={uiState.selectedFileName}
                   onChooseFile={chooseFile}
                   onDropFile={processFile}
+                  fileRestore={fileRestorePanel}
                 />
               )
             ) : null}
@@ -1618,6 +2294,8 @@ function App() {
                     onRun={runBatch}
                     onExport={exportBatch}
                     onClear={clearBatch}
+                    sharedCase={batchSharedCase}
+                    onSharedCaseChange={setBatchSharedCase}
                   />
                 </TierGate>
               </section>
@@ -1630,11 +2308,73 @@ function App() {
                   authState={authState}
                   error={authError}
                   loading={authActionLoading}
+                  browserLoginLoading={browserLoginLoading}
                   onLogin={login}
+                  onLoginBrowser={() => void loginWithBrowser("login")}
                   onRegister={openRegistration}
                   onLogout={() => void logout()}
                   onDeleteAccount={openAccountDeletion}
                 />
+                <ReplacementModeSettings
+                  mode={replacementMode}
+                  onChange={(mode) => {
+                    saveReplacementMode(mode);
+                    setReplacementMode(mode);
+                  }}
+                  profile={profile}
+                  onProfileChange={(next) => {
+                    saveProfile(next);
+                    setProfile(next);
+                  }}
+                />
+                <section className="settings-section">
+                  <h3>{texts.hotkeys.heading}</h3>
+                  <label className="checkbox-row">
+                    <input
+                      type="checkbox"
+                      checked={hotkeysEnabled}
+                      onChange={(event) => {
+                        saveHotkeysEnabled(event.target.checked);
+                        setHotkeysEnabled(event.target.checked);
+                      }}
+                    />
+                    <span>
+                      <strong>{texts.hotkeys.enabled}</strong>
+                      <span className="checkbox-row__note">{texts.hotkeys.note}</span>
+                    </span>
+                  </label>
+                </section>
+                <section className="settings-section">
+                  <h3>{texts.rememberedMaps.heading}</h3>
+                  <label className="checkbox-row">
+                    <input
+                      type="checkbox"
+                      checked={rememberMaps}
+                      onChange={(event) => {
+                        saveRememberMaps(event.target.checked);
+                        setRememberMaps(event.target.checked);
+                      }}
+                    />
+                    <span>
+                      <strong>{texts.rememberedMaps.enabled}</strong>
+                      <span className="checkbox-row__note">{texts.rememberedMaps.note}</span>
+                    </span>
+                  </label>
+                  <div className="toolbar">
+                    <button
+                      className="secondary-button"
+                      type="button"
+                      onClick={() => void deleteAllRememberedMaps()}
+                    >
+                      {texts.rememberedMaps.deleteButton}
+                    </button>
+                  </div>
+                  {rememberedMapsNote ? (
+                    <p className="status-note" role="status">
+                      {rememberedMapsNote}
+                    </p>
+                  ) : null}
+                </section>
                 <ExcludedCategoriesSettings
                   excluded={excludedCategories}
                   onChange={updateExcludedCategories}
@@ -1819,6 +2559,48 @@ function App() {
       ) : null}
     </div>
   );
+}
+
+/**
+ * Remembers the map of a document anonymized in the window, so "Przywróć dane w pliku" and the
+ * context menu find it later. Never interrupts anonymization (e.g. outside the desktop app).
+ */
+function rememberMapQuietly(map: ReplacementMap, sourceName: string | null): void {
+  const outputName = sourceName
+    ? poufnikFileName(sourceName, sourceName.split(".").pop() ?? "pdf", "result", map)
+    : null;
+  void rememberReplacementMap(map, { sourceName, outputName }).catch(() => undefined);
+}
+
+function shellOutcomeMessage(
+  action: string,
+  name: string,
+  outcome: ShellActionOutcome,
+): string {
+  if (!outcome.ok) {
+    if (outcome.reason === "no_map") {
+      return texts.shellActions.noMap;
+    }
+    if (outcome.reason === "ambiguous_map") {
+      return texts.shellActions.ambiguousMap;
+    }
+    if (outcome.reason === "unsupported") {
+      return texts.shellActions.unsupported;
+    }
+    return texts.shellActions.failed(name, outcome.message ?? texts.errors.generic);
+  }
+  const output = filenameOf(outcome.outputPath);
+  const message =
+    action === "ocr"
+      ? texts.shellActions.ocr(output)
+      : action === "markdown"
+        ? texts.shellActions.markdown(output)
+        : action === "restore"
+          ? texts.shellActions.restored(output)
+          : action === "metadata"
+            ? texts.shellActions.metadata(output)
+            : texts.shellActions.anonymized(output);
+  return outcome.notice ? `${message} ${outcome.notice}` : message;
 }
 
 function navItemClass(active: boolean, done: boolean): string {

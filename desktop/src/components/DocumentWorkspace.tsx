@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import type { ReactNode } from "react";
 
 import { acceptedEntityCount } from "../domain/entities";
 import { texts } from "../i18n";
@@ -42,8 +43,14 @@ interface DocumentWorkspaceProps {
   onNewDocument: () => void;
   onAnonymize: () => void;
   onCopyDocument: () => void;
-  onSaveMap: () => void;
+  onSaveMap: (password: string | null) => void;
   onExport: (format: ExportFormat) => void;
+  ownFormat?: string | null;
+  onExportOwnFormat?: () => void;
+  onSaveReport?: () => void;
+  fileRestore?: ReactNode;
+  documentPreview?: ReactNode;
+  caseControls?: ReactNode;
   exportNotice?: string | null;
   documentNotices?: string[];
   onLoadPrompts: () => void;
@@ -75,6 +82,12 @@ export function DocumentWorkspace({
   onCopyDocument,
   onSaveMap,
   onExport,
+  ownFormat,
+  onExportOwnFormat,
+  onSaveReport,
+  fileRestore,
+  documentPreview,
+  caseControls,
   exportNotice,
   documentNotices,
   onLoadPrompts,
@@ -208,6 +221,12 @@ export function DocumentWorkspace({
           onCopyDocument={onCopyDocument}
           onSaveMap={onSaveMap}
           onExport={onExport}
+          ownFormat={ownFormat}
+          onExportOwnFormat={onExportOwnFormat}
+          onSaveReport={onSaveReport}
+          fileRestore={fileRestore}
+          documentPreview={documentPreview}
+          caseControls={caseControls}
           exportNotice={exportNotice}
           documentNotices={documentNotices}
           onLoadPrompts={onLoadPrompts}

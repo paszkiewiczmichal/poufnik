@@ -154,7 +154,28 @@ describe("ResultView", () => {
     fireEvent.click(screen.getByRole("tab", { name: texts.generation.tabMap }));
     fireEvent.click(screen.getByRole("button", { name: texts.generation.saveMap }));
 
-    expect(handlers.onSaveMap).toHaveBeenCalledTimes(1);
+    expect(handlers.onSaveMap).toHaveBeenCalledWith(null);
+  });
+
+  it("saves the map encrypted only when both passwords match", () => {
+    const handlers = renderResult();
+    fireEvent.click(screen.getByRole("tab", { name: texts.generation.tabMap }));
+
+    fireEvent.change(screen.getByLabelText(texts.generation.mapPassword), {
+      target: { value: "Tajne-2026" },
+    });
+    fireEvent.change(screen.getByLabelText(texts.generation.mapPasswordRepeat), {
+      target: { value: "Tajne-2025" },
+    });
+    const save = screen.getByRole("button", { name: texts.generation.saveMapEncrypted });
+    expect(save).toBeDisabled();
+    expect(screen.getByText(texts.generation.mapPasswordMismatch)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(texts.generation.mapPasswordRepeat), {
+      target: { value: "Tajne-2026" },
+    });
+    fireEvent.click(save);
+    expect(handlers.onSaveMap).toHaveBeenCalledWith("Tajne-2026");
   });
 
   it("renders the restore panel on the restore tab", () => {

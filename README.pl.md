@@ -88,8 +88,9 @@ Lokalne przetwarzanie może wspierać realizację procesów RODO i AI Act, ale z
 | Katalog | Zawartość |
 | --- | --- |
 | `desktop/` | Aplikacja desktopowa Tauri 2, React i TypeScript |
-| `engine/` | Lokalny silnik anonimizacji w Pythonie uruchamiany jako sidecar |
-| `corpus/` | Mały, syntetyczny polski korpus ewaluacyjny używany przez testy |
+
+Silnik rozpoznawania danych nie jest częścią tego repozytorium. Instalatory zawierają go jako gotowy
+program, uruchamiany lokalnie obok aplikacji.
 
 ## Rozwój
 

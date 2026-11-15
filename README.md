@@ -88,8 +88,9 @@ Local processing can support RODO/GDPR and AI Act processes, but compliance depe
 | Directory | Contents |
 | --- | --- |
 | `desktop/` | Tauri 2, React and TypeScript desktop app |
-| `engine/` | Local Python anonymisation engine, bundled as a desktop sidecar |
-| `corpus/` | Small synthetic Polish evaluation corpus used by tests |
+
+The detection engine is not part of this repository. Installers include it as a ready-made program
+that runs locally next to the app.
 
 ## Development
 

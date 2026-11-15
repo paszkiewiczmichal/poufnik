@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createAnonymizerApiClient } from "./client";
-import type { DocumentProcessResponse, EngineEndpoint } from "../types";
+import type { DocumentProcessResponse, EngineEndpoint, ReplacementMap } from "../types";
 
 const endpoint: EngineEndpoint = {
   baseUrl: "http://127.0.0.1:8710",
@@ -171,6 +171,117 @@ describe("createAnonymizerApiClient", () => {
     expect((form.get("file") as File).name).toBe("umowa.docx");
     expect(JSON.parse(await (form.get("offset_map") as Blob).text())).toEqual(offsetMap);
     expect(await (form.get("anonymized_text") as Blob).text()).toBe("[OSOBA_1] zażółć");
+  });
+
+  it("sends the file and the replacement map to restore a DOCX in place", async () => {
+    const fetcher = vi.fn(async () => new Response(new Blob(["docx"])));
+    const client = createAnonymizerApiClient(endpoint, fetcher as unknown as typeof fetch);
+    const replacementMap = {
+      entries: [{ token: "[OSOBA_1]", category: "PERSON", canonical_text: "Jan Łęcki" }],
+      created_at: "2026-11-13T10:00:00Z",
+      document_fingerprint: "abc",
+    } as ReplacementMap;
+
+    await client.restoreDocxInPlace({
+      file: new File(["docx"], "pismo_poufnik.docx"),
+      replacementMap,
+    });
+
+    const [url, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("http://127.0.0.1:8710/v1/restore/docx");
+    expect(init.method).toBe("POST");
+    const form = init.body as FormData;
+    expect((form.get("file") as File).name).toBe("pismo_poufnik.docx");
+    expect(JSON.parse(await (form.get("replacement_map") as Blob).text())).toEqual(replacementMap);
+  });
+
+  it("hands over the restore warnings from the X-Poufnik-Warnings header", async () => {
+    const warnings = ["Unknown anonymization token [OŚWIATA_7] at offset 5."];
+    const fetcher = vi.fn(
+      async () =>
+        new Response("docx", {
+          headers: { "X-Poufnik-Warnings": encodeURIComponent(JSON.stringify(warnings)) },
+        }),
+    );
+    const client = createAnonymizerApiClient(endpoint, fetcher as unknown as typeof fetch);
+
+    const blob = await client.restoreDocxInPlace({
+      file: new File(["docx"], "pismo.docx"),
+      replacementMap: { entries: [] } as unknown as ReplacementMap,
+    });
+
+    expect(blob.warnings).toEqual(warnings);
+  });
+
+  it("tolerates a missing or garbled warnings header", async () => {
+    for (const header of [null, "%E0%A4%A", encodeURIComponent('{"a":1}'), "nie-json"]) {
+      const fetcher = vi.fn(
+        async () =>
+          new Response("docx", { headers: header === null ? {} : { "X-Poufnik-Warnings": header } }),
+      );
+      const client = createAnonymizerApiClient(endpoint, fetcher as unknown as typeof fetch);
+
+      const blob = await client.restoreDocxInPlace({
+        file: new File(["docx"], "pismo.docx"),
+        replacementMap: { entries: [] } as unknown as ReplacementMap,
+      });
+
+      expect(blob.warnings ?? []).toEqual([]);
+    }
+  });
+
+  it("asks for fictional data when it is chosen in Settings, and only then", async () => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({ anonymized_text: "" })));
+    const client = createAnonymizerApiClient(endpoint, fetcher as unknown as typeof fetch);
+
+    await client.anonymize("tekst", []);
+    window.localStorage.setItem("anonymizer.replacementMode.v1", "pseudonyms");
+    try {
+      await client.anonymize("tekst", []);
+      await client.processDocument(new File(["x"], "a.txt"), { forceOcr: false }).catch(() => null);
+    } finally {
+      window.localStorage.removeItem("anonymizer.replacementMode.v1");
+    }
+
+    const calls = fetcher.mock.calls as unknown as [string, RequestInit][];
+    expect(JSON.parse(calls[0][1].body as string).mode).toBeUndefined();
+    expect(JSON.parse(calls[1][1].body as string).mode).toBe("pseudonyms");
+    expect((calls[2][1].body as FormData).get("mode")).toBe("pseudonyms");
+  });
+
+  it("hands over what an in-place export did to pictures", async () => {
+    const fetcher = vi.fn(
+      async () =>
+        new Response("docx", { headers: { "X-Poufnik-Notices": "pictures_redacted" } }),
+    );
+    const client = createAnonymizerApiClient(endpoint, fetcher as unknown as typeof fetch);
+
+    const blob = await client.exportDocxInPlace({
+      file: new File(["docx"], "umowa.docx"),
+      offsetMap: [],
+      anonymizedText: "",
+    });
+
+    expect(blob.notices).toEqual(["pictures_redacted"]);
+  });
+
+  it("returns the cleaned file with the codes of removed metadata", async () => {
+    const fetcher = vi.fn(
+      async () =>
+        new Response("clean", {
+          headers: { "X-Poufnik-Removed": "exif,gps", "X-Poufnik-Notices": "" },
+        }),
+    );
+    const client = createAnonymizerApiClient(endpoint, fetcher as unknown as typeof fetch);
+
+    const result = await client.cleanMetadata(new File(["jpg"], "dowod.jpg"));
+
+    const [url, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("http://127.0.0.1:8710/v1/metadata/clean");
+    expect(((init.body as FormData).get("file") as File).name).toBe("dowod.jpg");
+    expect(result.removed).toEqual(["exif", "gps"]);
+    expect(result.notices).toEqual([]);
+    expect(await result.blob.text()).toBe("clean");
   });
 
   it("sends the OCR flag with an in-place PDF export", async () => {

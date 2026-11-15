@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { DragEvent } from "react";
+import type { DragEvent, ReactNode } from "react";
 
 import { texts } from "../i18n";
 import { ErrorIcon, FileIcon, LockIcon, UploadIcon } from "../ui/icons";
@@ -14,6 +14,8 @@ interface StartScreenProps {
   fileName: string | null;
   onChooseFile: () => void;
   onDropFile: (file: File) => void;
+  /** "Przywróć dane w pliku" for an answer that came back from an AI chat. */
+  fileRestore?: ReactNode;
 }
 
 export function StartScreen({
@@ -25,6 +27,7 @@ export function StartScreen({
   fileName,
   onChooseFile,
   onDropFile,
+  fileRestore,
 }: StartScreenProps) {
   const [dragActive, setDragActive] = useState(false);
   const disabled = engineStatus !== "ready" || processingStatus === "loading";
@@ -108,6 +111,8 @@ export function StartScreen({
         <LockIcon />
         <span>{texts.common.offlineFull}</span>
       </div>
+
+      {fileRestore}
 
       {engineStatus !== "ready" && (
         <p className="status-note">

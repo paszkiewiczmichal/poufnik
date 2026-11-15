@@ -17,6 +17,27 @@ function plural(count: number, one: string, few: string, many: string): string {
   return `${count} ${pluralWord(count, one, few, many)}`;
 }
 
+// What the engine reports as removed (X-Poufnik-Removed codes).
+const METADATA_LABELS: Record<string, string> = {
+  document_properties: "właściwości dokumentu (autor, daty, tytuł, firma)",
+  authors: "autorzy komentarzy i zmian",
+  revision_ids: "identyfikatory sesji edycji",
+  thumbnail: "miniatura strony",
+  custom_properties: "właściwości niestandardowe i SharePoint",
+  file_paths: "ścieżki plików i szablonów",
+  printer_settings: "ustawienia drukarki",
+  pdf_info: "informacje o dokumencie PDF",
+  pdf_xmp: "metadane XMP",
+  pdf_history: "wcześniejsze wersje zapisane w pliku",
+  exif: "dane EXIF (aparat, daty)",
+  gps: "lokalizacja GPS",
+  xmp: "metadane XMP",
+  iptc: "dane IPTC",
+  image_comments: "opisy i komentarze w obrazie",
+  trailing_data: "dane doklejone za obrazem",
+  stored_versions: "zapisane wersje dokumentu",
+};
+
 export const texts = {
   appTitle: "Poufnik",
   steps: {
@@ -39,6 +60,7 @@ export const texts = {
     accountBasicTitle: "Wersja Basic",
     accountBasicHint: "Historia i narzędzia seryjne są dostępne z darmowym kontem.",
     logout: "Wyloguj się.",
+    login: "Zaloguj się.",
     register: "Załóż darmowe konto.",
   },
   footer: {
@@ -53,7 +75,7 @@ export const texts = {
   },
   common: {
     offlineFull:
-      "Dokumenty przetwarzane w całości na Twoim komputerze. Poufnik nie wysyła ich do żadnego modelu językowego.",
+      "Dokumenty są przetwarzane w całości na Twoim komputerze. Poufnik nie wysyła ich do żadnego modelu językowego.",
     compliance:
       "Zaprojektowana pod zgodność z RODO i AI Act. Dane pozostają lokalnie, więc nie przekazujesz danych osobowych dostawcy AI.",
     connectivity:
@@ -122,7 +144,7 @@ export const texts = {
     loggingIn: "Logowanie...",
     password: "Hasło",
     emailPlaceholder: "imie@kancelaria.pl",
-    createAccount: "Załóż darmowe konto (Early Bird)",
+    createAccount: "Załóż darmowe konto",
     registerShort: "Załóż konto",
     noAccountPrompt: "Nie masz konta?",
     registerLink: "Załóż darmowe konto.",
@@ -235,7 +257,8 @@ export const texts = {
     subtitle: "Dokument zostanie odczytany i przeanalizowany na tym komputerze.",
     dropTitle: "Przeciągnij plik albo kliknij, aby wybrać.",
     dropActive: "Upuść dokument, aby rozpocząć.",
-    formats: "PDF, DOCX, TXT oraz skany i zdjęcia (PDF, JPG, PNG, HEIC). Do 50 MB.",
+    formats:
+      "PDF, Word, Excel, PowerPoint, OpenOffice (ODT, ODS, ODP), TXT oraz skany i zdjęcia (JPG, PNG, HEIC). Do 50 MB.",
     chooseFile: "Wybierz plik",
     ocrNote: "Skany i zdjęcia są rozpoznawane automatycznie, w całości lokalnie.",
     forceOcr: "Wymuś rozpoznawanie tekstu (OCR).",
@@ -265,9 +288,13 @@ export const texts = {
     progress: (done: number, total: number) => `${done} z ${total} plików gotowe`,
     entityCount: (count: number) => plural(count, "wykrycie", "wykrycia", "wykryć"),
     fileSize: (size: number) => `${Math.max(1, Math.round(size / 1024))} KB`,
+    noDetectionsYet: "—",
     columnFile: "Plik",
     columnStatus: "Stan",
     columnDetections: "Wykrycia",
+    sharedCase: "Jedna sprawa.",
+    sharedCaseNote:
+      "Ta sama osoba, firma czy adres dostaje to samo oznaczenie we wszystkich plikach, np. Jan Kowalski to [OSOBA_1] w każdym piśmie.",
     status: {
       queued: "Oczekuje",
       processing: "W toku",
@@ -288,6 +315,33 @@ export const texts = {
     loading: "Przetwarzam dokument...",
     pages: (count: number) => plural(count, "strona", "strony", "stron"),
   },
+  shellActions: {
+    title: "Poufnik",
+    anonymized: (name: string) => `Zanonimizowano. Zapisano: ${name}`,
+    ocr: (name: string) => `Tekst skopiowany do schowka i zapisany: ${name}`,
+    markdown: (name: string) => `Markdown skopiowany do schowka i zapisany: ${name}`,
+    restored: (name: string) => `Dane przywrócone. Zapisano: ${name}`,
+    metadata: (name: string) => `Usunięto metadane. Zapisano: ${name}`,
+    metadataRemoved: (codes: string[]) => {
+      const labels = [...new Set(codes.map((code) => METADATA_LABELS[code] ?? code))];
+      return labels.length > 0
+        ? `Usunięte: ${labels.join(", ")}.`
+        : "Plik nie zawierał metadanych do usunięcia.";
+    },
+    metadataSignature:
+      "Uwaga: plik miał podpis elektroniczny, który w kopii bez metadanych nie jest już ważny. Oryginał został bez zmian.",
+    metadataReencoded:
+      "Zdjęcie zapisano ponownie, bo ten format trzyma metadane w środku obrazu.",
+    restoredSimplified:
+      "Nie udało się zachować wyglądu oryginału, więc dokument zapisano w uproszczonym układzie.",
+    restoredPdfSimplified: "PDF zawiera sam tekst, bez układu stron oryginału.",
+    noMap:
+      "Nie znaleziono mapy zastąpień pasującej do tego pliku. Otwórz Poufnika i na ekranie startowym wybierz „Przywróć dane w pliku”, a potem wczytaj mapę.",
+    ambiguousMap:
+      "Do tego pliku pasuje kilka map zastąpień z różnymi danymi, więc Poufnik nie zgaduje. Otwórz Poufnika, wybierz „Przywróć dane w pliku” i wskaż właściwy dokument.",
+    unsupported: "Poufnik nie obsługuje tego typu pliku.",
+    failed: (name: string, message: string) => `Nie udało się przetworzyć ${name}: ${message}`,
+  },
   errors: {
     importTitle: "Nie udało się przygotować dokumentu.",
     chooseAnother: "Wybierz inny plik",
@@ -296,7 +350,12 @@ export const texts = {
     tesseractNotFound:
       "Nie znaleziono Tesseract OCR. Zainstaluj Tesseract 5 z pakietami języka polskiego i angielskiego albo ustaw ANONYMIZER_TESSERACT_PATH.",
     payloadTooLarge: "Plik jest za duży. Limit to 50 MB.",
-    unsupportedFile: "Nieobsługiwany format pliku. Użyj PDF, DOCX, TXT, JPG lub PNG.",
+    legacyNeedsOffice: (format: string) =>
+      `Plik ${format} Poufnik otwiera przez Microsoft Word albo LibreOffice, a żadnego z nich nie ma na tym komputerze. Zapisz plik jako DOCX i spróbuj ponownie.`,
+    legacyConversionFailed: (format: string, message: string) =>
+      `Nie udało się zamienić pliku ${format} na DOCX. ${message}`.trim(),
+    unsupportedFile:
+      "Nieobsługiwany format pliku. Użyj PDF, DOCX, DOC, RTF, XLSX, PPTX, ODT, ODS, ODP, TXT, JPG, PNG lub HEIC.",
     droppedMany: "Wybierz jeden dokument naraz.",
     noDocument: "Nie ma aktywnego dokumentu.",
     noReplacementMap: "Brak mapy zastąpień. Najpierw wykonaj anonimizację albo wczytaj mapę JSON.",
@@ -329,6 +388,16 @@ export const texts = {
     toReplace: "do zastąpienia",
     goToResult: "Przejdź do wyniku",
     showLabel: "Anonimizuj",
+  },
+  preview: {
+    before: "Przed",
+    after: "Po - tak wygląda zapisany plik",
+    loading: "Rysuję strony...",
+    building: "Przygotowuję zanonimizowany plik...",
+    failed: "Nie udało się pokazać tego pliku. Zapisany plik nadal wygląda jak oryginał.",
+    morePages: (count: number) => `Pozostałe strony (${count}) są w zapisanym pliku.`,
+    converting: "Przygotowuję podgląd w programie biurowym...",
+    needsOffice: "Podgląd wymaga Microsoft Office albo LibreOffice.",
   },
   compare: {
     title: "Porównanie oryginału i wyniku.",
@@ -389,6 +458,10 @@ export const texts = {
     subtitle: "Po anonimizacji - bezpieczny do wysłania.",
     replacementBadge: (replacements: number, places: number) =>
       `${pluralWord(replacements, "zastąpienie", "zastąpienia", "zastąpień")} w ${plural(places, "miejscu", "miejscach", "miejscach")}`,
+    tabDocument: "Dokument",
+    report: "Raport do akt (PDF)",
+    reportSaved: (name: string) => `Zapisano raport: ${name}.`,
+    documentHeader: "Dokument przed i po anonimizacji",
     tabText: "Zanonimizowany tekst",
     tabMap: "Mapa zastąpień",
     tabRestore: "Przywróć dane z odpowiedzi",
@@ -402,8 +475,24 @@ export const texts = {
     original: "Oryginał",
     copyDocument: "Kopiuj dokument",
     saveMap: "Zapisz mapę zastąpień",
+    saveMapEncrypted: "Zapisz mapę zaszyfrowaną",
+    caseTitle: "Sprawa z kilkoma dokumentami",
+    caseLead:
+      "Wczytaj mapę zapisaną przy poprzednim piśmie tej sprawy: ta sama osoba dostanie to samo oznaczenie, a nowe dane kolejne numery.",
+    caseLoad: "Użyj mapy sprawy",
+    caseActive: (count: number) =>
+      `Sprawa aktywna: ${count} oznaczeń. Kolejne dokumenty dostaną spójne oznaczenia; zapisz mapę, żeby kontynuować później.`,
+    caseEnd: "Zakończ sprawę",
+    caseBanner: (count: number) =>
+      `Trwa sprawa (${count} oznaczeń): kolejne dokumenty dostają oznaczenia z jej mapy. Inny klient? Najpierw zakończ sprawę.`,
+    mapPassword: "Hasło do mapy (opcjonalnie)",
+    mapPasswordRepeat: "Powtórz hasło",
+    mapPasswordMismatch: "Hasła się różnią.",
+    mapPasswordNote:
+      "Z hasłem mapa zapisze się zaszyfrowana (AES-256). Bez hasła nikt jej nie odczyta - Poufnik go nie zna i nie odzyska.",
     exportDocx: "Eksportuj DOCX",
     exportPdf: "Eksportuj PDF",
+    exportOwnFormat: (format: string) => `Eksportuj ${format.toUpperCase()}`,
     exportSimplifiedLayout:
       "Oryginalny plik nie jest dostępny (dokument otwarty z historii), więc DOCX zapisano w uproszczonym układzie. Aby zachować wygląd oryginału, zaimportuj plik ponownie.",
     exportDocxFromPdf:
@@ -417,7 +506,16 @@ export const texts = {
     exportPdfSandboxed:
       "Ta wersja Poufnika nie tworzy PDF przez Microsoft Word, więc PDF ma uproszczony układ. Aby uzyskać PDF wyglądający jak oryginał, wyeksportuj DOCX i w Wordzie wybierz Zapisz jako PDF.",
     noticesTitle: "Co Poufnik zmienił w pliku",
+    pictureNotices: {
+      pictures_redacted: "Dane osobowe widoczne na obrazach w dokumencie zostały zamalowane.",
+      pictures_replaced:
+        "Obraz, na którym nie dało się bezpiecznie zamalować danych, zastąpiono szarym polem.",
+      pictures_not_checked:
+        "Dokument ma obrazy w formacie, którego Poufnik nie odczytuje (np. EMF, SVG) - sprawdź je przed wysłaniem.",
+    } as Record<string, string>,
     notices: {
+      converted_to_docx:
+        "Plik w starym formacie (DOC lub RTF) został zamieniony na DOCX; wynik zapiszesz jako DOCX.",
       tracked_changes_accepted:
         "Śledzone zmiany zostały zaakceptowane - wynik zawiera ostateczną wersję tekstu.",
       comments_removed: "Komentarze zostały usunięte.",
@@ -439,6 +537,12 @@ export const texts = {
         "Tego PDF nie da się zanonimizować z zachowaniem wyglądu - eksport PDF będzie miał uproszczony układ.",
       images_or_objects_present:
         "Dokument zawiera obrazy lub osadzone obiekty. W eksporcie PDF dane zanonimizowane w tekście są zamalowywane także na obrazach (np. na zrzutach ekranu), ale obraz może pokazywać inne dane - sprawdź obrazy przed wysłaniem.",
+      sheet_names_replaced: "Nazwy arkuszy zawierające dane zastąpiono oznaczeniami.",
+      external_links_removed: "Usunięto powiązania z innymi plikami i ich zapamiętane wartości.",
+      connections_removed: "Usunięto połączenia z zewnętrznymi źródłami danych.",
+      pivot_cache_cleared:
+        "Usunięto zapamiętane dane tabel przestawnych - odświeżą się po otwarciu pliku.",
+      heic_exported_as_jpeg: "Zdjęcia HEIC nie dało się zapisać w tym formacie, zapisano je jako JPG.",
     } as Record<string, string>,
     mapWarning: "Zapisany plik mapy pozwala przywrócić dane. Traktuj go jak dane wrażliwe.",
     mapWarningTitle: "Zapis mapy zastąpień",
@@ -460,11 +564,94 @@ export const texts = {
     useCurrentMap: "Używana jest mapa z bieżącej sesji.",
     useLoadedMap: "Używana jest mapa wczytana z pliku.",
     loadMap: "Wczytaj mapę JSON",
+    loadMapShort: "Wczytaj mapę",
+    mapLoaded: "Wczytana mapa zostanie użyta jako pierwsza.",
+    mapEncrypted: "Ta mapa jest zaszyfrowana. Podaj hasło:",
+    mapUnlock: "Odszyfruj",
+    mapPasswordField: "Hasło do mapy",
     restore: "Przywróć dane",
     restoring: "Przywracam...",
     result: "Tekst z przywróconymi danymi",
     warnings: "Ostrzeżenia",
     copyResult: "Kopiuj wynik",
+    fileTitle: "Masz plik z odpowiedzią AI?",
+    fileLead:
+      "Wskaż plik DOCX, PDF, TXT lub MD. Poufnik sam dobierze mapę zastąpień po nazwie pliku i oznaczeniach w treści, a wynik zapisze w tym samym formacie.",
+    fileButton: "Przywróć dane w pliku",
+    fileWorking: "Przywracam dane w pliku...",
+    fileSaved: (name: string) => `Zapisano: ${name}.`,
+    fileCancelled: "Nie zapisano pliku.",
+    fileUnsupported: "Przywracać można pliki DOCX, PDF, TXT i MD.",
+    fileNoMap:
+      "Nie znaleziono mapy zastąpień pasującej do tego pliku. Wczytaj mapę JSON zapisaną przy anonimizacji.",
+    fileChoose:
+      "Do tego pliku pasuje kilka map z różnymi danymi. Wybierz dokument, z którego pochodzi odpowiedź:",
+    fileChoiceLabel: (source: string | null, savedAt: number | null) =>
+      `${source ?? "Mapa bez nazwy dokumentu"}${
+        savedAt ? `, ${new Date(savedAt).toLocaleString("pl-PL", { dateStyle: "short", timeStyle: "short" })}` : ""
+      }`,
+    fileCancelChoice: "Anuluj",
+  },
+  restoreWarnings: {
+    unknownTokens: (tokens: string[], subject: "file" | "text") => {
+      const count = tokens.length;
+      const lastDigit = count % 10;
+      const teens = count % 100 >= 12 && count % 100 <= 14;
+      const where = subject === "file" ? "pliku" : "tekście";
+      const phrase =
+        count === 1
+          ? "zostało 1 oznaczenie, którego nie ma"
+          : lastDigit >= 2 && lastDigit <= 4 && !teens
+            ? `zostały ${count} oznaczenia, których nie ma`
+            : `zostało ${count} oznaczeń, których nie ma`;
+      const shown = tokens.slice(0, 10).join(", ");
+      const more = count > 10 ? ` i ${count - 10} kolejnych` : "";
+      return `W ${where} ${phrase} w mapie: ${shown}${more}. Sprawdź je ręcznie.`;
+    },
+  },
+  hotkeys: {
+    heading: "Skróty klawiszowe",
+    enabled: "Anonimizacja i przywracanie przez schowek z dowolnego programu",
+    note:
+      "Skopiuj tekst (Ctrl+C), naciśnij Ctrl+Alt+Shift+P, a w schowku będzie wersja zanonimizowana do wklejenia w AI. Odpowiedź z AI skopiuj i naciśnij Ctrl+Alt+Shift+R: wróci z prawdziwymi danymi. Na Macu zamiast Ctrl jest Cmd. Poufnik musi być uruchomiony.",
+    anonymized: (count: number) =>
+      `Zanonimizowano ${count} ${count === 1 ? "fragment" : "fragmentów"}. Wklej tekst ze schowka.`,
+    restored: "Przywrócono dane. Wklej tekst ze schowka.",
+    empty: "Schowek jest pusty. Najpierw skopiuj tekst (Ctrl+C).",
+    nothingFound: "W skopiowanym tekście nie ma danych do anonimizacji; schowek bez zmian.",
+    noMap: "Nie znaleziono mapy pasującej do tekstu w schowku; schowek bez zmian.",
+    ambiguousMap:
+      "Do tego tekstu pasuje kilka map z różnymi danymi. Przywróć go w oknie Poufnika: Przywróć dane.",
+    failed: (message: string) => `Nie udało się: ${message}`,
+  },
+  rememberedMaps: {
+    heading: "Zapamiętane mapy do przywracania",
+    enabled: "Zapamiętuj mapy do przywracania",
+    note:
+      "Dzięki temu „Przywróć dane” samo znajdzie mapę dokumentu. Mapy są zaszyfrowane na tym komputerze i kasowane po 30 dniach. Mapy zapisane przez Ciebie do pliku zostają bez zmian.",
+    deleteButton: "Usuń zapamiętane mapy",
+    deleteConfirm:
+      "Usunąć wszystkie zapamiętane mapy? Dokumentów zanonimizowanych wcześniej nie da się już przywrócić automatycznie (mapy zapisane przez Ciebie do pliku zostaną).",
+    deleted: (count: number) =>
+      count === 0
+        ? "Nie było zapamiętanych map."
+        : `Usunięto zapamiętane mapy: ${count}.`,
+    deleteFailed: "Nie udało się usunąć zapamiętanych map.",
+  },
+  replacementMode: {
+    heading: "Sposób zastąpienia danych",
+    tokens: "Oznaczenia, np. [OSOBA_1], [PESEL_1]",
+    tokensNote: "Od razu widać, co zostało ukryte. Zalecane do akt i do korekty.",
+    pseudonyms: "Dane fikcyjne, np. „Adam Nowicki”, fikcyjny PESEL",
+    pseudonymsNote:
+      "Osoby, firmy i numery dostają wymyślone wartości w tej samej formie odmiany, więc tekst czyta się naturalnie. Adresy, daty i kwoty zostają oznaczeniami. Przywracanie działa tak samo, ale tylko z mapą tego dokumentu.",
+    reportMode: "dane fikcyjne (osoby, firmy, numery); pozostałe kategorie: oznaczenia",
+    profileHeading: "Rodzaj dokumentu",
+    profileStandard: "Zwykły dokument",
+    profileStandardNote: "Anonimizowane są wszystkie wykryte dane.",
+    profileJudgment: "Orzeczenie do publikacji (BIP, portal orzeczeń)",
+    profileJudgmentNote:
+      "Sąd, sędziowie, protokolant, prokurator, sygnatury i daty zostają; strony, świadkowie, pełnomocnicy i daty urodzenia są anonimizowane. W przeglądzie możesz to zmienić dla każdego wykrycia.",
   },
   excludedCategories: {
     heading: "Kategorie do anonimizacji",
@@ -496,6 +683,9 @@ export const texts = {
     IP_ADDRESS: "Adres IP",
     MAC_ADDRESS: "Adres MAC",
     API_KEY: "Klucz API",
+    DRIVING_LICENSE: "Prawo jazdy",
+    LAND_PARCEL: "Działka",
+    KSEF: "Numer KSeF",
     DATE: "Data",
     BANK_ACCOUNT: "Rachunek bankowy",
     PAYMENT_CARD: "Karta płatnicza",

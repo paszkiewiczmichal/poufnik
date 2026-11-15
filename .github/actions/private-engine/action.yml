@@ -1,0 +1,41 @@
+name: Private engine source
+description: >-
+  Puts the detection engine and its test corpora next to the app before a test or a build.
+  The engine is not published in this repository; it is checked out from the private
+  repository at the same tag, with a read-only deploy key.
+inputs:
+  deploy-key:
+    description: Private SSH key of the read-only deploy key of the private repository.
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Check the deploy key
+      shell: bash
+      env:
+        DEPLOY_KEY: ${{ inputs.deploy-key }}
+      run: |
+        if [ -z "$DEPLOY_KEY" ]; then
+          echo "::error::Secret POUFNIK_ENGINE_DEPLOY_KEY is missing: the engine cannot be fetched."
+          exit 1
+        fi
+
+    - name: Check out the engine (private repository, same tag)
+      uses: actions/checkout@v4
+      with:
+        repository: paszkiewiczmichal/poufnik_mcp
+        ref: ${{ github.ref_name }}
+        ssh-key: ${{ inputs.deploy-key }}
+        persist-credentials: false
+        path: .private-engine
+        sparse-checkout: |
+          engine
+          corpus
+
+    - name: Put it in place
+      shell: bash
+      run: |
+        rm -rf engine corpus
+        mv .private-engine/engine engine
+        mv .private-engine/corpus corpus
+        rm -rf .private-engine

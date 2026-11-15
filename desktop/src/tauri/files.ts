@@ -4,11 +4,35 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 
 import { batchExportFiles, type BatchExportInput } from "../domain/batchExport";
+import { RESTORABLE_FILE_EXTENSIONS } from "../domain/shellActions";
 
-const ACCEPTED_EXTENSIONS = ["pdf", "docx", "txt", "png", "jpg", "jpeg", "heic", "heif"] as const;
+const ACCEPTED_EXTENSIONS = [
+  "pdf",
+  "docx",
+  "doc",
+  "rtf",
+  "xlsx",
+  "pptx",
+  "odt",
+  "ods",
+  "odp",
+  "txt",
+  "png",
+  "jpg",
+  "jpeg",
+  "heic",
+  "heif",
+] as const;
 const MIME_BY_EXTENSION: Record<string, string> = {
   pdf: "application/pdf",
   docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  doc: "application/msword",
+  rtf: "application/rtf",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  odt: "application/vnd.oasis.opendocument.text",
+  ods: "application/vnd.oasis.opendocument.spreadsheet",
+  odp: "application/vnd.oasis.opendocument.presentation",
   txt: "text/plain",
   png: "image/png",
   jpg: "image/jpeg",
@@ -102,19 +126,22 @@ export async function saveJsonFile(defaultPath: string, contents: string): Promi
   }
 }
 
+/** Asks where to save and writes the file; the chosen name, or null when the user cancelled. */
 export async function saveBinaryFile(
   defaultPath: string,
   blob: Blob,
-  extension: "docx" | "pdf",
-): Promise<void> {
+  extension: string,
+): Promise<string | null> {
   const path = await save({
     title: "Zapisz dokument",
     defaultPath,
     filters: [{ name: extension.toUpperCase(), extensions: [extension] }],
   });
-  if (path) {
-    await writeFile(path, new Uint8Array(await blob.arrayBuffer()));
+  if (!path) {
+    return null;
   }
+  await writeFile(path, new Uint8Array(await blob.arrayBuffer()));
+  return filenameFromPath(path);
 }
 
 export async function exportBatchResultsToDirectory(
@@ -134,6 +161,33 @@ export async function confirmSensitiveAction(message: string, title: string): Pr
   } catch {
     return window.confirm(message);
   }
+}
+
+/** A file that came back from an AI chat, to restore; the path finds map files next to it. */
+export async function pickRestorableFile(): Promise<{ file: File; path: string | null } | null> {
+  const selected = await open({
+    multiple: false,
+    directory: false,
+    title: "Wybierz plik z odpowiedzią AI",
+    filters: [{ name: "Dokumenty", extensions: [...RESTORABLE_FILE_EXTENSIONS] }],
+  });
+  if (!selected || Array.isArray(selected)) {
+    return null;
+  }
+  return { file: await fileFromPath(selected), path: selected };
+}
+
+export function pickBrowserRestorableFile(): Promise<{ file: File; path: null } | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = RESTORABLE_FILE_EXTENSIONS.map((extension) => `.${extension}`).join(",");
+    input.onchange = () => {
+      const file = input.files?.item(0);
+      resolve(file ? { file, path: null } : null);
+    };
+    input.click();
+  });
 }
 
 export function pickBrowserDocumentFile(): Promise<File | null> {

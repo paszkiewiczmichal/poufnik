@@ -5,6 +5,8 @@
   xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
   xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
   xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  xmlns:desktop4="http://schemas.microsoft.com/appx/manifest/desktop/windows10/4"
+  xmlns:desktop5="http://schemas.microsoft.com/appx/manifest/desktop/windows10/5"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities">
 
   <Identity
@@ -42,7 +44,81 @@
         <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
       </uap:VisualElements>
 
-{{EXTENSIONS}}
+      <!-- Written here instead of bundle.config.json "extensions": the bundler's own
+           context-menu template has no CLSID. Explorer context menu (Windows 11 top level):
+           desktop/shell-menu builds poufnik_shell_menu.dll, an IExplorerCommand handler that
+           starts Poufnik.exe with the poufnik-action flag. Which item shows for which file type is
+           decided in the DLL. The CLSID must match CLSID_POUFNIK_MENU in shell-menu/src/com.rs. -->
+      <Extensions>
+        <desktop4:Extension Category="windows.fileExplorerContextMenus">
+          <desktop4:FileExplorerContextMenus>
+            <desktop5:ItemType Type=".pdf">
+              <desktop5:Verb Id="Poufnik" Clsid="a2ba5662-b3cb-43d1-aa89-84265f213e7c" />
+            </desktop5:ItemType>
+            <desktop5:ItemType Type=".docx">
+              <desktop5:Verb Id="Poufnik" Clsid="a2ba5662-b3cb-43d1-aa89-84265f213e7c" />
+            </desktop5:ItemType>
+            <desktop5:ItemType Type=".doc">
+              <desktop5:Verb Id="Poufnik" Clsid="a2ba5662-b3cb-43d1-aa89-84265f213e7c" />
+            </desktop5:ItemType>
+            <desktop5:ItemType Type=".rtf">
+              <desktop5:Verb Id="Poufnik" Clsid="a2ba5662-b3cb-43d1-aa89-84265f213e7c" />
+            </desktop5:ItemType>
+            <desktop5:ItemType Type=".txt">
+              <desktop5:Verb Id="Poufnik" Clsid="a2ba5662-b3cb-43d1-aa89-84265f213e7c" />
+            </desktop5:ItemType>
+            <desktop5:ItemType Type=".md">
+              <desktop5:Verb Id="Poufnik" Clsid="a2ba5662-b3cb-43d1-aa89-84265f213e7c" />
+            </desktop5:ItemType>
+            <desktop5:ItemType Type=".png">
+              <desktop5:Verb Id="Poufnik" Clsid="a2ba5662-b3cb-43d1-aa89-84265f213e7c" />
+            </desktop5:ItemType>
+            <desktop5:ItemType Type=".jpg">
+              <desktop5:Verb Id="Poufnik" Clsid="a2ba5662-b3cb-43d1-aa89-84265f213e7c" />
+            </desktop5:ItemType>
+            <desktop5:ItemType Type=".jpeg">
+              <desktop5:Verb Id="Poufnik" Clsid="a2ba5662-b3cb-43d1-aa89-84265f213e7c" />
+            </desktop5:ItemType>
+            <desktop5:ItemType Type=".heic">
+              <desktop5:Verb Id="Poufnik" Clsid="a2ba5662-b3cb-43d1-aa89-84265f213e7c" />
+            </desktop5:ItemType>
+            <desktop5:ItemType Type=".heif">
+              <desktop5:Verb Id="Poufnik" Clsid="a2ba5662-b3cb-43d1-aa89-84265f213e7c" />
+            </desktop5:ItemType>
+            <desktop5:ItemType Type=".jpe">
+              <desktop5:Verb Id="Poufnik" Clsid="a2ba5662-b3cb-43d1-aa89-84265f213e7c" />
+            </desktop5:ItemType>
+            <desktop5:ItemType Type=".tif">
+              <desktop5:Verb Id="Poufnik" Clsid="a2ba5662-b3cb-43d1-aa89-84265f213e7c" />
+            </desktop5:ItemType>
+            <desktop5:ItemType Type=".tiff">
+              <desktop5:Verb Id="Poufnik" Clsid="a2ba5662-b3cb-43d1-aa89-84265f213e7c" />
+            </desktop5:ItemType>
+            <desktop5:ItemType Type=".xlsx">
+              <desktop5:Verb Id="Poufnik" Clsid="a2ba5662-b3cb-43d1-aa89-84265f213e7c" />
+            </desktop5:ItemType>
+            <desktop5:ItemType Type=".pptx">
+              <desktop5:Verb Id="Poufnik" Clsid="a2ba5662-b3cb-43d1-aa89-84265f213e7c" />
+            </desktop5:ItemType>
+            <desktop5:ItemType Type=".odt">
+              <desktop5:Verb Id="Poufnik" Clsid="a2ba5662-b3cb-43d1-aa89-84265f213e7c" />
+            </desktop5:ItemType>
+            <desktop5:ItemType Type=".ods">
+              <desktop5:Verb Id="Poufnik" Clsid="a2ba5662-b3cb-43d1-aa89-84265f213e7c" />
+            </desktop5:ItemType>
+            <desktop5:ItemType Type=".odp">
+              <desktop5:Verb Id="Poufnik" Clsid="a2ba5662-b3cb-43d1-aa89-84265f213e7c" />
+            </desktop5:ItemType>
+          </desktop4:FileExplorerContextMenus>
+        </desktop4:Extension>
+        <com:Extension Category="windows.comServer">
+          <com:ComServer>
+            <com:SurrogateServer DisplayName="Poufnik - menu kontekstowe">
+              <com:Class Id="a2ba5662-b3cb-43d1-aa89-84265f213e7c" Path="poufnik_shell_menu.dll" ThreadingModel="STA" />
+            </com:SurrogateServer>
+          </com:ComServer>
+        </com:Extension>
+      </Extensions>
     </Application>
   </Applications>
 

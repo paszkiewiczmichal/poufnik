@@ -15,11 +15,19 @@ describe("desktop offline guard", () => {
       fs.readFileSync(path.join(DESKTOP_ROOT, "src-tauri", "tauri.conf.json"), "utf-8"),
     );
 
+    // The 1:1 preview (pdf.js, docx-preview) needs blob: pictures and fonts and the <style>
+    // elements docx-preview writes; all of it is local - no external host is allowed.
+    expect(config.app.security.dangerousDisableAssetCspModification).toEqual(["style-src"]);
+    for (const directive of ["style-src", "img-src", "font-src", "worker-src"]) {
+      expect(config.app.security.csp[directive]).not.toMatch(/https?:/);
+    }
     expect(config.app.security.csp).toEqual({
       "default-src": "'self'",
       "script-src": "'self'",
-      "style-src": "'self'",
-      "img-src": "'self' data:",
+      "style-src": "'self' 'unsafe-inline'",
+      "img-src": "'self' data: blob:",
+      "font-src": "'self' data: blob:",
+      "worker-src": "'self'",
       "connect-src": [
         "'self'",
         "ipc:",

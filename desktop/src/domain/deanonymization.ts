@@ -4,7 +4,7 @@ export type RestoredTextSegment =
   | { type: "text"; text: string; start: number; end: number }
   | { type: "restored"; text: string; start: number; end: number; token: string };
 
-const TOKEN_PATTERN = /\[[A-ZĄĆĘŁŃÓŚŹŻ]+(?:_[A-ZĄĆĘŁŃÓŚŹŻ]+)*_\d+\]/g;
+export const TOKEN_PATTERN = /\[[A-ZĄĆĘŁŃÓŚŹŻ]+(?:_[A-ZĄĆĘŁŃÓŚŹŻ]+)*_\d+\]/g;
 
 export function restoredSegmentsFromTokenizedText(
   tokenizedText: string,

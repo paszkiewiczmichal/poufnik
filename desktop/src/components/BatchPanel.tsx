@@ -14,6 +14,9 @@ interface BatchPanelProps {
   onRun: () => void;
   onExport: () => void;
   onClear: () => void;
+  /** All files belong to one case: the same person gets the same token in every file. */
+  sharedCase?: boolean;
+  onSharedCaseChange?: (shared: boolean) => void;
 }
 
 export function BatchPanel({
@@ -27,6 +30,8 @@ export function BatchPanel({
   onRun,
   onExport,
   onClear,
+  sharedCase = false,
+  onSharedCaseChange,
 }: BatchPanelProps) {
   const progress = batchProgress(items);
   const processed = progress.complete + progress.failed;
@@ -39,6 +44,20 @@ export function BatchPanel({
         {texts.batch.title}
       </h2>
       <p className="muted">{items.length === 0 ? texts.batch.empty : texts.batch.lead}</p>
+
+      {onSharedCaseChange ? (
+        <label className="checkbox-row">
+          <input
+            type="checkbox"
+            checked={sharedCase}
+            disabled={running}
+            onChange={(event) => onSharedCaseChange(event.target.checked)}
+          />
+          <span>
+            <strong>{texts.batch.sharedCase}</strong> {texts.batch.sharedCaseNote}
+          </span>
+        </label>
+      ) : null}
 
       <div className="batch-drop">
         <PlusIcon />
@@ -84,7 +103,10 @@ export function BatchPanel({
                   key={item.id}
                   role="listitem"
                 >
-                  <span className="batch-item__name">{item.filename}</span>
+                  <span className="batch-item__name">
+                    {item.filename}{" "}
+                    <span className="muted">· {texts.batch.fileSize(item.size)}</span>
+                  </span>
                   <span className="batch-item__status">{texts.batch.status[item.status]}</span>
                   <span className="batch-item__meta">{batchItemMeta(item)}</span>
                 </article>
@@ -140,5 +162,6 @@ function batchItemMeta(item: BatchQueueItem): string {
   if (item.status === "error") {
     return item.error ?? texts.errors.generic;
   }
-  return texts.batch.fileSize(item.size);
+  // The column counts detections; a file not processed yet has none to show.
+  return texts.batch.noDetectionsYet;
 }

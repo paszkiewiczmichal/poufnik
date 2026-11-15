@@ -22,7 +22,9 @@ export async function readStoredAuthToken(): Promise<string | null> {
 
   try {
     if (!(await exists(SESSION_PATH, { baseDir: BaseDirectory.AppLocalData }))) {
-      return null;
+      // Up to 1.0.22 the app could not create the auth folder, so the session lived only in
+      // localStorage; reading it here keeps those users logged in.
+      return readBrowserToken();
     }
     const payload = JSON.parse(
       await readTextFile(SESSION_PATH, { baseDir: BaseDirectory.AppLocalData }),

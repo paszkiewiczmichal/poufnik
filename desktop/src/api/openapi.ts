@@ -106,6 +106,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Report Endpoint
+         * @description Anonymization report for the case file (PDF), without any value from the document.
+         *
+         *     Only tokens ("[OSOBA_1]"), categories, counts and the user's decisions go in; a
+         *     request carrying anything that is not a token is refused.
+         */
+        post: operations["report_endpoint_v1_report_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/export/docx": {
         parameters: {
             query?: never;
@@ -131,6 +154,118 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/export/xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export Xlsx In Place
+         * @description Anonymize the original XLSX in place, keeping its sheets, styles and formulas.
+         *
+         *     Same contract as ``/v1/export/docx``. Every sheet (hidden ones too) is part of the
+         *     text; comments, external links, pivot caches and metadata are removed.
+         */
+        post: operations["export_xlsx_in_place_v1_export_xlsx_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/export/pptx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export Pptx In Place
+         * @description Anonymize the original PPTX in place, keeping its slides and formatting.
+         *
+         *     Same contract as ``/v1/export/docx``. Speaker notes are part of the text;
+         *     comments, embedded objects and metadata are removed.
+         */
+        post: operations["export_pptx_in_place_v1_export_pptx_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/export/odt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export Odt In Place
+         * @description Anonymize the original .odt file in place, keeping its layout.
+         *
+         *     Same contract as ``/v1/export/docx``: ``offset_map`` and ``anonymized_text`` must come from anonymizing exactly this file; the engine re-reads the file, refuses to export when they do not match and verifies that no original value is left.
+         */
+        post: operations["export_odt_in_place_v1_export_odt_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/export/ods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export Ods In Place
+         * @description Anonymize the original .ods file in place, keeping its layout.
+         *
+         *     Same contract as ``/v1/export/docx``: ``offset_map`` and ``anonymized_text`` must come from anonymizing exactly this file; the engine re-reads the file, refuses to export when they do not match and verifies that no original value is left.
+         */
+        post: operations["export_ods_in_place_v1_export_ods_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/export/odp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export Odp In Place
+         * @description Anonymize the original .odp file in place, keeping its layout.
+         *
+         *     Same contract as ``/v1/export/docx``: ``offset_map`` and ``anonymized_text`` must come from anonymizing exactly this file; the engine re-reads the file, refuses to export when they do not match and verifies that no original value is left.
+         */
+        post: operations["export_odp_in_place_v1_export_odp_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/export/pdf": {
         parameters: {
             query?: never;
@@ -149,6 +284,78 @@ export interface paths {
          *     text came from OCR, exactly as when it was imported.
          */
         post: operations["export_pdf_in_place_v1_export_pdf_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/export/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export Image In Place
+         * @description Anonymize the original PNG/JPEG/HEIC image in place: values are painted over.
+         *
+         *     The response has the same format as the upload (a HEIC the engine cannot encode
+         *     comes back as JPEG - check the response media type) and carries no metadata.
+         *     ``offset_map`` and ``anonymized_text`` must come from importing exactly this file.
+         */
+        post: operations["export_image_in_place_v1_export_image_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/restore/docx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore Docx Endpoint
+         * @description Put the original values back into an anonymized DOCX, keeping its layout.
+         *
+         *     Every token known to ``replacement_map`` (JSON, sent as a file part like the
+         *     export inputs) is replaced in place; unknown tokens stay. Tracked changes and
+         *     comments added after the anonymization are kept, tokens inside them restored.
+         */
+        post: operations["restore_docx_endpoint_v1_restore_docx_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/metadata/clean": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Clean Metadata Endpoint
+         * @description Remove all file metadata (authors, dates, paths, thumbnails, EXIF/GPS, XMP...).
+         *
+         *     The document content is not touched and nothing is anonymized. The response holds
+         *     the cleaned file; ``X-Poufnik-Removed`` lists what was removed and
+         *     ``X-Poufnik-Notices`` anything the user should know (comma-separated codes).
+         */
+        post: operations["clean_metadata_endpoint_v1_metadata_clean_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -237,6 +444,12 @@ export interface components {
              */
             language: string;
             /**
+             * Profile
+             * @default standard
+             * @enum {string}
+             */
+            profile: "standard" | "judgment";
+            /**
              * Custom Rules
              * @description Optional local custom regex rules. At most 25 rules are accepted; each pattern/regex value is limited to 256 characters and must compile. Matches are returned as CUSTOM entities with source=regex.
              */
@@ -260,6 +473,13 @@ export interface components {
             language: string;
             /** Entities */
             entities?: components["schemas"]["DetectedEntity"][] | null;
+            case_map?: components["schemas"]["ReplacementMap"] | null;
+            /**
+             * Mode
+             * @default tokens
+             * @enum {string}
+             */
+            mode: "tokens" | "pseudonyms";
         };
         /** AnonymizeResponse */
         AnonymizeResponse: {
@@ -283,8 +503,49 @@ export interface components {
             /** Page */
             page?: number | null;
         };
+        /** Body_clean_metadata_endpoint_v1_metadata_clean_post */
+        Body_clean_metadata_endpoint_v1_metadata_clean_post: {
+            /** File */
+            file: string;
+        };
         /** Body_export_docx_in_place_v1_export_docx_post */
         Body_export_docx_in_place_v1_export_docx_post: {
+            /** File */
+            file: string;
+            /** Offset Map */
+            offset_map: string;
+            /** Anonymized Text */
+            anonymized_text: string;
+        };
+        /** Body_export_image_in_place_v1_export_image_post */
+        Body_export_image_in_place_v1_export_image_post: {
+            /** File */
+            file: string;
+            /** Offset Map */
+            offset_map: string;
+            /** Anonymized Text */
+            anonymized_text: string;
+        };
+        /** Body_export_odp_in_place_v1_export_odp_post */
+        Body_export_odp_in_place_v1_export_odp_post: {
+            /** File */
+            file: string;
+            /** Offset Map */
+            offset_map: string;
+            /** Anonymized Text */
+            anonymized_text: string;
+        };
+        /** Body_export_ods_in_place_v1_export_ods_post */
+        Body_export_ods_in_place_v1_export_ods_post: {
+            /** File */
+            file: string;
+            /** Offset Map */
+            offset_map: string;
+            /** Anonymized Text */
+            anonymized_text: string;
+        };
+        /** Body_export_odt_in_place_v1_export_odt_post */
+        Body_export_odt_in_place_v1_export_odt_post: {
             /** File */
             file: string;
             /** Offset Map */
@@ -306,6 +567,24 @@ export interface components {
              */
             ocr: boolean;
         };
+        /** Body_export_pptx_in_place_v1_export_pptx_post */
+        Body_export_pptx_in_place_v1_export_pptx_post: {
+            /** File */
+            file: string;
+            /** Offset Map */
+            offset_map: string;
+            /** Anonymized Text */
+            anonymized_text: string;
+        };
+        /** Body_export_xlsx_in_place_v1_export_xlsx_post */
+        Body_export_xlsx_in_place_v1_export_xlsx_post: {
+            /** File */
+            file: string;
+            /** Offset Map */
+            offset_map: string;
+            /** Anonymized Text */
+            anonymized_text: string;
+        };
         /** Body_process_document_v1_documents_process_post */
         Body_process_document_v1_documents_process_post: {
             /** File */
@@ -320,6 +599,25 @@ export interface components {
              * @default pl
              */
             language: string;
+            /**
+             * Mode
+             * @default tokens
+             * @enum {string}
+             */
+            mode: "tokens" | "pseudonyms";
+            /**
+             * Profile
+             * @default standard
+             * @enum {string}
+             */
+            profile: "standard" | "judgment";
+        };
+        /** Body_restore_docx_endpoint_v1_restore_docx_post */
+        Body_restore_docx_endpoint_v1_restore_docx_post: {
+            /** File */
+            file: string;
+            /** Replacement Map */
+            replacement_map: string;
         };
         /** DeanonymizeRequest */
         DeanonymizeRequest: {
@@ -376,7 +674,7 @@ export interface components {
          * EntityCategory
          * @enum {string}
          */
-        EntityCategory: "PESEL" | "NIP" | "REGON" | "ID_CARD" | "PASSPORT" | "KRS" | "BANK_ACCOUNT" | "PAYMENT_CARD" | "LAND_REGISTER" | "PHONE" | "EMAIL" | "URL" | "IP_ADDRESS" | "MAC_ADDRESS" | "API_KEY" | "VEHICLE" | "CASE_NUMBER" | "ADMIN_CASE" | "GPS" | "MONEY" | "PERSON" | "COMPANY" | "PUBLIC_INSTITUTION" | "ADDRESS" | "DATE" | "CUSTOM";
+        EntityCategory: "PESEL" | "NIP" | "REGON" | "ID_CARD" | "PASSPORT" | "KRS" | "BANK_ACCOUNT" | "PAYMENT_CARD" | "LAND_REGISTER" | "PHONE" | "EMAIL" | "URL" | "IP_ADDRESS" | "MAC_ADDRESS" | "API_KEY" | "VEHICLE" | "DRIVING_LICENSE" | "LAND_PARCEL" | "KSEF" | "CASE_NUMBER" | "ADMIN_CASE" | "GPS" | "MONEY" | "PERSON" | "COMPANY" | "PUBLIC_INSTITUTION" | "ADDRESS" | "DATE" | "CUSTOM";
         /**
          * EntityStatus
          * @enum {string}
@@ -449,6 +747,8 @@ export interface components {
             token: string;
             /** Category */
             category: string;
+            /** Label */
+            label?: string | null;
         };
         /** ProcessedDocument */
         ProcessedDocument: {
@@ -458,7 +758,7 @@ export interface components {
              * Format
              * @enum {string}
              */
-            format: "txt" | "docx" | "pdf" | "png" | "jpg" | "heic";
+            format: "txt" | "docx" | "xlsx" | "pptx" | "odt" | "ods" | "odp" | "pdf" | "png" | "jpg" | "heic";
             /**
              * Source
              * @enum {string}
@@ -498,6 +798,10 @@ export interface components {
             canonical_text: string;
             /** Variants */
             variants?: string[];
+            /** Fake Forms */
+            fake_forms?: {
+                [key: string]: string;
+            };
         };
         /** ReplacementMap */
         ReplacementMap: {
@@ -510,6 +814,64 @@ export interface components {
             created_at?: string;
             /** Document Fingerprint */
             document_fingerprint: string;
+        };
+        /**
+         * ReportRequest
+         * @description What the window knows about one anonymization; no value from the document.
+         */
+        ReportRequest: {
+            /**
+             * Document Name
+             * @description Name of the anonymized file.
+             */
+            document_name: string;
+            /** Document Format */
+            document_format: string;
+            /** Page Count */
+            page_count: number;
+            /** Source Sha256 */
+            source_sha256?: string | null;
+            /** App Version */
+            app_version: string;
+            /** Tokens */
+            tokens: components["schemas"]["ReportToken"][];
+            /**
+             * Detected
+             * @description Detections the engine proposed.
+             */
+            detected: number;
+            /**
+             * Rejected
+             * @description Detections the user left in the text.
+             */
+            rejected: number;
+            /**
+             * Manual
+             * @description Values the user marked by hand.
+             */
+            manual: number;
+            /** Excluded Categories */
+            excluded_categories?: string[];
+            /**
+             * Notices
+             * @description Notices, already in Polish (one line, at most 500 chars).
+             */
+            notices?: string[];
+            /**
+             * Mode
+             * @description How data was replaced, in words, or one of: tokens, pseudonyms.
+             * @default oznaczenia kategorii z numerem, np. [OSOBA_1]
+             */
+            mode: string;
+        };
+        /** ReportToken */
+        ReportToken: {
+            /** Token */
+            token: string;
+            /** Category */
+            category: string;
+            /** Occurrences */
+            occurrences: number;
         };
         /** UsageResponse */
         UsageResponse: {
@@ -730,7 +1092,78 @@ export interface operations {
                 };
                 content: {
                     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": string;
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    "application/vnd.openxmlformats-officedocument.presentationml.presentation": string;
                     "application/pdf": string;
+                    "image/png": string;
+                    "image/jpeg": string;
+                    "image/heic": string;
+                };
+            };
+            /** @description Bad request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Request payload exceeds the configured limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Validation error. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+        };
+    };
+    report_endpoint_v1_report_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportRequest"];
+            };
+        };
+        responses: {
+            /** @description Anonymized document export. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": string;
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    "application/vnd.openxmlformats-officedocument.presentationml.presentation": string;
+                    "application/pdf": string;
+                    "image/png": string;
+                    "image/jpeg": string;
+                    "image/heic": string;
                 };
             };
             /** @description Bad request. */
@@ -791,7 +1224,342 @@ export interface operations {
                 };
                 content: {
                     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": string;
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    "application/vnd.openxmlformats-officedocument.presentationml.presentation": string;
                     "application/pdf": string;
+                    "image/png": string;
+                    "image/jpeg": string;
+                    "image/heic": string;
+                };
+            };
+            /** @description Bad request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Request payload exceeds the configured limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Validation error. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+        };
+    };
+    export_xlsx_in_place_v1_export_xlsx_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_export_xlsx_in_place_v1_export_xlsx_post"];
+            };
+        };
+        responses: {
+            /** @description Anonymized document export. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": string;
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    "application/vnd.openxmlformats-officedocument.presentationml.presentation": string;
+                    "application/pdf": string;
+                    "image/png": string;
+                    "image/jpeg": string;
+                    "image/heic": string;
+                };
+            };
+            /** @description Bad request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Request payload exceeds the configured limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Validation error. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+        };
+    };
+    export_pptx_in_place_v1_export_pptx_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_export_pptx_in_place_v1_export_pptx_post"];
+            };
+        };
+        responses: {
+            /** @description Anonymized document export. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": string;
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    "application/vnd.openxmlformats-officedocument.presentationml.presentation": string;
+                    "application/pdf": string;
+                    "image/png": string;
+                    "image/jpeg": string;
+                    "image/heic": string;
+                };
+            };
+            /** @description Bad request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Request payload exceeds the configured limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Validation error. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+        };
+    };
+    export_odt_in_place_v1_export_odt_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_export_odt_in_place_v1_export_odt_post"];
+            };
+        };
+        responses: {
+            /** @description Anonymized document export. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": string;
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    "application/vnd.openxmlformats-officedocument.presentationml.presentation": string;
+                    "application/pdf": string;
+                    "image/png": string;
+                    "image/jpeg": string;
+                    "image/heic": string;
+                };
+            };
+            /** @description Bad request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Request payload exceeds the configured limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Validation error. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+        };
+    };
+    export_ods_in_place_v1_export_ods_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_export_ods_in_place_v1_export_ods_post"];
+            };
+        };
+        responses: {
+            /** @description Anonymized document export. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": string;
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    "application/vnd.openxmlformats-officedocument.presentationml.presentation": string;
+                    "application/pdf": string;
+                    "image/png": string;
+                    "image/jpeg": string;
+                    "image/heic": string;
+                };
+            };
+            /** @description Bad request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Request payload exceeds the configured limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Validation error. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+        };
+    };
+    export_odp_in_place_v1_export_odp_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_export_odp_in_place_v1_export_odp_post"];
+            };
+        };
+        responses: {
+            /** @description Anonymized document export. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": string;
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    "application/vnd.openxmlformats-officedocument.presentationml.presentation": string;
+                    "application/pdf": string;
+                    "image/png": string;
+                    "image/jpeg": string;
+                    "image/heic": string;
                 };
             };
             /** @description Bad request. */
@@ -852,7 +1620,200 @@ export interface operations {
                 };
                 content: {
                     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": string;
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    "application/vnd.openxmlformats-officedocument.presentationml.presentation": string;
                     "application/pdf": string;
+                    "image/png": string;
+                    "image/jpeg": string;
+                    "image/heic": string;
+                };
+            };
+            /** @description Bad request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Request payload exceeds the configured limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Validation error. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+        };
+    };
+    export_image_in_place_v1_export_image_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_export_image_in_place_v1_export_image_post"];
+            };
+        };
+        responses: {
+            /** @description Anonymized document export. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": string;
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    "application/vnd.openxmlformats-officedocument.presentationml.presentation": string;
+                    "application/pdf": string;
+                    "image/png": string;
+                    "image/jpeg": string;
+                    "image/heic": string;
+                };
+            };
+            /** @description Bad request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Request payload exceeds the configured limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Validation error. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+        };
+    };
+    restore_docx_endpoint_v1_restore_docx_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_restore_docx_endpoint_v1_restore_docx_post"];
+            };
+        };
+        responses: {
+            /** @description The DOCX with the original values put back. */
+            200: {
+                headers: {
+                    /** @description Present when the restore had warnings (e.g. tokens the map does not know, left in place): a JSON array of messages, percent-encoded (at most 50 messages). */
+                    "X-Poufnik-Warnings"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": string;
+                };
+            };
+            /** @description Bad request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Request payload exceeds the configured limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Validation error. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+        };
+    };
+    clean_metadata_endpoint_v1_metadata_clean_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_clean_metadata_endpoint_v1_metadata_clean_post"];
+            };
+        };
+        responses: {
+            /** @description The same file without metadata. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
                 };
             };
             /** @description Bad request. */

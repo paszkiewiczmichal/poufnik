@@ -10,6 +10,7 @@ afterEach(() => cleanup());
 function renderSettings(props: Partial<Parameters<typeof AccountSettings>[0]> = {}) {
   const handlers = {
     onLogin: vi.fn().mockResolvedValue(undefined),
+    onLoginBrowser: vi.fn(),
     onRegister: vi.fn(),
     onLogout: vi.fn(),
     onDeleteAccount: vi.fn(),
@@ -19,6 +20,7 @@ function renderSettings(props: Partial<Parameters<typeof AccountSettings>[0]> = 
       authState={{ status: "basic", message: null }}
       error={null}
       loading={false}
+      browserLoginLoading={false}
       {...handlers}
       {...props}
     />,
@@ -33,6 +35,21 @@ describe("AccountSettings - basic (unauthenticated)", () => {
     expect(screen.getByText(texts.auth.settingsBasicNote)).toBeInTheDocument();
     expect(screen.getByLabelText(texts.account.email)).toBeInTheDocument();
     expect(screen.getByLabelText(texts.auth.password)).toBeInTheDocument();
+  });
+
+  it("offers login through the browser (Google) next to the form", () => {
+    const handlers = renderSettings();
+
+    fireEvent.click(screen.getByRole("button", { name: texts.auth.loginBrowser }));
+
+    expect(handlers.onLoginBrowser).toHaveBeenCalledOnce();
+    expect(handlers.onLogin).not.toHaveBeenCalled();
+  });
+
+  it("disables the browser login while waiting for the browser", () => {
+    renderSettings({ browserLoginLoading: true });
+
+    expect(screen.getByRole("button", { name: texts.auth.browserWaiting })).toBeDisabled();
   });
 
   it("shows the basic-state message when present", () => {

@@ -101,6 +101,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Engine source (private repository)
+        uses: ./.github/actions/private-engine
+        with:
+          deploy-key: ${{ secrets.POUFNIK_ENGINE_DEPLOY_KEY }}
+
       - name: Install uv
         uses: astral-sh/setup-uv@v5
         with:
@@ -131,9 +136,10 @@ jobs:
         working-directory: engine
         run: uv sync --group dev --group models
 
+      # The log of this public repository is public: short output, no source lines in tracebacks.
       - name: Pytest
         working-directory: engine
-        run: uv run pytest
+        run: uv run pytest -q --tb=line -p no:cacheprovider
 
   test-desktop:
     name: test-desktop
@@ -183,6 +189,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Engine source (private repository)
+        uses: ./.github/actions/private-engine
+        with:
+          deploy-key: ${{ secrets.POUFNIK_ENGINE_DEPLOY_KEY }}
+
       - name: Install uv
         uses: astral-sh/setup-uv@v5
         with:
@@ -209,7 +220,9 @@ jobs:
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: desktop/src-tauri -> target
+          workspaces: |
+            desktop/src-tauri -> target
+            desktop/shell-menu -> target
 
       - name: Set up .NET 8 for Azure Artifact Signing
         if: env.AZURE_ARTIFACT_SIGNING_AVAILABLE == 'true'
@@ -294,6 +307,64 @@ jobs:
             "$sidecar"
           signtool verify /pa "$sidecar"
 
+      # Windows 11 top-level Explorer context menu for the GitHub installer: the same menu DLL
+      # as in the MSIX plus a signed identity package (sparse package) that hooks.nsh registers
+      # with the installation folder as its content. If the package cannot be registered (for
+      # example it is unsigned), the installer writes the classic registry menu instead.
+      - name: Build Explorer context-menu handler
+        run: cargo build --release --locked --manifest-path desktop/shell-menu/Cargo.toml
+
+      - name: Build context-menu identity package and add it to installer resources
+        run: uv run --python ${{ env.PYTHON_VERSION }} --no-project python desktop/shell-menu/sparse/build_sparse_package.py --add-resources
+
+      - name: Sign context-menu handler
+        if: env.AZURE_ARTIFACT_SIGNING_AVAILABLE == 'true'
+        run: |
+          $dll = "desktop/shell-menu/target/release/poufnik_shell_menu.dll"
+          artifact-signing-cli `
+            -e "$env:AZURE_ARTIFACT_SIGNING_ENDPOINT" `
+            -a "$env:AZURE_ARTIFACT_SIGNING_ACCOUNT" `
+            -c "$env:AZURE_ARTIFACT_SIGNING_CERTIFICATE_PROFILE" `
+            -d "Poufnik" `
+            "$dll"
+          signtool verify /pa "$dll"
+
+      # Publisher in the package manifest must equal the certificate subject
+      # (RELEASE_PUBLISHER in build_sparse_package.py). A failure here does not stop the
+      # release: users then get the classic menu under "Pokaż więcej opcji".
+      - name: Sign context-menu identity package
+        if: env.AZURE_ARTIFACT_SIGNING_AVAILABLE == 'true'
+        continue-on-error: true
+        run: |
+          $package = "desktop/shell-menu/target/poufnik-menu.msix"
+          artifact-signing-cli `
+            -e "$env:AZURE_ARTIFACT_SIGNING_ENDPOINT" `
+            -a "$env:AZURE_ARTIFACT_SIGNING_ACCOUNT" `
+            -c "$env:AZURE_ARTIFACT_SIGNING_CERTIFICATE_PROFILE" `
+            -d "Poufnik" `
+            "$package"
+          signtool verify /pa "$package"
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "::warning::The context-menu identity package is not signed; the installer will use the classic menu."
+            exit 1
+          }
+          # Windows registers the package only when the certificate subject is exactly the
+          # manifest Publisher (RELEASE_PUBLISHER in build_sparse_package.py). signtool does not
+          # check that, so compare here: otherwise every user silently gets the classic menu.
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [IO.Compression.ZipFile]::OpenRead((Resolve-Path $package))
+          try {
+            $reader = New-Object IO.StreamReader($zip.GetEntry("AppxManifest.xml").Open())
+            [xml]$manifest = $reader.ReadToEnd()
+            $reader.Dispose()
+          } finally { $zip.Dispose() }
+          $publisher = [Security.Cryptography.X509Certificates.X500DistinguishedName]::new($manifest.Package.Identity.Publisher).Name
+          $subject = (Get-AuthenticodeSignature $package).SignerCertificate.SubjectName.Name
+          if ($publisher -ne $subject) {
+            Write-Host "::warning::Identity package Publisher '$publisher' differs from the certificate subject '$subject'; Windows will refuse it and users get the classic menu. Update RELEASE_PUBLISHER."
+            exit 1
+          }
+
       - name: Build Tauri installer
         id: tauri
         uses: tauri-apps/tauri-action@v1
@@ -312,6 +383,28 @@ jobs:
           updaterJsonPreferNsis: true
           uploadUpdaterSignatures: true
           releaseAssetNamePattern: "[name]_[version]_[platform]_[arch][setup][ext]"
+
+      # Software bill of materials (CycloneDX) of the engine (Python) and the window (npm),
+      # attached to the release for IT departments. Does not block the release.
+      # The tools are pinned and the job's signing secrets are blanked for this step: a
+      # compromised release of an SBOM tool must not see them.
+      - name: Attach SBOM to the release
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ""
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+          AZURE_CLIENT_SECRET: ""
+          AZURE_CLIENT_ID: ""
+          AZURE_TENANT_ID: ""
+        run: |
+          # What ships in the engine: runtime packages and the language model, no dev tools.
+          (cd engine && uv export --no-dev --group models --no-hashes --no-emit-project             --format requirements-txt -o ../engine-runtime.txt)
+          uvx --from cyclonedx-bom==8.0.1 cyclonedx-py requirements engine-runtime.txt --of JSON -o sbom-engine.cdx.json
+          (cd desktop && npx --yes @cyclonedx/cyclonedx-npm@7.0.1 --omit dev --output-format JSON --output-file ../sbom-desktop.cdx.json)
+          test -s sbom-engine.cdx.json && test -s sbom-desktop.cdx.json
+          gh release upload "${GITHUB_REF_NAME}" sbom-engine.cdx.json sbom-desktop.cdx.json --clobber --repo "${{ github.repository }}"
 
       - name: Verify Windows signatures
         if: env.AZURE_ARTIFACT_SIGNING_AVAILABLE == 'true'
@@ -401,6 +494,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Engine source (private repository)
+        uses: ./.github/actions/private-engine
+        with:
+          deploy-key: ${{ secrets.POUFNIK_ENGINE_DEPLOY_KEY }}
+
       - name: Install uv
         uses: astral-sh/setup-uv@v5
         with:
@@ -427,7 +525,9 @@ jobs:
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: desktop/src-tauri -> target
+          workspaces: |
+            desktop/src-tauri -> target
+            desktop/shell-menu -> target
           shared-key: msix
 
       - name: Install Tesseract
@@ -466,6 +566,14 @@ jobs:
       - name: Add engine sidecar to MSIX resources
         run: uv run --python ${{ env.PYTHON_VERSION }} --no-project python .github/scripts/add_msix_sidecar_resource.py --target-triple "${{ env.RELEASE_TARGET }}"
 
+      # Windows 11 top-level Explorer context menu (Poufnik → Anonimizuj / OCR / Markdown /
+      # Przywróć dane): an IExplorerCommand COM handler declared in AppxManifest.xml.template.
+      - name: Build Explorer context-menu handler
+        run: cargo build --release --locked --manifest-path desktop/shell-menu/Cargo.toml
+
+      - name: Add context-menu handler to MSIX resources
+        run: uv run --python ${{ env.PYTHON_VERSION }} --no-project python .github/scripts/add_msix_shell_menu.py
+
       # No signing here: Microsoft Store re-signs MSIX/MSIXbundle packages with its own
       # certificate after certification, so an unsigned build is the correct artifact to
       # hand to Partner Center. bundle.config.json's signing.pfx stays null in CI - local
@@ -500,6 +608,7 @@ jobs:
           foreach ($required in @("Poufnik.exe", "anonymizer-engine.exe")) {
             if ($names -notcontains $required) { throw "MSIX is missing $required - the app cannot start its engine." }
           }
+          if ($names -notcontains "poufnik_shell_menu.dll") { throw "MSIX is missing poufnik_shell_menu.dll - the Explorer context menu would not work." }
           if (-not ($names | Where-Object { $_ -like "_internal/*" })) { throw "MSIX is missing the _internal runtime folder." }
           # Without resources.pri Windows ignores the targetsize/unplated variants and draws the
           # accent-colour plate behind the taskbar icon.
@@ -622,6 +731,11 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Engine source (private repository)
+        uses: ./.github/actions/private-engine
+        with:
+          deploy-key: ${{ secrets.POUFNIK_ENGINE_DEPLOY_KEY }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -901,6 +1015,11 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Engine source (private repository)
+        uses: ./.github/actions/private-engine
+        with:
+          deploy-key: ${{ secrets.POUFNIK_ENGINE_DEPLOY_KEY }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5

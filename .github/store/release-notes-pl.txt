@@ -1,3 +1,10 @@
-Wersja 1.0.22
-- Odznaczenie kategorii w przeglądzie (np. „Data”) naprawdę wyłącza ją z anonimizacji w wyniku i w eksporcie.
-- Nowa sekcja w Ustawieniach: „Kategorie do anonimizacji”. Odznaczone kategorie nie są anonimizowane w nowych dokumentach, także w trybie seryjnym.
+Wersja 1.0.26
+- Podgląd 1:1: oryginał i wynik obok siebie, tak jak wyglądają w Wordzie, PDF-ie, Excelu i PowerPoincie.
+- Menu kontekstowe w Eksploratorze dla wszystkich, bez konta: Anonimizuj, Wyciągnij tekst (OCR), Anonimizuj do Markdown (dla AI), Przywróć dane, Usuń metadane.
+- Wynik w tym samym formacie także dla Excela, PowerPointa, plików OpenOffice i LibreOffice, zdjęć oraz starych plików DOC i RTF.
+- Przywracanie danych prosto do pliku od AI. Poufnik sam dobiera mapę zastąpień i ostrzega o oznaczeniach, których w niej nie ma.
+- Tryb danych fikcyjnych: zamiast [OSOBA_1] zmyślone imię i nazwisko, odmienione jak w oryginale.
+- Raport z anonimizacji w PDF, mapa zastąpień chroniona hasłem, wspólne oznaczenia dla dokumentów jednej sprawy i tryb orzeczeń do publikacji.
+- Skróty w każdym programie: Ctrl+Alt+Shift+P anonimizuje tekst w schowku, Ctrl+Alt+Shift+R przywraca dane.
+- Nowe rodzaje danych, m.in. prawo jazdy, działki, numery KSeF, klucze API i kwoty słownie. Dokładniejsze wykrywanie na skanach i w tekście z błędami OCR.
+- Zdjęcia wewnątrz dokumentów: dane widoczne na obrazie są zamalowywane, a metadane i lokalizacja GPS usuwane.
