@@ -50,10 +50,14 @@ def item_types() -> list[str]:
 
 
 def package_version() -> str:
+    """ "1.0.26" -> "1.0.26.0"; a test build "1.0.26-rc.3" -> "1.0.26.3" (MSIX: four numbers)."""
     version = json.loads(TAURI_CONF.read_text("utf-8"))["version"]
-    if not re.fullmatch(r"\d+\.\d+\.\d+", version):
+    match = re.fullmatch(r"(\d+\.\d+\.\d+)(?:-([0-9A-Za-z.-]+))?(?:\+.*)?", version)
+    if not match:
         raise SystemExit(f"Unexpected version in tauri.conf.json: {version}")
-    return f"{version}.0"
+    core, prerelease = match.groups()
+    numbers = re.findall(r"\d+", prerelease or "")
+    return f"{core}.{numbers[-1] if numbers else 0}"
 
 
 def render_manifest(publisher: str, version: str) -> str:

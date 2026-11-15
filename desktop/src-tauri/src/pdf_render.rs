@@ -350,8 +350,10 @@ end run
 fn render_with_word(input: &Path, output: &Path, target: Target) -> Result<(), String> {
     let format = match target {
         Target::Pdf => "format PDF",
-        // "format document" is the old binary .doc (wdFormatDocument = 0); DOCX is the XML one.
-        Target::Docx => "format XML document",
+        // In Word for Mac "format document" is DOCX (wdFormatXMLDocument = 12); the binary
+        // .doc is "format document97". "format XML document" does not exist and the script
+        // fails to compile.
+        Target::Docx => "format document",
     };
     let script = WORD_SCRIPT.replace("FORMAT_PLACEHOLDER", format);
     let mut command = Command::new("osascript");

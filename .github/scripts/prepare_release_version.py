@@ -20,7 +20,27 @@ def main() -> None:
     update_json(repo / "desktop" / "package.json", "version", version)
     replace_first_version(repo / "desktop" / "src-tauri" / "Cargo.toml", version)
     replace_first_version(repo / "engine" / "pyproject.toml", pep440_version(version))
-    print(f"Prepared release version {version}.")
+    # MSIX takes four numbers only; the bundler would turn "1.0.26-rc.3" into an invalid
+    # "1.0.26-rc.3", so the manifest gets the number written in directly.
+    manifest = repo / "desktop" / "src-tauri" / "gen" / "windows" / "AppxManifest.xml.template"
+    if manifest.exists():
+        content = manifest.read_text(encoding="utf-8")
+        manifest.write_text(content.replace("{{VERSION}}", msix_version(version)), encoding="utf-8")
+    print(f"Prepared release version {version} (MSIX {msix_version(version)}).")
+
+
+def msix_version(semver: str) -> str:
+    """ "1.0.26" -> "1.0.26.0"; a test build "1.0.26-rc.3" -> "1.0.26.3".
+
+    Only final versions go to the Microsoft Store (which wants the last number 0); a test
+    build gets its own number, so the next test installs over the previous one.
+    """
+    match = re.fullmatch(r"(\d+\.\d+\.\d+)(?:-([0-9A-Za-z.-]+))?(?:\+.*)?", semver)
+    if not match:
+        raise SystemExit(f"Cannot make an MSIX version of {semver!r}.")
+    core, prerelease = match.groups()
+    numbers = re.findall(r"\d+", prerelease or "")
+    return f"{core}.{numbers[-1] if numbers else 0}"
 
 
 def pep440_version(semver: str) -> str:

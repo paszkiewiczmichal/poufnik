@@ -1,4 +1,4 @@
-Wersja 1.0.26
+Wersja 1.1.0
 - Podgląd 1:1: oryginał i wynik obok siebie, tak jak wyglądają w Wordzie, PDF-ie, Excelu i PowerPoincie.
 - Menu kontekstowe w Eksploratorze dla wszystkich, bez konta: Anonimizuj, Wyciągnij tekst (OCR), Anonimizuj do Markdown (dla AI), Przywróć dane, Usuń metadane.
 - Wynik w tym samym formacie także dla Excela, PowerPointa, plików OpenOffice i LibreOffice, zdjęć oraz starych plików DOC i RTF.

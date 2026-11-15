@@ -700,13 +700,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
+          # macos-14 was retired by GitHub in November 2026 ("macos-14-arm64-us-default is not
+          # supported"); Homebrew's bottles on macos-15 need macOS 15 (decision 15.11.2026).
+          - os: macos-15
             arch: arm64
             target: aarch64-apple-darwin
             asset_arch: aarch64
             # The oldest macOS every bundled binary loads on (Homebrew's Tesseract);
             # smoke_app_bundle.py fails the build when a binary needs more.
-            minimum_macos: "14.8.5"
+            minimum_macos: "15.0"
             staple: true
           # macos-13 was fully retired 2025-12-08 (GitHub deprecated the whole macOS 13
           # image); macos-15-intel is the current label for a hosted Intel runner, kept
@@ -1007,7 +1009,7 @@ jobs:
       - test-engine
       - test-desktop
     if: needs.release-metadata.outputs.mas == 'true'
-    runs-on: macos-14
+    runs-on: macos-15
     env:
       RELEASE_TARGET: aarch64-apple-darwin
     steps:
