@@ -75,6 +75,7 @@ import {
   registerClipboardShortcuts,
   saveHotkeysEnabled,
 } from "./tauri/hotkeys";
+import { DeanonymizePanel } from "./components/DeanonymizePanel";
 import {
   FileRestorePanel,
   IDLE_FILE_RESTORE,
@@ -154,7 +155,7 @@ import type {
   ReplacementMap,
 } from "./types";
 
-type AppScreen = "flow" | "history" | "batch" | "settings";
+type AppScreen = "flow" | "history" | "batch" | "restore" | "settings";
 
 declare global {
   interface Window {
@@ -1016,6 +1017,10 @@ function App() {
           });
           if (saved) {
             setHistoryMessage(texts.history.saved);
+            window.setTimeout(
+              () => setHistoryMessage((current) => (current === texts.history.saved ? null : current)),
+              5000,
+            );
             if (screen === "history") {
               void loadHistoryEntries();
             }
@@ -1441,16 +1446,7 @@ function App() {
     }
   }, []);
 
-  const restoreFileFromAi = useCallback(async () => {
-    let picked: { file: File; path: string | null } | null = null;
-    try {
-      picked = await pickRestorableFile();
-    } catch {
-      picked = await pickBrowserRestorableFile().catch(() => null);
-    }
-    if (!picked) {
-      return;
-    }
+  const restorePickedFile = useCallback(async (picked: { file: File; path: string | null }) => {
     const { file, path } = picked;
     const fail = (message: string) => setFileRestore({ status: "error", message, choices: [] });
     if (!isRestorableFileName(file.name)) {
@@ -1506,6 +1502,25 @@ function App() {
     resolveEndpoint,
     uiState.selectedFileName,
   ]);
+
+  const restoreFileFromAi = useCallback(async () => {
+    let picked: { file: File; path: string | null } | null = null;
+    try {
+      picked = await pickRestorableFile();
+    } catch {
+      picked = await pickBrowserRestorableFile().catch(() => null);
+    }
+    if (picked) {
+      await restorePickedFile(picked);
+    }
+  }, [restorePickedFile]);
+
+  // A file dropped on the "Przywracanie" screen: the browser gives no path, so only maps
+  // known to the app are searched.
+  const restoreDroppedFile = useCallback(
+    (file: File) => void restorePickedFile({ file, path: null }),
+    [restorePickedFile],
+  );
 
   const cancelFileRestoreChoice = useCallback(() => {
     pendingFileRestore.current = null;
@@ -1696,6 +1711,22 @@ function App() {
       state={fileRestore}
       disabled={uiState.engineStatus !== "ready"}
       onChooseFile={() => void restoreFileFromAi()}
+      onChooseMap={(candidate) => void finishFileRestore(candidate)}
+      onCancelChoice={cancelFileRestoreChoice}
+      onLoadMap={() => void loadReplacementMap()}
+      mapLoaded={deanonymization.mapSource === "file"}
+      lockedMap={lockedMap ? { error: lockedMap.error } : null}
+      onUnlockMap={(password) => void unlockMap(password)}
+    />
+  );
+
+  const fileRestoreTool = (
+    <FileRestorePanel
+      variant="tool"
+      state={fileRestore}
+      disabled={uiState.engineStatus !== "ready"}
+      onChooseFile={() => void restoreFileFromAi()}
+      onDropFile={restoreDroppedFile}
       onChooseMap={(candidate) => void finishFileRestore(candidate)}
       onCancelChoice={cancelFileRestoreChoice}
       onLoadMap={() => void loadReplacementMap()}
@@ -2045,6 +2076,13 @@ function App() {
                 </span>
               ) : null}
             </button>
+            <button
+              className={navItemClass(screen === "restore", false)}
+              type="button"
+              onClick={() => setScreen("restore")}
+            >
+              <span>{texts.nav.restore}</span>
+            </button>
           </nav>
 
           <div className="app-sidebar__spacer" />
@@ -2153,7 +2191,6 @@ function App() {
                   onCopyPrompt={copyPrompt}
                   onDeanonymizationInput={setDeanonymizationInput}
                   onDeanonymize={deanonymizeText}
-                  onLoadReplacementMap={loadReplacementMap}
                   onCopyDeanonymizedResult={copyDeanonymizedResult}
                   tier={productTier}
                   onRegister={openRegistration}
@@ -2169,9 +2206,26 @@ function App() {
                   fileName={uiState.selectedFileName}
                   onChooseFile={chooseFile}
                   onDropFile={processFile}
-                  fileRestore={fileRestorePanel}
                 />
               )
+            ) : null}
+
+            {screen === "restore" ? (
+              <section className="screen screen--tool" key="restore" aria-labelledby="restore-title">
+                <h2 className="screen-title" id="restore-title">
+                  {texts.deanonymization.toolTitle}
+                </h2>
+                <p className="screen-lead">{texts.deanonymization.fileLead}</p>
+                <div className="screen__body">
+                  {fileRestoreTool}
+                  <DeanonymizePanel
+                    deanonymization={deanonymization}
+                    onInputChange={setDeanonymizationInput}
+                    onRestore={deanonymizeText}
+                    onCopyResult={copyDeanonymizedResult}
+                  />
+                </div>
+              </section>
             ) : null}
 
             {screen === "history" ? (
@@ -2221,45 +2275,53 @@ function App() {
                           {texts.history.clear}
                         </button>
                       </div>
-                      {historyLoading ? <p className="muted">{texts.history.loading}</p> : null}
-                      {historyMessage ? <p className="status-note">{historyMessage}</p> : null}
-                      {historyError ? <p className="error-note">{historyError}</p> : null}
-                      <div className="card history-list-card">
-                        {!historyLoading && historyEntries.length === 0 ? (
-                          <div className="history-empty">
-                            <strong>{texts.history.empty}</strong>
-                            <p>{texts.history.emptyHint}</p>
-                          </div>
-                        ) : (
-                          historyEntries.map((entry) => (
-                            <article className="history-item" key={entry.id}>
-                              <FileIcon />
-                              <span className="history-item__name">{entry.filename}</span>
-                              <span className="history-item__meta">
-                                {formatHistoryDate(entry.createdAt)} ·{" "}
-                                {entry.documentFormat.toUpperCase()} ·{" "}
-                                {entry.acceptedEntityCount}/{entry.entityCount}{" "}
-                                {texts.history.savedEntities}
-                              </span>
-                              <div className="history-item__actions">
-                                <button
-                                  className="secondary-button secondary-button--compact"
-                                  type="button"
-                                  onClick={() => void openHistoryEntry(entry.id)}
-                                >
-                                  {texts.history.open}
-                                </button>
-                                <button
-                                  className="ghost-button ghost-button--compact"
-                                  type="button"
-                                  onClick={() => void deleteHistoryEntry(entry.id)}
-                                >
-                                  {texts.history.delete}
-                                </button>
-                              </div>
-                            </article>
-                          ))
-                        )}
+                      <div className="screen__body">
+                        {historyLoading ? <p className="muted">{texts.history.loading}</p> : null}
+                        {historyMessage ? <p className="status-note">{historyMessage}</p> : null}
+                        {historyError ? <p className="error-note">{historyError}</p> : null}
+                        <div className="card history-list-card">
+                          {!historyLoading && historyEntries.length === 0 ? (
+                            <div className="history-empty">
+                              <strong>{texts.history.empty}</strong>
+                              <p>{texts.history.emptyHint}</p>
+                            </div>
+                          ) : (
+                            historyEntries.map((entry) => (
+                              <article className="history-item" key={entry.id}>
+                                <FileIcon />
+                                <div className="history-item__main">
+                                  <span className="history-item__name" title={entry.filename}>
+                                    {entry.filename}
+                                  </span>
+                                  <span className="history-item__meta">
+                                    {formatHistoryDate(entry.createdAt)} ·{" "}
+                                    {entry.documentFormat.toUpperCase()} ·{" "}
+                                    {texts.history.entitiesReplaced(
+                                      entry.acceptedEntityCount,
+                                      entry.entityCount,
+                                    )}
+                                  </span>
+                                </div>
+                                <div className="history-item__actions">
+                                  <button
+                                    className="secondary-button secondary-button--compact"
+                                    type="button"
+                                    onClick={() => void openHistoryEntry(entry.id)}
+                                  >
+                                    {texts.history.open}
+                                  </button>
+                                  <button
+                                    className="ghost-button ghost-button--compact"
+                                    type="button"
+                                    onClick={() => void deleteHistoryEntry(entry.id)}
+                                  >
+                                    {texts.history.delete}
+                                  </button>
+                                </div>
+                              </article>
+                            ))
+                          )}
+                        </div>
                       </div>
                     </>
                   )}
@@ -2297,6 +2359,7 @@ function App() {
                     onClear={clearBatch}
                     sharedCase={batchSharedCase}
                     onSharedCaseChange={setBatchSharedCase}
+                    onDropFiles={appendBatchFiles}
                   />
                 </TierGate>
               </section>

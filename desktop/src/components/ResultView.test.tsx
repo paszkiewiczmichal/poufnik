@@ -53,7 +53,6 @@ function renderResult(props: Partial<Parameters<typeof ResultView>[0]> = {}) {
     onCopyPrompt: vi.fn(),
     onDeanonymizationInput: vi.fn(),
     onDeanonymize: vi.fn(),
-    onLoadReplacementMap: vi.fn(),
     onCopyDeanonymizedResult: vi.fn(),
   };
   render(
@@ -184,5 +183,30 @@ describe("ResultView", () => {
     fireEvent.click(screen.getByRole("tab", { name: texts.generation.tabRestore }));
 
     expect(screen.getByText(texts.deanonymization.useCurrentMap)).toBeInTheDocument();
+  });
+
+  it("offers the map in one place: one show button, password above the save button", () => {
+    renderResult();
+    fireEvent.click(screen.getByRole("tab", { name: texts.generation.tabMap }));
+
+    expect(screen.getAllByRole("button", { name: texts.generation.mapShow })).toHaveLength(1);
+    const password = screen.getByLabelText(texts.generation.mapPassword);
+    const save = screen.getByRole("button", { name: texts.generation.saveMap });
+    expect(password.compareDocumentPosition(save) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText(texts.generation.mapPasswordNote)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: texts.generation.mapShow }));
+    expect(screen.queryByRole("button", { name: texts.generation.mapShow })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: texts.generation.mapHide })).toBeInTheDocument();
+  });
+
+  it("keeps the file box under the pasted text in the restore tab, with one map button", () => {
+    renderResult({ fileRestore: <section aria-label="plik">pole pliku</section> });
+    fireEvent.click(screen.getByRole("tab", { name: texts.generation.tabRestore }));
+
+    expect(screen.getByText("pole pliku")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: texts.deanonymization.loadMapShort }),
+    ).not.toBeInTheDocument();
   });
 });

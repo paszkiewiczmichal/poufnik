@@ -23,7 +23,7 @@ describe("custom regex rules", () => {
       0,
     );
 
-    expect(message).toContain("Niepoprawny regex");
+    expect(message).toContain("Niepoprawny wzorzec");
   });
 
   it("builds payloads only from enabled rules", () => {
@@ -62,7 +62,7 @@ describe("validateCustomRuleDraft", () => {
   });
 
   it("requires a label", () => {
-    expect(validateCustomRuleDraft({ ...draft, label: "" }, 0)).toContain("etykietę");
+    expect(validateCustomRuleDraft({ ...draft, label: "" }, 0)).toContain("oznaczenie");
   });
 
   it("requires a pattern", () => {

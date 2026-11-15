@@ -62,6 +62,14 @@ describe("CustomRulesPanel", () => {
     expect(screen.getByRole("button", { name: texts.customRules.add })).toBeDisabled();
   });
 
+  it("does not show the red validation message before anything is typed", () => {
+    renderPanel();
+
+    expect(document.querySelector(".error-note")).toBeNull();
+    expect(screen.getByRole("button", { name: texts.customRules.add })).toBeDisabled();
+    expect(screen.getByText(texts.customRules.matchCount(0))).toBeInTheDocument();
+  });
+
   it("shows a regex error for an invalid pattern", () => {
     renderPanel();
 
@@ -71,7 +79,7 @@ describe("CustomRulesPanel", () => {
       target: { value: "(unclosed" },
     });
 
-    expect(screen.getByText(/Niepoprawny regex/)).toBeInTheDocument();
+    expect(screen.getByText(/Niepoprawny wzorzec/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: texts.customRules.add })).toBeDisabled();
   });
 

@@ -36,24 +36,26 @@ export function ReplacementModeSettings({
     },
   ];
   return (
-    <section className="settings-section">
-      <h3>{texts.replacementMode.heading}</h3>
-      {options.map((option) => (
-        <label className="checkbox-row" key={option.value}>
-          <input
-            type="radio"
-            name="replacement-mode"
-            checked={mode === option.value}
-            onChange={() => onChange(option.value)}
-          />
-          <span>
-            <strong>{option.label}</strong>
-            <span className="checkbox-row__note">{option.note}</span>
-          </span>
-        </label>
-      ))}
+    <>
+      <section className="settings-section">
+        <h3>{texts.replacementMode.heading}</h3>
+        {options.map((option) => (
+          <label className="checkbox-row" key={option.value}>
+            <input
+              type="radio"
+              name="replacement-mode"
+              checked={mode === option.value}
+              onChange={() => onChange(option.value)}
+            />
+            <span>
+              <strong>{option.label}</strong>
+              <span className="checkbox-row__note">{option.note}</span>
+            </span>
+          </label>
+        ))}
+      </section>
       {onProfileChange ? (
-        <>
+        <section className="settings-section">
           <h3>{texts.replacementMode.profileHeading}</h3>
           {profiles.map((option) => (
             <label className="checkbox-row" key={option.value}>
@@ -69,8 +71,8 @@ export function ReplacementModeSettings({
               </span>
             </label>
           ))}
-        </>
+        </section>
       ) : null}
-    </section>
+    </>
   );
 }

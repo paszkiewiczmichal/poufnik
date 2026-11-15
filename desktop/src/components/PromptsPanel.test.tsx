@@ -133,4 +133,18 @@ describe("PromptsPanel", () => {
 
     expect(handlers.onCopyPrompt).toHaveBeenCalledWith("Przeanalizuj:\n[OSOBA_1] zlozyl pozew.");
   });
+
+  it("starts with the instruction collapsed and the copy buttons in view", () => {
+    renderPanel({ anonymizedText: "Treść." });
+
+    const text = document.querySelector(".prompt-preview__text")!;
+    expect(text).toHaveClass("prompt-preview__text--collapsed");
+    expect(screen.getByRole("button", { name: texts.prompts.copyWithDocument })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: texts.prompts.copyPrompt })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: texts.prompts.showFull }));
+    expect(text).toHaveClass("prompt-preview__text--open");
+    fireEvent.click(screen.getByRole("button", { name: texts.prompts.hideFull }));
+    expect(text).toHaveClass("prompt-preview__text--collapsed");
+  });
 });

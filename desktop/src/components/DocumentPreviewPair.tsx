@@ -4,6 +4,7 @@ import type { PreviewKind } from "../domain/preview";
 import { texts } from "../i18n";
 import { toUserMessage } from "../api/errors";
 import { FilePreview } from "./FilePreview";
+import { PreviewFrame } from "./PreviewFrame";
 
 export interface PreviewFile {
   blob: Blob;
@@ -57,34 +58,36 @@ export function DocumentPreviewPair({
   }, [version]);
 
   return (
-    <div className="document-preview-pair">
-      {original ? (
-        <FilePreview
-          file={original.file}
-          kind={original.kind}
-          format={original.format}
-          label={texts.preview.before}
-        />
+    <div className="document-preview">
+      {anonymized?.notice && anonymized.notice !== shownNotice ? (
+        <p className="status-note">{anonymized.notice}</p>
       ) : null}
-      <div className="document-preview-pair__after">
+      <div className="document-preview-pair">
+        {original ? (
+          <FilePreview
+            file={original.file}
+            kind={original.kind}
+            format={original.format}
+            label={texts.preview.before}
+          />
+        ) : null}
         {anonymized ? (
-          <>
-            {anonymized.notice && anonymized.notice !== shownNotice ? (
-              <p className="status-note">{anonymized.notice}</p>
-            ) : null}
-            <FilePreview
-              file={anonymized.blob}
-              kind={anonymized.kind}
-              format={anonymized.format}
-              label={texts.preview.after}
-            />
-          </>
-        ) : error ? (
-          <p className="error-note" role="alert">
-            {error}
-          </p>
+          <FilePreview
+            file={anonymized.blob}
+            kind={anonymized.kind}
+            format={anonymized.format}
+            label={texts.preview.after}
+          />
         ) : (
-          <p className="muted">{texts.preview.building}</p>
+          <PreviewFrame label={texts.preview.after}>
+            {error ? (
+              <p className="error-note" role="alert">
+                {error}
+              </p>
+            ) : (
+              <p className="muted">{texts.preview.building}</p>
+            )}
+          </PreviewFrame>
         )}
       </div>
     </div>

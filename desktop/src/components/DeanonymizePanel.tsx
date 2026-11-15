@@ -5,7 +5,6 @@ import type { DeanonymizationState } from "../types";
 interface DeanonymizePanelProps {
   deanonymization: DeanonymizationState;
   onInputChange: (input: string) => void;
-  onLoadMap: () => void;
   onRestore: () => void;
   onCopyResult: () => void;
 }
@@ -13,7 +12,6 @@ interface DeanonymizePanelProps {
 export function DeanonymizePanel({
   deanonymization,
   onInputChange,
-  onLoadMap,
   onRestore,
   onCopyResult,
 }: DeanonymizePanelProps) {
@@ -24,12 +22,12 @@ export function DeanonymizePanel({
       : [];
 
   return (
-    <section className="card deanon-panel" aria-labelledby="deanon-panel-title">
+    <section className="card card--padded deanon-panel" aria-labelledby="deanon-panel-title">
       <h3 className="card-title" id="deanon-panel-title">
         {texts.deanonymization.title}
       </h3>
       <p className="deanon-panel__lead">{texts.deanonymization.lead}</p>
-      <p className="muted">
+      <p className="muted deanon-panel__map">
         {deanonymization.mapSource === "file"
           ? texts.deanonymization.useLoadedMap
           : deanonymization.mapSource === "session"
@@ -48,9 +46,6 @@ export function DeanonymizePanel({
       </label>
 
       <div className="toolbar">
-        <button className="secondary-button" type="button" onClick={onLoadMap}>
-          {texts.deanonymization.loadMap}
-        </button>
         <button
           className="primary-button"
           type="button"

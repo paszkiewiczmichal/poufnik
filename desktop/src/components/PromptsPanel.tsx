@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import { renderPrompt } from "../domain/prompts";
 import { texts } from "../i18n";
@@ -27,6 +27,9 @@ export function PromptsPanel({
 
   const selected =
     prompts.items.find((prompt) => prompt.id === prompts.selectedId) ?? prompts.items[0] ?? null;
+  // The instruction is long: it starts collapsed so the copy buttons stay in view.
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const expanded = selected !== null && expandedId === selected.id;
 
   return (
     <section className="card prompt-panel" aria-labelledby="prompt-panel-title">
@@ -61,7 +64,19 @@ export function PromptsPanel({
 
       {selected && (
         <article className="prompt-preview">
-          <p className="prompt-preview__text">{readablePrompt(selected.body)}</p>
+          <p
+            className={`prompt-preview__text ${expanded ? "prompt-preview__text--open" : "prompt-preview__text--collapsed"}`}
+          >
+            {readablePrompt(selected.body)}
+          </p>
+          <button
+            className="link-button prompt-preview__toggle"
+            type="button"
+            aria-expanded={expanded}
+            onClick={() => setExpandedId(expanded ? null : selected.id)}
+          >
+            {expanded ? texts.prompts.hideFull : texts.prompts.showFull}
+          </button>
           <div className="toolbar">
             <button
               className="primary-button primary-button--compact"

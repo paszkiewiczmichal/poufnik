@@ -40,7 +40,6 @@ interface ResultViewProps {
   onCopyPrompt: (text: string) => void;
   onDeanonymizationInput: (input: string) => void;
   onDeanonymize: () => void;
-  onLoadReplacementMap: () => void;
   onCopyDeanonymizedResult: () => void;
 }
 
@@ -64,7 +63,6 @@ export function ResultView({
   onCopyPrompt,
   onDeanonymizationInput,
   onDeanonymize,
-  onLoadReplacementMap,
   onCopyDeanonymizedResult,
 }: ResultViewProps) {
   const [activeTab, setActiveTab] = useState<ResultTab>(documentPreview ? "document" : "text");
@@ -187,10 +185,12 @@ export function ResultView({
       </div>
 
       {activeTab === "document" && (
-        <div className="card">
-          <div className="card__header">
-            <span className="caps-label">{texts.generation.documentHeader}</span>
-            <div className="toolbar">{exportButtons}</div>
+        <div className="result-stack result-stack--fill">
+          <div className="card">
+            <div className="card__header">
+              <span className="caps-label">{texts.generation.documentHeader}</span>
+              <div className="toolbar">{exportButtons}</div>
+            </div>
           </div>
           {exportNotice ? (
             <p className="status-note" role="status">
@@ -243,23 +243,8 @@ export function ResultView({
           <div className="card__header card__header--stacked">
             <h3 className="card-title">{texts.generation.replacementMap}</h3>
             <p className="card__header-note">{texts.generation.mapNote}</p>
-            <div className="toolbar settings-actions">
-              <button
-                className="secondary-button secondary-button--compact"
-                type="button"
-                onClick={() => setMapVisible((visible) => !visible)}
-              >
-                {mapVisible ? texts.generation.mapHide : texts.generation.mapShow}
-              </button>
-              <button
-                className="ghost-button ghost-button--compact"
-                type="button"
-                disabled={passwordMismatch}
-                onClick={() => onSaveMap(mapPassword || null)}
-              >
-                {mapPassword ? texts.generation.saveMapEncrypted : texts.generation.saveMap}
-              </button>
-            </div>
+          </div>
+          <div className="map-save">
             <div className="map-password">
               <label className="field">
                 <span>{texts.generation.mapPassword}</span>
@@ -281,14 +266,35 @@ export function ResultView({
                   />
                 </label>
               ) : null}
-              <p className="muted">
+              <p className={passwordMismatch ? "field-hint field-hint--error" : "field-hint"}>
                 {passwordMismatch ? texts.generation.mapPasswordMismatch : texts.generation.mapPasswordNote}
               </p>
+            </div>
+            <div className="toolbar">
+              <button
+                className="secondary-button secondary-button--compact"
+                type="button"
+                disabled={passwordMismatch}
+                onClick={() => onSaveMap(mapPassword || null)}
+              >
+                {mapPassword ? texts.generation.saveMapEncrypted : texts.generation.saveMap}
+              </button>
             </div>
           </div>
           {caseControls}
           {mapVisible ? (
-            <ReplacementMapTable replacementMap={replacementMap} />
+            <>
+              <div className="map-card__bar">
+                <button
+                  className="link-button"
+                  type="button"
+                  onClick={() => setMapVisible(false)}
+                >
+                  {texts.generation.mapHide}
+                </button>
+              </div>
+              <ReplacementMapTable replacementMap={replacementMap} />
+            </>
           ) : (
             <div className="map-card__blur">
               <div className="map-card__rows--blurred" aria-hidden="true">
@@ -315,15 +321,16 @@ export function ResultView({
       )}
 
       {activeTab === "restore" && (
-        <DeanonymizePanel
-          deanonymization={deanonymization}
-          onInputChange={onDeanonymizationInput}
-          onLoadMap={onLoadReplacementMap}
-          onRestore={onDeanonymize}
-          onCopyResult={onCopyDeanonymizedResult}
-        />
+        <div className="result-stack">
+          <DeanonymizePanel
+            deanonymization={deanonymization}
+            onInputChange={onDeanonymizationInput}
+            onRestore={onDeanonymize}
+            onCopyResult={onCopyDeanonymizedResult}
+          />
+          {fileRestore}
+        </div>
       )}
-      {activeTab === "restore" && fileRestore}
     </section>
   );
 }

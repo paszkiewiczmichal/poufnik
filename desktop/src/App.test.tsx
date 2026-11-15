@@ -405,6 +405,7 @@ describe("App engine health", () => {
     mocks.saveBinaryFile.mockResolvedValue("odpowiedz_przywrocone.txt");
 
     render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: texts.nav.restore }));
     fireEvent.click(
       await screen.findByRole("button", { name: texts.deanonymization.fileButton }),
     );
@@ -442,6 +443,7 @@ describe("App engine health", () => {
     mocks.saveBinaryFile.mockResolvedValue("odpowiedz_przywrocone.txt");
 
     render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: texts.nav.restore }));
     fireEvent.click(await screen.findByRole("button", { name: texts.deanonymization.fileButton }));
 
     expect(
@@ -482,6 +484,28 @@ describe("App engine health", () => {
     fireEvent.click(await screen.findByRole("checkbox", { name: new RegExp(texts.rememberedMaps.enabled) }));
 
     expect(mocks.shell.saveRememberMaps).toHaveBeenCalledWith(false);
+  });
+
+  it("reaches the restore tool from the sidebar, not from the start screen", async () => {
+    render(<App />);
+
+    await screen.findByRole("heading", { name: texts.start.title });
+    expect(
+      screen.queryByRole("button", { name: texts.deanonymization.fileButton }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(texts.deanonymization.fileTitle)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: texts.nav.restore }));
+
+    expect(
+      await screen.findByRole("heading", { name: texts.deanonymization.toolTitle }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(texts.deanonymization.toolDropTitle)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: texts.deanonymization.fileButton }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: texts.deanonymization.loadMapShort })).toBeInTheDocument();
+    expect(screen.getByLabelText(texts.deanonymization.inputLabel)).toBeInTheDocument();
   });
 
   it("offers login from the Basic sidebar and opens the account settings", async () => {
@@ -887,8 +911,8 @@ describe("App engine health", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: texts.nav.batch }));
 
-    expect(await screen.findByRole("heading", { name: texts.batch.title })).toBeInTheDocument();
-    expect(screen.getByText(texts.batch.empty)).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: texts.batch.heading })).toBeInTheDocument();
+    expect(screen.getByText(texts.batch.dropTitle)).toBeInTheDocument();
   });
 
   it("gives the files of one case shared tokens, one file after another", async () => {

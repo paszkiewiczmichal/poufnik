@@ -142,7 +142,6 @@ function renderWorkspace(tier: "basic" | "early_bird", options: RenderWorkspaceO
       onCopyPrompt={vi.fn()}
       onDeanonymizationInput={vi.fn()}
       onDeanonymize={vi.fn()}
-      onLoadReplacementMap={vi.fn()}
       onCopyDeanonymizedResult={vi.fn()}
       onRegister={vi.fn()}
       canRedetect

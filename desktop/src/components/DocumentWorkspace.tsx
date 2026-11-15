@@ -58,7 +58,6 @@ interface DocumentWorkspaceProps {
   onCopyPrompt: (text: string) => void;
   onDeanonymizationInput: (input: string) => void;
   onDeanonymize: () => void;
-  onLoadReplacementMap: () => void;
   onCopyDeanonymizedResult: () => void;
   onRegister: () => void;
   canRedetect: boolean;
@@ -95,7 +94,6 @@ export function DocumentWorkspace({
   onCopyPrompt,
   onDeanonymizationInput,
   onDeanonymize,
-  onLoadReplacementMap,
   onCopyDeanonymizedResult,
   onRegister,
   canRedetect,
@@ -234,7 +232,6 @@ export function DocumentWorkspace({
           onCopyPrompt={onCopyPrompt}
           onDeanonymizationInput={onDeanonymizationInput}
           onDeanonymize={onDeanonymize}
-          onLoadReplacementMap={onLoadReplacementMap}
           onCopyDeanonymizedResult={onCopyDeanonymizedResult}
         />
       ) : (

@@ -20,10 +20,10 @@ export function validateCustomRuleDraft(
     return "Podaj nazwę reguły.";
   }
   if (!draft.label.trim()) {
-    return "Podaj etykietę kategorii CUSTOM.";
+    return "Podaj oznaczenie w tekście, np. SYGNATURA.";
   }
   if (!draft.pattern.trim()) {
-    return "Podaj wzorzec regex.";
+    return "Podaj wzorzec.";
   }
   if (draft.pattern.length > MAX_CUSTOM_RULE_PATTERN_LENGTH) {
     return `Wzorzec może mieć maksymalnie ${MAX_CUSTOM_RULE_PATTERN_LENGTH} znaków.`;
@@ -31,7 +31,7 @@ export function validateCustomRuleDraft(
   try {
     compileCustomRulePattern(draft.pattern);
   } catch (error) {
-    return `Niepoprawny regex: ${error instanceof Error ? error.message : String(error)}`;
+    return `Niepoprawny wzorzec: ${error instanceof Error ? error.message : String(error)}`;
   }
   return null;
 }

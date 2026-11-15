@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { PreviewKind } from "../domain/preview";
 import { texts } from "../i18n";
 import { convertToPdf, NoPreviewConverterError } from "../tauri/pdf";
+import { PreviewFrame } from "./PreviewFrame";
 
 // A long contract still opens quickly; the saved file always has every page.
 const MAX_PDF_PAGES = 60;
@@ -113,8 +114,7 @@ export function FilePreview({ file, kind, label, format }: FilePreviewProps) {
   }, [file, kind, format]);
 
   return (
-    <section className="file-preview" aria-label={label}>
-      <div className="file-preview__label caps-label">{label}</div>
+    <PreviewFrame label={label}>
       {status === "loading" && (
         <p className="muted file-preview__status">
           {kind === "office" ? texts.preview.converting : texts.preview.loading}
@@ -143,7 +143,7 @@ export function FilePreview({ file, kind, label, format }: FilePreviewProps) {
           <img className="file-preview__image" src={imageUrl} alt={label} />
         ) : null}
       </div>
-    </section>
+    </PreviewFrame>
   );
 }
 

@@ -35,4 +35,56 @@ describe("i18n copy rules", () => {
       }
     }
   });
+
+  it("writes headings without a trailing full stop", async () => {
+    const { texts } = await import("./i18n");
+    const headings = [
+      texts.settings.title,
+      texts.settings.advanced,
+      texts.account.sectionTitle,
+      texts.tiers.plansTitle,
+      texts.updates.sectionTitle,
+      texts.updates.settingsTitle,
+      texts.updates.consentTitle,
+      texts.updates.updateTitle,
+      texts.history.heading,
+      texts.history.disabledTitle,
+      texts.customRules.heading,
+      texts.start.title,
+      texts.batch.heading,
+      texts.processing.title,
+      texts.errors.importTitle,
+      texts.engine.failedTitle,
+      texts.review.title,
+      texts.entities.heading,
+      texts.generation.title,
+      texts.generation.replacementMap,
+      texts.compare.title,
+      texts.prompts.title,
+      texts.deanonymization.title,
+      texts.deanonymization.toolTitle,
+    ];
+
+    for (const heading of headings) {
+      expect(heading.length).toBeGreaterThan(0);
+      expect(heading).not.toMatch(/\.$/);
+    }
+  });
+
+  it("uses an en dash, not a hyphen, as a dash and says plan, not layer, for the account", async () => {
+    const { texts } = await import("./i18n");
+
+    expect(texts.preview.after).toBe("Po – tak wygląda zapisany plik");
+    expect(texts.account.sectionTitle).toBe("Konto i plan");
+    const contents = fs.readFileSync(path.join(process.cwd(), "src", "i18n.ts"), "utf-8");
+    expect(contents).not.toMatch(/"[^"\n]* - [^"\n]*"/);
+  });
+
+  it("does not promise better detection in a paid plan", async () => {
+    const { texts } = await import("./i18n");
+    const pro = texts.tiers.plans.find((plan) => plan.code === "pro");
+
+    expect(pro?.description).not.toMatch(/dokładniejsz/i);
+    expect(JSON.stringify(texts.tiers.plans)).not.toMatch(/dokładniejsz/i);
+  });
 });

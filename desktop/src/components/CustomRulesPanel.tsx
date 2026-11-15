@@ -27,6 +27,8 @@ export function CustomRulesPanel({ rules, onChange }: CustomRulesPanelProps) {
     () => validateCustomRuleDraft(draft, rules.length),
     [draft, rules.length],
   );
+  // The red message waits until the user has typed something into the form.
+  const draftTouched = Boolean(draft.name || draft.label || draft.pattern);
   const matches = useMemo(() => {
     if (validationMessage || !sampleText) {
       return [];
@@ -97,12 +99,11 @@ export function CustomRulesPanel({ rules, onChange }: CustomRulesPanelProps) {
           />
         </label>
         <div className="custom-rule-form__wide custom-rule-test">
-          <span className="tag-row">
-            <span>CUSTOM</span>
-            <span>{texts.customRules.matchCount(matches.length)}</span>
-          </span>
+          <p className="muted">{texts.customRules.matchCount(matches.length)}</p>
           {matches.length > 0 ? <p>{matches.slice(0, 5).join(", ")}</p> : null}
-          {validationMessage ? <p className="error-note">{validationMessage}</p> : null}
+          {validationMessage && draftTouched ? (
+            <p className="error-note">{validationMessage}</p>
+          ) : null}
         </div>
         <div className="custom-rule-form__actions">
           <button

@@ -30,14 +30,12 @@ function renderPanel(
   deanonymization: DeanonymizationState,
   handlers: Partial<{
     onInputChange: ReturnType<typeof vi.fn>;
-    onLoadMap: ReturnType<typeof vi.fn>;
     onRestore: ReturnType<typeof vi.fn>;
     onCopyResult: ReturnType<typeof vi.fn>;
   }> = {},
 ) {
   const merged = {
     onInputChange: vi.fn(),
-    onLoadMap: vi.fn(),
     onRestore: vi.fn(),
     onCopyResult: vi.fn(),
     ...handlers,
@@ -46,7 +44,6 @@ function renderPanel(
     <DeanonymizePanel
       deanonymization={deanonymization}
       onInputChange={merged.onInputChange}
-      onLoadMap={merged.onLoadMap}
       onRestore={merged.onRestore}
       onCopyResult={merged.onCopyResult}
     />,
@@ -68,7 +65,7 @@ describe("DeanonymizePanel - map status label", () => {
     expect(screen.queryByText(texts.deanonymization.useLoadedMap)).not.toBeInTheDocument();
   });
 
-  it("labels the map as loaded from a file after Wczytaj mapę JSON", () => {
+  it("labels the map as loaded from a file after Wczytaj mapę", () => {
     renderPanel({ ...baseDeanonymization, replacementMap: {} as never, mapSource: "file" });
 
     expect(screen.getByText(texts.deanonymization.useLoadedMap)).toBeInTheDocument();
@@ -87,12 +84,12 @@ describe("DeanonymizePanel - input and actions", () => {
     expect(handlers.onInputChange).toHaveBeenCalledWith("[OSOBA_1] zlozyl pozew.");
   });
 
-  it("calls onLoadMap from the load-map button", () => {
-    const handlers = renderPanel(baseDeanonymization);
+  it("has no map button of its own: the map is loaded in the file box", () => {
+    renderPanel(baseDeanonymization);
 
-    fireEvent.click(screen.getByRole("button", { name: texts.deanonymization.loadMap }));
-
-    expect(handlers.onLoadMap).toHaveBeenCalledTimes(1);
+    expect(
+      screen.queryByRole("button", { name: texts.deanonymization.loadMapShort }),
+    ).not.toBeInTheDocument();
   });
 
   it("disables restore when there is no input or no map", () => {

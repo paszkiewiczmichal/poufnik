@@ -1,5 +1,9 @@
+import { useState } from "react";
+import type { DragEvent } from "react";
+
 import type { MapCandidate } from "../domain/mapLinking";
 import { texts } from "../i18n";
+import { UploadIcon } from "../ui/icons";
 import { MapPasswordForm } from "./MapPasswordForm";
 
 export interface FileRestoreState {
@@ -23,6 +27,12 @@ interface FileRestorePanelProps {
   /** An encrypted map waiting for its password. */
   lockedMap?: { error: string | null } | null;
   onUnlockMap?: (password: string) => void;
+  /**
+   * "card" - a box under the pasted text (result tab); "tool" - the "Przywracanie" screen
+   * with a large drop zone like the import screen.
+   */
+  variant?: "card" | "tool";
+  onDropFile?: (file: File) => void;
 }
 
 /** Restoring the original data into a file that came back from an AI chat, in its own format. */
@@ -36,32 +46,36 @@ export function FileRestorePanel({
   mapLoaded = false,
   lockedMap = null,
   onUnlockMap,
+  variant = "card",
+  onDropFile,
 }: FileRestorePanelProps) {
-  return (
-    <section className="card file-restore" aria-labelledby="file-restore-title">
-      <h3 className="card-title" id="file-restore-title">
-        {texts.deanonymization.fileTitle}
-      </h3>
-      <p className="muted">{texts.deanonymization.fileLead}</p>
-      <div className="toolbar">
-        <button
-          className="secondary-button"
-          type="button"
-          disabled={disabled || state.status === "loading"}
-          onClick={onChooseFile}
-        >
-          {state.status === "loading"
-            ? texts.deanonymization.fileWorking
-            : texts.deanonymization.fileButton}
-        </button>
-        {onLoadMap ? (
-          <button className="ghost-button" type="button" onClick={onLoadMap}>
-            {texts.deanonymization.loadMapShort}
-          </button>
-        ) : null}
-      </div>
-      {mapLoaded ? <p className="muted">{texts.deanonymization.mapLoaded}</p> : null}
+  const [dragActive, setDragActive] = useState(false);
+  const busy = disabled || state.status === "loading";
+  const buttonLabel =
+    state.status === "loading" ? texts.deanonymization.fileWorking : texts.deanonymization.fileButton;
 
+  const handleDrop = (event: DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    setDragActive(false);
+    const file = event.dataTransfer.files.item(0);
+    if (file && !busy) {
+      onDropFile?.(file);
+    }
+  };
+
+  const mapRow = onLoadMap ? (
+    <div className="file-restore__map">
+      <button className="ghost-button ghost-button--compact" type="button" onClick={onLoadMap}>
+        {texts.deanonymization.loadMapShort}
+      </button>
+      <span className="muted">
+        {mapLoaded ? texts.deanonymization.mapLoaded : texts.deanonymization.mapHint}
+      </span>
+    </div>
+  ) : null;
+
+  const details = (
+    <>
       {lockedMap && onUnlockMap ? (
         <MapPasswordForm error={lockedMap.error} onUnlock={onUnlockMap} />
       ) : null}
@@ -99,6 +113,65 @@ export function FileRestorePanel({
           {state.message}
         </p>
       )}
+    </>
+  );
+
+  if (variant === "tool") {
+    return (
+      <section
+        className="file-restore file-restore--tool"
+        aria-label={texts.deanonymization.toolTitle}
+        onDragOver={(event) => {
+          event.preventDefault();
+          setDragActive(true);
+        }}
+        onDragLeave={() => setDragActive(false)}
+        onDrop={handleDrop}
+      >
+        <div
+          className={`drop-zone ${dragActive ? "drop-zone--active" : ""}`}
+          onClick={() => {
+            if (!busy) {
+              onChooseFile();
+            }
+          }}
+        >
+          <UploadIcon className="drop-zone__icon" />
+          <div className="drop-zone__title">
+            {dragActive ? texts.deanonymization.toolDropActive : texts.deanonymization.toolDropTitle}
+          </div>
+          <button
+            className="secondary-button"
+            type="button"
+            disabled={busy}
+            onClick={(event) => {
+              event.stopPropagation();
+              onChooseFile();
+            }}
+          >
+            {buttonLabel}
+          </button>
+          <div className="drop-zone__formats">{texts.deanonymization.toolFormats}</div>
+        </div>
+        {mapRow}
+        {details}
+      </section>
+    );
+  }
+
+  return (
+    <section className="card card--padded file-restore" aria-labelledby="file-restore-title">
+      <h3 className="card-title" id="file-restore-title">
+        {texts.deanonymization.fileTitle}
+      </h3>
+      <p className="muted">{texts.deanonymization.fileLead}</p>
+      <div className="toolbar">
+        <button className="secondary-button" type="button" disabled={busy} onClick={onChooseFile}>
+          {buttonLabel}
+        </button>
+      </div>
+      {mapRow}
+      {details}
     </section>
   );
 }

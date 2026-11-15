@@ -46,11 +46,31 @@ function renderPanel(props: Partial<Parameters<typeof BatchPanel>[0]> = {}) {
 }
 
 describe("BatchPanel", () => {
-  it("shows the empty-queue note when there are no items", () => {
+  it("shows a large drop zone when the queue is empty", () => {
     renderPanel({ items: [] });
 
-    expect(screen.getByText(texts.batch.empty)).toBeInTheDocument();
+    expect(screen.getByText(texts.batch.dropTitle)).toBeInTheDocument();
+    expect(screen.queryByText(texts.batch.dropHint)).not.toBeInTheDocument();
     expect(screen.queryByRole("list")).not.toBeInTheDocument();
+  });
+
+  it("says \"kolejne\" only when files are already queued", () => {
+    renderPanel({ items: [makeItem()] });
+
+    expect(screen.getByText(texts.batch.dropHint)).toBeInTheDocument();
+    expect(screen.queryByText(texts.batch.dropTitle)).not.toBeInTheDocument();
+  });
+
+  it("passes dropped files on", () => {
+    const onDropFiles = vi.fn();
+    renderPanel({ items: [], onDropFiles });
+    const file = new File(["a"], "pozew.txt");
+
+    fireEvent.drop(screen.getByText(texts.batch.dropTitle).closest(".drop-zone")!, {
+      dataTransfer: { files: [file] },
+    });
+
+    expect(onDropFiles).toHaveBeenCalledWith([file]);
   });
 
   it("shows the lead note and item list once items are queued", () => {
