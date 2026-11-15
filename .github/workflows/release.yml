@@ -118,7 +118,7 @@ jobs:
         run: |
           $tessHome = "C:\Program Files\Tesseract-OCR"
           if (-not (Test-Path "$tessHome\tesseract.exe")) {
-            choco install tesseract --yes --no-progress
+            choco install tesseract --version 5.4.0.20240606 --yes --no-progress  # the version tested locally and bundled; 5.5 reads some OCR labels differently
           }
           if (-not (Test-Path "$tessHome\tesseract.exe")) {
             throw "Tesseract not found at $tessHome and Chocolatey install did not provide it."
@@ -234,7 +234,7 @@ jobs:
         run: |
           $tessHome = "C:\Program Files\Tesseract-OCR"
           if (-not (Test-Path "$tessHome\tesseract.exe")) {
-            choco install tesseract --yes --no-progress
+            choco install tesseract --version 5.4.0.20240606 --yes --no-progress  # the version tested locally and bundled; 5.5 reads some OCR labels differently
           }
           if (-not (Test-Path "$tessHome\tesseract.exe")) {
             throw "Tesseract not found at $tessHome and Chocolatey install did not provide it."
@@ -534,7 +534,7 @@ jobs:
         run: |
           $tessHome = "C:\Program Files\Tesseract-OCR"
           if (-not (Test-Path "$tessHome\tesseract.exe")) {
-            choco install tesseract --yes --no-progress
+            choco install tesseract --version 5.4.0.20240606 --yes --no-progress  # the version tested locally and bundled; 5.5 reads some OCR labels differently
           }
           if (-not (Test-Path "$tessHome\tesseract.exe")) {
             throw "Tesseract not found at $tessHome and Chocolatey install did not provide it."
