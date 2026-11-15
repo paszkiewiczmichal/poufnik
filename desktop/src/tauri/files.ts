@@ -155,9 +155,14 @@ export async function exportBatchResultsToDirectory(
   return files.length;
 }
 
-export async function confirmSensitiveAction(message: string, title: string): Promise<boolean> {
+export async function confirmSensitiveAction(
+  message: string,
+  title: string,
+  okLabel = "Tak",
+): Promise<boolean> {
   try {
-    return await confirm(message, { title, kind: "warning" });
+    // Polish buttons: without labels the system dialog says "OK" / "Cancel".
+    return await confirm(message, { title, kind: "warning", okLabel, cancelLabel: "Anuluj" });
   } catch {
     return window.confirm(message);
   }

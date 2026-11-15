@@ -224,7 +224,13 @@ describe("confirmSensitiveAction", () => {
     confirmDialog.mockResolvedValue(true);
 
     await expect(confirmSensitiveAction("Na pewno?", "Uwaga")).resolves.toBe(true);
-    expect(confirmDialog).toHaveBeenCalledWith("Na pewno?", { title: "Uwaga", kind: "warning" });
+    // Polish buttons, not the system's "OK" / "Cancel".
+    expect(confirmDialog).toHaveBeenCalledWith("Na pewno?", {
+      title: "Uwaga",
+      kind: "warning",
+      okLabel: "Tak",
+      cancelLabel: "Anuluj",
+    });
   });
 
   it("falls back to window.confirm when the Tauri dialog throws", async () => {

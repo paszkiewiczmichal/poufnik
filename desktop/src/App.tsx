@@ -268,6 +268,7 @@ function App() {
     const confirmed = await confirmSensitiveAction(
       texts.rememberedMaps.deleteConfirm,
       texts.rememberedMaps.deleteButton,
+      texts.rememberedMaps.deleteConfirmButton,
     );
     if (!confirmed) {
       return;
@@ -2357,7 +2358,9 @@ function App() {
                     />
                     <span>
                       <strong>{texts.rememberedMaps.enabled}</strong>
-                      <span className="checkbox-row__note">{texts.rememberedMaps.note}</span>
+                      <span className="checkbox-row__note">
+                        {texts.rememberedMaps.note(!/Mac/i.test(navigator.userAgent))}
+                      </span>
                     </span>
                   </label>
                   <div className="toolbar">

@@ -707,8 +707,9 @@ jobs:
             target: aarch64-apple-darwin
             asset_arch: aarch64
             # The oldest macOS every bundled binary loads on (Homebrew's Tesseract);
-            # smoke_app_bundle.py fails the build when a binary needs more.
-            minimum_macos: "15.0"
+            # smoke_app_bundle.py fails the build when a binary needs more. Tesseract 5.5.4
+            # from Homebrew on macos-15 needs 15.8.1 (v1.1.0-rc.1).
+            minimum_macos: "15.8.1"
             staple: true
           # macos-13 was fully retired 2025-12-08 (GitHub deprecated the whole macOS 13
           # image); macos-15-intel is the current label for a hosted Intel runner, kept

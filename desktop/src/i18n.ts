@@ -627,9 +627,14 @@ export const texts = {
   rememberedMaps: {
     heading: "Zapamiętane mapy do przywracania",
     enabled: "Zapamiętuj mapy do przywracania",
-    note:
-      "Dzięki temu „Przywróć dane” samo znajdzie mapę dokumentu. Mapy są zaszyfrowane na tym komputerze i kasowane po 30 dniach. Mapy zapisane przez Ciebie do pliku zostają bez zmian.",
+    // Only Windows encrypts them (DPAPI); on the Mac the Keychain comes in a later version,
+    // so the text must not promise encryption there.
+    note: (encrypted: boolean) =>
+      encrypted
+        ? "Dzięki temu „Przywróć dane” samo znajdzie mapę dokumentu. Mapy są zaszyfrowane kluczem Twojego konta Windows i kasowane po 30 dniach. Mapy zapisane przez Ciebie do pliku zostają bez zmian."
+        : "Dzięki temu „Przywróć dane” samo znajdzie mapę dokumentu. Na Macu mapy są na razie zapisane bez szyfrowania, w danych aplikacji na tym komputerze, i kasowane po 30 dniach. Jeśli nie chcesz ich przechowywać, wyłącz tę opcję. Mapy zapisane przez Ciebie do pliku zostają bez zmian.",
     deleteButton: "Usuń zapamiętane mapy",
+    deleteConfirmButton: "Usuń",
     deleteConfirm:
       "Usunąć wszystkie zapamiętane mapy? Dokumentów zanonimizowanych wcześniej nie da się już przywrócić automatycznie (mapy zapisane przez Ciebie do pliku zostaną).",
     deleted: (count: number) =>

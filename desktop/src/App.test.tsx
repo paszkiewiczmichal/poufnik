@@ -461,6 +461,7 @@ describe("App engine health", () => {
     expect(mocks.confirmSensitiveAction).toHaveBeenCalledWith(
       texts.rememberedMaps.deleteConfirm,
       texts.rememberedMaps.deleteButton,
+      texts.rememberedMaps.deleteConfirmButton,
     );
   });
 
