@@ -2,113 +2,101 @@
   <img src="desktop/src/assets/images/logo.webp" width="250" alt="Poufnik" />
 </p>
 
+<h1 align="center">Poufnik – anonimizacja dokumentów</h1>
+
 <p align="center">
-  <strong>Prepare Polish-language documents for AI without sending their contents to an external model.</strong>
+  <strong>Darmowy program do anonimizacji dokumentów na Windows i macOS. Działa lokalnie, na Twoim komputerze.</strong>
 </p>
 
 <p align="center">
-  <a href="https://poufnik.app">Download for Windows</a> ·
-  <a href="https://github.com/paszkiewiczmichal/poufnik/releases/latest">Latest release</a> ·
-  <a href="README.pl.md">Polska wersja</a>
+  <a href="https://poufnik.app/pobierz/">Pobierz</a> ·
+  <a href="https://apps.microsoft.com/detail/9P6ZLK40V3LL">Microsoft Store</a> ·
+  <a href="https://apps.apple.com/app/poufnik/id6824860270">Mac App Store</a> ·
+  <a href="https://github.com/paszkiewiczmichal/poufnik/releases/latest">Najnowsze wydanie</a> ·
+  <a href="README.en.md">English</a>
 </p>
 
-![Poufnik - import screen](docs/images/import-screen.jpg)
+![Poufnik: przegląd wykrytych danych w umowie](docs/images/przeglad.webp)
 
-Poufnik is a free, open-source desktop app for anonymising documents before using them with ChatGPT, Claude, Copilot or another AI tool. Parsing, OCR, detection, anonymisation, export and prompt preparation run on the local computer. Document content is never uploaded to an AI provider.
+Poufnik znajduje dane osobowe w PDF, Wordzie, Excelu i skanach. Zamienia je na oznaczenia albo trwale usuwa z pliku, zanim dokument trafi do czatu AI, kontrahenta albo do BIP.
 
-The app is designed for Polish documents. It recognises Polish identifiers and language patterns, including inflected names, so a document can be reviewed and anonymised before it leaves the organisation.
+Program jest wyspecjalizowany w języku polskim. Wykrywa dane osobowe, firmowe i sądowe w ponad 20 kategoriach, w tym nazwiska w odmianie, numery ksiąg wieczystych i sygnatury akt. Zastępuje je oznaczeniami w rodzaju `[OSOBA_1]` albo trwale usuwa z pliku. Gdy model AI odpowie na tekst z oznaczeniami, wklejasz odpowiedź do Poufnika i dostajesz ją z prawdziwymi danymi.
 
-> The screenshot shows the import workspace in the installed app. Documents are processed locally before they are used with an AI tool.
+## Jakie dane wychodzą razem z dokumentem
 
-## Why Poufnik
+Plik wysłany do czatu AI, kontrahenta albo opublikowany w BIP niesie więcej danych, niż widać na ekranie.
 
-- **Local by design.** The document-processing pipeline runs locally. The app communicates with its engine only through `127.0.0.1`.
-- **Made for Polish documents.** Detects PESEL, NIP, REGON, KRS, IDs, passports, bank accounts and payment cards, land-register numbers, case references, addresses, coordinates, IP/MAC addresses, API keys, amounts, names, organisations and contact details.
-- **You remain in control.** Review each detection, keep or exclude it, change its category, merge occurrences into a common token, or add a missed fragment manually.
-- **Files, scans and images.** Import PDF, DOCX and TXT, as well as scans and images. OCR is performed locally when needed.
-- **Practical AI hand-off.** Copy anonymised text, export DOCX or PDF, or prepare a legal prompt containing the anonymised document.
-- **Controlled reversibility.** Keep a local replacement map and restore tokens in an AI response on the same computer. The map is not copied with the anonymised text.
-- **No account required.** The free Basic tier includes the complete anonymisation workflow. A free Early Bird account unlocks additional workspace features while document content remains local.
+- Tekst wklejony do czatu AI trafia na serwer dostawcy usługi razem z każdym nazwiskiem, numerem PESEL i sygnaturą.
+- Czarny prostokąt w PDF często zasłania tekst tylko na ekranie. Warstwa tekstowa zostaje w pliku i wystarczy ją zaznaczyć i skopiować.
+- Plik Worda przechowuje autora, nazwę firmy, komentarze i tekst usunięty w trybie śledzenia zmian.
 
-## Who it is for
+Poufnik usuwa te dane w jednym przebiegu, a Ty przed zapisaniem widzisz każde wykrycie i decydujesz, co zostaje.
 
-- Lawyers, law firms and in-house legal teams preparing contracts, pleadings, correspondence and case files for AI-assisted work.
-- HR, finance, compliance and operations teams handling personal or confidential documents.
-- Consultants, researchers and public-sector professionals who need to discuss documents with AI without exposing identifiers.
-- Organisations that want a practical privacy layer before adopting AI in their document workflow.
+## Jak to działa
 
-Poufnik prepares material for safer work. It does not replace legal, security or privacy review. Always verify the final text before sharing it.
+1. **Wczytaj dokument.** PDF, Word, Excel, PowerPoint, OpenDocument (ODT, ODS, ODP), TXT, skan albo zdjęcie dokumentu (JPG, PNG, HEIC) do 50 MB, a także tekst ze schowka. Tekst ze skanu odczytuje OCR, który działa na Twoim komputerze.
+2. **Przejrzyj wykrycia.** Każde wykrycie możesz wyłączyć albo przenieść do innej kategorii, a fragment, który program pominął, dodać ręcznie.
+3. **Skopiuj albo zapisz wynik.** Ta sama osoba ma w całym tekście to samo oznaczenie, więc model AI nadal rozumie, kto jest kim. Tekst kopiujesz sam albo razem z gotowym promptem prawniczym. Plik zapisujesz w tym samym formacie co oryginał.
+4. **Przywróć dane w odpowiedzi AI.** Wklej odpowiedź modelu, a oznaczenia zamienią się z powrotem na prawdziwe dane. Mapa zastąpień zostaje na komputerze i nie trafia do schowka razem z tekstem.
 
-## How it works
+![Dokument gotowy do wysłania do AI](docs/images/wynik.webp)
 
-1. **Import.** Drag a file into the app or select it from disk. Poufnik accepts PDF, DOCX, TXT, JPG, PNG and HEIC files up to 50 MB.
-2. **Review.** Inspect highlighted entities and use the sidebar to accept, reject or correct them. Add your own selection when extra protection is needed.
-3. **Anonymise.** Accepted data is replaced with consistent tokens, such as `[OSOBA_1]` and `[PESEL_1]`.
-4. **Use with AI.** Copy the safe text, export DOCX/PDF, or copy a ready prompt with the document included.
-5. **Restore locally, if needed.** Paste an AI response containing tokens and restore the data with the local replacement map.
+![Odpowiedź modelu z przywróconymi danymi](docs/images/przywracanie.webp)
 
-## Screenshots
+## Co wykrywa
 
-### Review and correction
+Imiona i nazwiska także w odmianie, nazwy firm i instytucji, adresy, PESEL, NIP, REGON, KRS, numery dowodów i paszportów, rachunki bankowe i karty płatnicze, numery ksiąg wieczystych, sygnatury akt, numery rejestracyjne i VIN pojazdów, telefony, adresy e-mail i kwoty. Na zdjęciach i skanach może też zamalować twarze (opcja w Ustawieniach).
 
-![Review of detected data in a fully fictional agreement](docs/images/review-screen.jpg)
+## Trwałe zaczernianie w PDF
 
-### Anonymised document ready for AI
+Poufnik usuwa znaki danych z pliku, zamiast rysować na nich prostokąt, więc nazwiska ani numeru nie da się spod zaczernienia skopiować. Czyści też cały plik: metadane, komentarze, załączniki, zakładki i ukryte teksty zastępcze.
 
-![Anonymised agreement and ready legal prompts](docs/images/result-screen.jpg)
+![Zaczernienie w PDF usuwa dane z pliku](docs/images/pdf.webp)
 
-The screenshots use [a fully fictional sample agreement](docs/demo/umowa-poufnik-demo.txt). It is safe to import when exploring the app.
+## Treść dokumentu nie opuszcza komputera
 
-## Privacy and connectivity
+Odczyt pliku, OCR, wykrywanie danych, anonimizację i przywracanie wykonuje silnik uruchomiony na Twoim komputerze, także bez internetu. Aplikacja łączy się z siecią przy sprawdzaniu aktualizacji i przy logowaniu do konta Lawtern, jeśli z niego korzystasz. Treści dokumentu w tych połączeniach nie przesyła. Listę połączeń do porównania z kodem zawiera dokument [dla działu IT i IOD](docs/dla-it-i-iod.md).
 
-Document parsing, OCR, detection, anonymisation, export and restoring tokenised AI responses stay on the device. Poufnik does not send document content to an AI model or another external document-processing service.
+Model AI dostaje tylko dane potrzebne do zadania, zgodnie z zasadą minimalizacji z RODO. Oznaczenia z mapą zastąpień odwrócisz tylko Ty, na swoim komputerze, i w rozumieniu RODO jest to pseudonimizacja. Trwałe zaczernienie w PDF nie zostawia mapy, więc nie da się go odwrócić.
 
-Internet is used only for optional, separate functions, such as checking the update manifest or using an Early Bird account. Update checks are opt-in at first launch and can be changed in Settings. Explicitly opened website links use the system browser. These connections do not upload document content.
+Poufnik przygotowuje materiał do bezpieczniejszej pracy, ale nie zastępuje przeglądu prawnego. Przed wysłaniem dokumentu przejrzyj wynik.
 
-Local processing can support RODO/GDPR and AI Act processes, but compliance depends on the complete workflow, configuration and human review.
+## Dla kogo
 
-## Editions
+Kancelarie (akta, pisma procesowe, umowy, orzeczenia), urzędy publikujące w BIP, placówki medyczne, działy kadr i księgowości oraz każdy, kto chce pracować z AI na dokumentach bez ujawniania danych osobowych.
 
-| Edition | Availability | Includes |
+## Wersje
+
+| Wersja | Dostępność | Zakres |
 | --- | --- | --- |
-| **Basic** | Free, no sign-in | Full local anonymisation, review, OCR, export and prompt preparation |
-| **Early Bird** | Free account | History, side-by-side comparison, batch processing and custom detection rules |
-| **Pro** | Planned | More precise sensitive-data detection |
-| **Enterprise** | Planned | API integration with document-management workflows |
+| **Basic** | Za darmo, na stałe, bez konta | Pełna anonimizacja bez limitu dokumentów, OCR, eksport, gotowe prompty |
+| **Early Bird** | Za darmo, z kontem Lawtern | Wszystko z Basic i nowe funkcje wcześniej |
 
-## Install and use
+## Instalacja
 
-1. Download the current Windows installer from [poufnik.app](https://poufnik.app) or the [latest GitHub release](https://github.com/paszkiewiczmichal/poufnik/releases/latest).
-2. Install and open **Poufnik** from the Start menu.
-3. Select **Start without signing in** to use Basic immediately, or create a free Early Bird account for additional features.
-4. Choose whether to allow version-only update checks on the first launch.
+- **Windows 10 i 11:** [Microsoft Store](https://apps.microsoft.com/detail/9P6ZLK40V3LL) albo instalator `.exe` z [najnowszego wydania](https://github.com/paszkiewiczmichal/poufnik/releases/latest).
+- **macOS 15 lub nowszy:** [Mac App Store](https://apps.apple.com/app/poufnik/id6824860270) albo podpisany plik DMG z [najnowszego wydania](https://github.com/paszkiewiczmichal/poufnik/releases/latest), osobno dla Apple Silicon i Intel.
 
-## Repository structure
+Pierwszy dokument zanonimizujesz bez zakładania konta. Instrukcja krok po kroku jest na stronie [poufnik.app/pobierz](https://poufnik.app/pobierz/).
 
-| Directory | Contents |
+## Kod
+
+Kod aplikacji jest publiczny w tym repozytorium. Silnik wykrywania nie jest publiczny: instalatory zawierają go jako gotowy program, który działa lokalnie obok aplikacji i łączy się z nią tylko przez `127.0.0.1`.
+
+| Katalog | Zawartość |
 | --- | --- |
-| `desktop/` | Tauri 2, React and TypeScript desktop app |
-
-The detection engine is not part of this repository. Installers include it as a ready-made program
-that runs locally next to the app.
-
-## Development
-
-The desktop application targets Windows. It requires Visual Studio 2022 Build Tools with the **Desktop development with C++** workload and `link.exe` available in the terminal.
-
-```powershell
-where link
-```
+| `desktop/` | Aplikacja Tauri 2, React i TypeScript |
+| `desktop/shell-menu/` | Menu pliku w Eksploratorze Windows |
+| `docs/` | Dokumentacja (IT i IOD, podpis i notaryzacja macOS, Mac App Store) |
 
 ```bash
-cd engine && uv sync && uv run pytest && uv run ruff check .
-cd desktop && npm install && npm run test && npm run lint && npm run tauri dev
+cd desktop && npm install && npm run test && npm run lint
 ```
 
-## Releases
+Tagi `v*` budują w GitHub Actions instalatory Windows (MSIX i `.exe`) oraz macOS (DMG i Mac App Store) i publikują je na stronie [wydań](../../releases).
 
-Tags matching `v*` build a signed Windows installer with GitHub Actions and publish it, together with the Tauri update manifest, on the [Releases](../../releases) page.
+## Autor i licencja
 
-## License
+Poufnika zbudował radca prawny Michał Paszkiewicz do pracy w swojej [kancelarii](https://kancelariapaszkiewicz.pl). Program należy do grupy narzędzi [Lawtern](https://lawtern.com). Kontakt: kontakt@poufnik.app.
 
-Apache License 2.0. See [LICENSE](LICENSE). Copyright 2026 Kancelaria Radcy Prawnego Michał Paszkiewicz.
+Licencja Apache 2.0, szczegóły w pliku [LICENSE](LICENSE). Copyright 2026 Kancelaria Radcy Prawnego Michał Paszkiewicz.
