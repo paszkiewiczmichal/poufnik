@@ -32,6 +32,24 @@ runs:
           engine
           corpus
 
+    # A stale tag of the same name in the private repository would silently ship an old
+    # engine (v1.2.0-v1.2.3 from July 2026 did exist there). The engine version must match
+    # the tag without its prerelease suffix: v1.2.0-rc.7 needs engine 1.2.0.
+    - name: Check that the engine version matches the tag
+      if: github.ref_type == 'tag'
+      shell: bash
+      env:
+        TAG: ${{ github.ref_name }}
+      run: |
+        expected="${TAG#v}"
+        expected="${expected%%-*}"
+        actual="$(tr -d '\r' < .private-engine/engine/pyproject.toml | sed -n 's/^version = "\(.*\)"$/\1/p' | head -n 1)"
+        if [ "$actual" != "$expected" ]; then
+          echo "::error::Engine version '$actual' at private tag $TAG does not match $expected. Bump engine/pyproject.toml in the private repository or check the tag."
+          exit 1
+        fi
+        echo "Engine version $actual matches tag $TAG."
+
     - name: Put it in place
       shell: bash
       run: |
