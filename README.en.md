@@ -75,6 +75,6 @@ cd desktop && npm install && npm run test && npm run lint
 
 ## Author and licence
 
-Poufnik was built by Michał Paszkiewicz, a Polish attorney (radca prawny), for work in his own [law firm](https://kancelariapaszkiewicz.pl). It is part of the [Lawtern](https://lawtern.com) tools. Contact: kontakt@poufnik.app.
+Poufnik was built by Michał Paszkiewicz, a Polish attorney (radca prawny), for work in his own [law firm](https://kancelariapaszkiewicz.pl). It is part of the [Lawtern](https://lawtern.com) tools. Contact: contact@lawtern.com, support: support@lawtern.com.
 
 Apache License 2.0, see [LICENSE](LICENSE). Copyright 2026 Kancelaria Radcy Prawnego Michał Paszkiewicz.

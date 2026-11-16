@@ -97,6 +97,6 @@ Tagi `v*` budują w GitHub Actions instalatory Windows (MSIX i `.exe`) oraz macO
 
 ## Autor i licencja
 
-Poufnika zbudował radca prawny Michał Paszkiewicz do pracy w swojej [kancelarii](https://kancelariapaszkiewicz.pl). Program należy do grupy narzędzi [Lawtern](https://lawtern.com). Kontakt: kontakt@poufnik.app.
+Poufnika zbudował radca prawny Michał Paszkiewicz do pracy w swojej [kancelarii](https://kancelariapaszkiewicz.pl). Program należy do grupy narzędzi [Lawtern](https://lawtern.com). Kontakt: contact@lawtern.com, wsparcie: support@lawtern.com.
 
 Licencja Apache 2.0, szczegóły w pliku [LICENSE](LICENSE). Copyright 2026 Kancelaria Radcy Prawnego Michał Paszkiewicz.
