@@ -701,15 +701,14 @@ jobs:
       matrix:
         include:
           # macos-14 was retired by GitHub in November 2026 ("macos-14-arm64-us-default is not
-          # supported"); Homebrew's bottles on macos-15 need macOS 15 (decision 15.11.2026).
+          # supported"); the app needs macOS 15 (decision 15.11.2026).
           - os: macos-15
             arch: arm64
             target: aarch64-apple-darwin
             asset_arch: aarch64
-            # The oldest macOS every bundled binary loads on (Homebrew's Tesseract);
-            # smoke_app_bundle.py fails the build when a binary needs more. Tesseract 5.5.4
-            # from Homebrew on macos-15 needs 15.8.1 (v1.1.0-rc.1).
-            minimum_macos: "15.8.1"
+            # The oldest macOS every bundled binary loads on; smoke_app_bundle.py fails the
+            # build when a binary needs more. Tesseract is built for it (build_tesseract_macos.sh).
+            minimum_macos: "15.0"
             staple: true
           # macos-13 was fully retired 2025-12-08 (GitHub deprecated the whole macOS 13
           # image); macos-15-intel is the current label for a hosted Intel runner, kept
@@ -769,12 +768,23 @@ jobs:
           workspaces: desktop/src-tauri -> target
           shared-key: macos-${{ matrix.arch }}
 
-      # build_sidecar.py finds this via shutil.which("tesseract"), downloads any missing
-      # pol/eng traineddata itself (Homebrew's formula only ships eng), and stages the
-      # binary + dylibs (rpath-rewritten) into the bundled binaries/tesseract resource -
-      # no separate tessdata step needed, unlike the Windows job.
+      # Homebrew's Tesseract only provides tessdata (eng, osd, configs; build_sidecar.py
+      # downloads pol). The bundled program is Tesseract 5.4.0, the version Windows ships,
+      # built with its libraries linked in for the oldest macOS the app supports: Homebrew's
+      # bottle needs the runner's macOS (15.8+) and changes version with every brew update.
       - name: Install Tesseract
         run: brew install tesseract
+
+      - name: Cache Tesseract 5.4.0
+        id: tesseract-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.poufnik-tesseract
+          key: tesseract-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('engine/build/build_tesseract_macos.sh') }}
+
+      - name: Build Tesseract 5.4.0 (macOS 15.0)
+        if: steps.tesseract-cache.outputs.cache-hit != 'true'
+        run: bash engine/build/build_tesseract_macos.sh "$(uname -m)" "$HOME/.poufnik-tesseract" "$RUNNER_TEMP/tesseract-build"
 
       # UV_LINK_MODE=copy: uv's default cache-linking (hardlinks/symlinks on macOS) leaves
       # site-packages data files that PyInstaller's --collect-data can't always see when
@@ -840,7 +850,7 @@ jobs:
 
       - name: Build engine sidecar
         working-directory: engine
-        run: uv run python build/build_sidecar.py --target-triple "$RELEASE_TARGET" --clean
+        run: uv run python build/build_sidecar.py --target-triple "$RELEASE_TARGET" --clean --tesseract-bin "$HOME/.poufnik-tesseract/bin/tesseract"
 
       # Info.plist's LSMinimumSystemVersion for this architecture; Homebrew's bottles for
       # the Intel runner need a newer macOS than those for Apple Silicon.
@@ -1053,8 +1063,23 @@ jobs:
           workspaces: desktop/src-tauri -> target
           shared-key: macos-mas
 
+      # Homebrew's Tesseract only provides tessdata (eng, osd, configs; build_sidecar.py
+      # downloads pol). The bundled program is Tesseract 5.4.0, the version Windows ships,
+      # built with its libraries linked in for the oldest macOS the app supports: Homebrew's
+      # bottle needs the runner's macOS (15.8+) and changes version with every brew update.
       - name: Install Tesseract
         run: brew install tesseract
+
+      - name: Cache Tesseract 5.4.0
+        id: tesseract-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.poufnik-tesseract
+          key: tesseract-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('engine/build/build_tesseract_macos.sh') }}
+
+      - name: Build Tesseract 5.4.0 (macOS 15.0)
+        if: steps.tesseract-cache.outputs.cache-hit != 'true'
+        run: bash engine/build/build_tesseract_macos.sh "$(uname -m)" "$HOME/.poufnik-tesseract" "$RUNNER_TEMP/tesseract-build"
 
       - name: Install engine dependencies
         working-directory: engine
@@ -1114,7 +1139,7 @@ jobs:
       # engine and Tesseract binary for the sandbox afterwards.
       - name: Build engine sidecar
         working-directory: engine
-        run: uv run python build/build_sidecar.py --target-triple "$RELEASE_TARGET" --clean
+        run: uv run python build/build_sidecar.py --target-triple "$RELEASE_TARGET" --clean --tesseract-bin "$HOME/.poufnik-tesseract/bin/tesseract"
 
       - name: Build Tauri app (Mac App Store)
         working-directory: desktop

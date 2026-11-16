@@ -11,7 +11,7 @@
     "createUpdaterArtifacts": false,
     "category": "Business",
     "macOS": {
-      "minimumSystemVersion": "15.8.1",
+      "minimumSystemVersion": "15.0",
       "hardenedRuntime": false,
       "entitlements": "Entitlements.mas.plist",
       "infoPlist": "Info.plist"
