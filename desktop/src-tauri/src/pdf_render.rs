@@ -227,8 +227,7 @@ fn detect_renderer() -> Option<PdfRenderer> {
     libreoffice_path().map(|_| PdfRenderer::Libreoffice)
 }
 
-/// Excel and PowerPoint are driven through COM on Windows only. On a Mac they are not
-/// scripted (their sandbox and AppleScript dictionaries differ), so LibreOffice is used.
+/// Excel and PowerPoint are driven through COM on Windows and AppleScript on a Mac.
 fn office_installed(renderer: PdfRenderer) -> bool {
     match renderer {
         PdfRenderer::Word => word_installed(),
@@ -236,6 +235,10 @@ fn office_installed(renderer: PdfRenderer) -> bool {
         PdfRenderer::Excel => com_installed("Excel.Application"),
         #[cfg(windows)]
         PdfRenderer::PowerPoint => com_installed("PowerPoint.Application"),
+        #[cfg(target_os = "macos")]
+        PdfRenderer::Excel => Path::new("/Applications/Microsoft Excel.app").exists(),
+        #[cfg(target_os = "macos")]
+        PdfRenderer::PowerPoint => Path::new("/Applications/Microsoft PowerPoint.app").exists(),
         _ => false,
     }
 }
@@ -453,12 +456,66 @@ fn render_with_powerpoint(input: &Path, output: &Path) -> Result<(), String> {
     run_powershell_script(POWERPOINT_SCRIPT, input, output, "Microsoft PowerPoint")
 }
 
-#[cfg(not(windows))]
+// Excel and PowerPoint for Mac are sandboxed like Word: the working copy is in their own
+// container (see base_temp_dir). As in the Windows scripts, the program is quit afterwards
+// only when this conversion started it, and only the file opened here is closed.
+// Excel's "save workbook as" takes the output as a POSIX path string (a POSIX file fails
+// with -50); "open workbook ... update links" fails the same way, so plain "open" is used.
+#[cfg(target_os = "macos")]
+const EXCEL_SCRIPT: &str = r#"
+on run argv
+  set inputPath to item 1 of argv
+  set outputPath to item 2 of argv
+  set wasRunning to application "Microsoft Excel" is running
+  tell application "Microsoft Excel"
+    open (POSIX file inputPath)
+    set workbookRef to active workbook
+    save workbook as workbookRef filename outputPath file format PDF file format
+    close workbookRef saving no
+    if not wasRunning and (count of workbooks) is 0 then quit
+  end tell
+end run
+"#;
+
+#[cfg(target_os = "macos")]
+const POWERPOINT_SCRIPT: &str = r#"
+on run argv
+  set inputPath to item 1 of argv
+  set outputPath to item 2 of argv
+  set wasRunning to application "Microsoft PowerPoint" is running
+  tell application "Microsoft PowerPoint"
+    open (POSIX file inputPath)
+    set presentationRef to active presentation
+    save presentationRef in (POSIX file outputPath) as save as PDF
+    close presentationRef saving no
+    if not wasRunning and (count of presentations) is 0 then quit
+  end tell
+end run
+"#;
+
+#[cfg(target_os = "macos")]
+fn run_applescript(script: &str, input: &Path, output: &Path, program: &str) -> Result<(), String> {
+    let mut command = Command::new("osascript");
+    command.arg("-e").arg(script).arg(input).arg(output);
+    run_with_timeout(command, program)
+}
+
+#[cfg(target_os = "macos")]
+fn render_with_excel(input: &Path, output: &Path) -> Result<(), String> {
+    run_applescript(EXCEL_SCRIPT, input, output, "Microsoft Excel")
+}
+
+#[cfg(target_os = "macos")]
+fn render_with_powerpoint(input: &Path, output: &Path) -> Result<(), String> {
+    run_applescript(POWERPOINT_SCRIPT, input, output, "Microsoft PowerPoint")
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
 fn render_with_excel(_input: &Path, _output: &Path) -> Result<(), String> {
     Err("no_renderer".to_string())
 }
 
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "macos")))]
 fn render_with_powerpoint(_input: &Path, _output: &Path) -> Result<(), String> {
     Err("no_renderer".to_string())
 }
@@ -582,13 +639,16 @@ impl Drop for TempDir {
 
 #[cfg(target_os = "macos")]
 fn base_temp_dir(renderer: PdfRenderer) -> PathBuf {
-    if renderer == PdfRenderer::Word {
-        if let Some(home) = std::env::var_os("HOME") {
-            let container =
-                PathBuf::from(home).join("Library/Containers/com.microsoft.Word/Data/tmp");
-            if fs::create_dir_all(&container).is_ok() {
-                return container;
-            }
+    let container = match renderer {
+        PdfRenderer::Word => Some("com.microsoft.Word"),
+        PdfRenderer::Excel => Some("com.microsoft.Excel"),
+        PdfRenderer::PowerPoint => Some("com.microsoft.Powerpoint"),
+        PdfRenderer::Libreoffice => None,
+    };
+    if let (Some(container), Some(home)) = (container, std::env::var_os("HOME")) {
+        let path = PathBuf::from(home).join(format!("Library/Containers/{container}/Data/tmp"));
+        if fs::create_dir_all(&path).is_ok() {
+            return path;
         }
     }
     std::env::temp_dir()

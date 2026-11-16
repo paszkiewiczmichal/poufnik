@@ -3,6 +3,6 @@
 <plist version="1.0">
 <dict>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>Poufnik używa Microsoft Worda, żeby zapisać zanonimizowany dokument jako PDF z wyglądem oryginału.</string>
+	<string>Poufnik używa programów Microsoft Office (Word, Excel, PowerPoint), żeby pokazać podgląd dokumentu i zapisać PDF z wyglądem oryginału.</string>
 </dict>
 </plist>
