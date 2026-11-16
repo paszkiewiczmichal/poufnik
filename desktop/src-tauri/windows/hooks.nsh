@@ -144,6 +144,14 @@
   ${If} ${FileExists} "$INSTDIR\poufnik-menu.ps1"
     !insertmacro POUFNIK_IDENTITY_PACKAGE "unregister"
   ${EndIf}
+  ; The engine and Tesseract folders are copied over, never cleared, so files an older version
+  ; had and this one does not (removed prompts, old libraries, Tesseract training tools) would
+  ; stay and be used. Only in a Poufnik installation, never in a folder the user picked that
+  ; holds something else.
+  ${If} ${FileExists} "$INSTDIR\${MAINBINARYNAME}.exe"
+    RMDir /r "$INSTDIR\_internal"
+    RMDir /r "$INSTDIR\binaries\tesseract"
+  ${EndIf}
 !macroend
 
 !macro NSIS_HOOK_POSTINSTALL
