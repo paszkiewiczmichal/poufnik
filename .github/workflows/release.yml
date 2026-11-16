@@ -684,7 +684,10 @@ jobs:
           msstore submission update $env:STORE_PRODUCT_ID ($submission | ConvertTo-Json -Depth 100 -Compress)
           if ($LASTEXITCODE -ne 0) { throw "msstore submission update failed." }
 
+      # With the repository variable STORE_AUTO_SUBMIT=false the draft stays open, so the listing
+      # (name, description, images, trailer) can be changed in Partner Center and submitted by hand.
       - name: Submit for certification
+        if: vars.STORE_AUTO_SUBMIT != 'false'
         run: |
           msstore submission publish $env:STORE_PRODUCT_ID
           if ($LASTEXITCODE -ne 0) { throw "msstore submission publish failed." }

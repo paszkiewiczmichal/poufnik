@@ -15,8 +15,10 @@
     Version="{{VERSION}}"
     ProcessorArchitecture="{{ARCH}}" />
 
+  <!-- Store name, written out instead of {{DISPLAY_NAME}} (= productName "Poufnik", which also names
+       Poufnik.exe). It must be one of the names reserved in Partner Center. -->
   <Properties>
-    <DisplayName>{{DISPLAY_NAME}}</DisplayName>
+    <DisplayName>Poufnik – anonimizacja dokumentów</DisplayName>
     <PublisherDisplayName>{{PUBLISHER_DISPLAY_NAME}}</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
@@ -36,7 +38,7 @@
       Executable="{{EXECUTABLE}}"
       EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
-        DisplayName="{{DISPLAY_NAME}}"
+        DisplayName="Poufnik – anonimizacja dokumentów"
         Description="{{DESCRIPTION}}"
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
