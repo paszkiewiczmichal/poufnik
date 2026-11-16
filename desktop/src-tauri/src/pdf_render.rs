@@ -87,6 +87,11 @@ fn preview_renderers(extension: &str) -> Result<Vec<PdfRenderer>, String> {
         "docx" | "odt" => PdfRenderer::Word,
         _ => return Err("Podgląd obsługuje pliki XLSX, ODS, PPTX, ODP, ODT i DOCX.".to_string()),
     };
+    // The App Sandbox blocks both Apple Events to Office and LibreOffice (see detect_renderer),
+    // so the Mac App Store build shows the "needs Office" message instead of a failed attempt.
+    if cfg!(feature = "mas") {
+        return Err("no_renderer".to_string());
+    }
     let mut candidates = Vec::new();
     if office_installed(office) {
         candidates.push(office);
@@ -690,6 +695,14 @@ mod tests {
     fn preview_refuses_formats_it_cannot_convert() {
         assert!(preview_renderers("exe").is_err());
         assert!(preview_renderers("").is_err());
+    }
+
+    #[cfg(feature = "mas")]
+    #[test]
+    fn mac_app_store_build_asks_for_office_instead_of_trying_it() {
+        for extension in ["docx", "odt", "xlsx", "pptx"] {
+            assert_eq!(preview_renderers(extension), Err("no_renderer".to_string()));
+        }
     }
 
     #[cfg(windows)]

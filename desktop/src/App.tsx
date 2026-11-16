@@ -32,8 +32,10 @@ import { EngineError } from "./components/EngineError";
 import { ExcludedCategoriesSettings } from "./components/ExcludedCategoriesSettings";
 import { ReplacementModeSettings } from "./components/ReplacementModeSettings";
 import {
+  loadMaskFaces,
   loadProfile,
   loadReplacementMode,
+  saveMaskFaces,
   saveProfile,
   saveReplacementMode,
 } from "./tauri/replacementMode";
@@ -258,6 +260,7 @@ function App() {
   const [batchRunning, setBatchRunning] = useState(false);
   const [replacementMode, setReplacementMode] = useState(() => loadReplacementMode());
   const [profile, setProfile] = useState(() => loadProfile());
+  const [maskFaces, setMaskFaces] = useState(() => loadMaskFaces());
   const [hotkeysEnabled, setHotkeysEnabled] = useState(() => loadHotkeysEnabled());
   const [rememberMaps, setRememberMaps] = useState(() => loadRememberMaps());
   const [rememberedMapsNote, setRememberedMapsNote] = useState<string | null>(null);
@@ -1277,9 +1280,14 @@ function App() {
         offsetMap: anonymization.offsetMap,
         entities,
         excludedCategories,
-        notices: (document.notices ?? [])
-          .map((code) => texts.generation.notices[code])
-          .filter((notice): notice is string => Boolean(notice)),
+        notices: [
+          ...(document.notices ?? [])
+            .map((code) => texts.generation.notices[code])
+            .filter((notice): notice is string => Boolean(notice)),
+          ...((document.unread_pages ?? []).length > 0
+            ? [texts.generation.unreadPages(document.unread_pages ?? [])]
+            : []),
+        ],
         mode: anonymization.offsetMap.some((entry) => entry.label)
           ? texts.replacementMode.reportMode
           : undefined,
@@ -2186,6 +2194,7 @@ function App() {
                   onExportOwnFormat={() => void exportOwnFormat()}
                   exportNotice={exportNotice}
                   documentNotices={document?.notices ?? []}
+                  unreadPages={document?.unread_pages ?? []}
                   onLoadPrompts={loadPrompts}
                   onSelectPrompt={setSelectedPrompt}
                   onCopyPrompt={copyPrompt}
@@ -2389,6 +2398,11 @@ function App() {
                   onProfileChange={(next) => {
                     saveProfile(next);
                     setProfile(next);
+                  }}
+                  maskFaces={maskFaces}
+                  onMaskFacesChange={(enabled) => {
+                    saveMaskFaces(enabled);
+                    setMaskFaces(enabled);
                   }}
                 />
                 <section className="settings-section">

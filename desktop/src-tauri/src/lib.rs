@@ -16,6 +16,8 @@ use tauri_plugin_shell::{
 
 mod browser_login;
 mod history;
+#[cfg(all(target_os = "macos", not(feature = "mas")))]
+mod mac_services;
 mod map_protect;
 mod pdf_render;
 mod shell_actions;
@@ -553,6 +555,8 @@ pub fn run() {
                     Some(request) => app.state::<shell_actions::ShellActionState>().push(request),
                     None => shell_actions::show_main_window(app.handle()),
                 }
+                #[cfg(all(target_os = "macos", not(feature = "mas")))]
+                mac_services::register(app.handle());
                 spawn_engine_supervisor(app.handle().clone(), engine_state.clone());
                 Ok(())
             }

@@ -281,7 +281,9 @@ export interface paths {
          *
          *     Text PDFs lose the glyphs of every value (a token is drawn instead); scanned pages
          *     are re-rendered with the values painted over. ``ocr`` must say whether the document
-         *     text came from OCR, exactly as when it was imported.
+         *     text came from OCR, exactly as when it was imported. ``mask_faces`` (scanned pages
+         *     only; default true) paints faces over; the count is in ``X-Poufnik-Notices``
+         *     (``faces_masked:N``).
          */
         post: operations["export_pdf_in_place_v1_export_pdf_post"];
         delete?: never;
@@ -306,6 +308,8 @@ export interface paths {
          *     The response has the same format as the upload (a HEIC the engine cannot encode
          *     comes back as JPEG - check the response media type) and carries no metadata.
          *     ``offset_map`` and ``anonymized_text`` must come from importing exactly this file.
+         *     Faces are painted over too unless ``mask_faces`` is false; ``X-Poufnik-Notices``
+         *     carries ``faces_masked:N`` and the other notices of the export.
          */
         post: operations["export_image_in_place_v1_export_image_post"];
         delete?: never;
@@ -516,6 +520,11 @@ export interface components {
             offset_map: string;
             /** Anonymized Text */
             anonymized_text: string;
+            /**
+             * Mask Faces
+             * @default true
+             */
+            mask_faces: boolean;
         };
         /** Body_export_image_in_place_v1_export_image_post */
         Body_export_image_in_place_v1_export_image_post: {
@@ -525,6 +534,11 @@ export interface components {
             offset_map: string;
             /** Anonymized Text */
             anonymized_text: string;
+            /**
+             * Mask Faces
+             * @default true
+             */
+            mask_faces: boolean;
         };
         /** Body_export_odp_in_place_v1_export_odp_post */
         Body_export_odp_in_place_v1_export_odp_post: {
@@ -566,6 +580,11 @@ export interface components {
              * @default false
              */
             ocr: boolean;
+            /**
+             * Mask Faces
+             * @default true
+             */
+            mask_faces: boolean;
         };
         /** Body_export_pptx_in_place_v1_export_pptx_post */
         Body_export_pptx_in_place_v1_export_pptx_post: {
@@ -575,6 +594,11 @@ export interface components {
             offset_map: string;
             /** Anonymized Text */
             anonymized_text: string;
+            /**
+             * Mask Faces
+             * @default true
+             */
+            mask_faces: boolean;
         };
         /** Body_export_xlsx_in_place_v1_export_xlsx_post */
         Body_export_xlsx_in_place_v1_export_xlsx_post: {
@@ -584,6 +608,11 @@ export interface components {
             offset_map: string;
             /** Anonymized Text */
             anonymized_text: string;
+            /**
+             * Mask Faces
+             * @default true
+             */
+            mask_faces: boolean;
         };
         /** Body_process_document_v1_documents_process_post */
         Body_process_document_v1_documents_process_post: {
@@ -770,6 +799,8 @@ export interface components {
             text: string;
             /** Notices */
             notices?: string[];
+            /** Unread Pages */
+            unread_pages?: number[];
         };
         /** PromptTemplateResponse */
         PromptTemplateResponse: {

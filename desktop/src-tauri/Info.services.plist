@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Poufnik używa Microsoft Worda, żeby zapisać zanonimizowany dokument jako PDF z wyglądem oryginału.</string>
+	<key>NSServices</key>
+	<array>
+		<dict>
+			<key>NSMenuItem</key>
+			<dict>
+				<key>default</key>
+				<string>Poufnik – Anonimizuj</string>
+			</dict>
+			<key>NSMessage</key>
+			<string>anonymize</string>
+			<key>NSPortName</key>
+			<string>Poufnik</string>
+			<key>NSRequiredContext</key>
+			<dict/>
+			<key>NSSendFileTypes</key>
+			<array>
+				<string>com.adobe.pdf</string>
+				<string>org.openxmlformats.wordprocessingml.document</string>
+				<string>com.microsoft.word.doc</string>
+				<string>public.rtf</string>
+				<string>org.oasis-open.opendocument.text</string>
+				<string>org.openxmlformats.spreadsheetml.sheet</string>
+				<string>org.oasis-open.opendocument.spreadsheet</string>
+				<string>org.openxmlformats.presentationml.presentation</string>
+				<string>org.oasis-open.opendocument.presentation</string>
+				<string>public.plain-text</string>
+				<string>net.daringfireball.markdown</string>
+				<string>public.image</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSMenuItem</key>
+			<dict>
+				<key>default</key>
+				<string>Poufnik – Anonimizuj do Markdown (dla AI)</string>
+			</dict>
+			<key>NSMessage</key>
+			<string>markdown</string>
+			<key>NSPortName</key>
+			<string>Poufnik</string>
+			<key>NSRequiredContext</key>
+			<dict/>
+			<key>NSSendFileTypes</key>
+			<array>
+				<string>com.adobe.pdf</string>
+				<string>org.openxmlformats.wordprocessingml.document</string>
+				<string>com.microsoft.word.doc</string>
+				<string>public.rtf</string>
+				<string>org.oasis-open.opendocument.text</string>
+				<string>org.openxmlformats.spreadsheetml.sheet</string>
+				<string>org.oasis-open.opendocument.spreadsheet</string>
+				<string>org.openxmlformats.presentationml.presentation</string>
+				<string>org.oasis-open.opendocument.presentation</string>
+				<string>public.plain-text</string>
+				<string>net.daringfireball.markdown</string>
+				<string>public.image</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSMenuItem</key>
+			<dict>
+				<key>default</key>
+				<string>Poufnik – Wyciągnij tekst (OCR)</string>
+			</dict>
+			<key>NSMessage</key>
+			<string>ocr</string>
+			<key>NSPortName</key>
+			<string>Poufnik</string>
+			<key>NSRequiredContext</key>
+			<dict/>
+			<key>NSSendFileTypes</key>
+			<array>
+				<string>com.adobe.pdf</string>
+				<string>public.image</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSMenuItem</key>
+			<dict>
+				<key>default</key>
+				<string>Poufnik – Przywróć dane</string>
+			</dict>
+			<key>NSMessage</key>
+			<string>restore</string>
+			<key>NSPortName</key>
+			<string>Poufnik</string>
+			<key>NSRequiredContext</key>
+			<dict/>
+			<key>NSSendFileTypes</key>
+			<array>
+				<string>org.openxmlformats.wordprocessingml.document</string>
+				<string>com.adobe.pdf</string>
+				<string>public.plain-text</string>
+				<string>net.daringfireball.markdown</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSMenuItem</key>
+			<dict>
+				<key>default</key>
+				<string>Poufnik – Usuń metadane</string>
+			</dict>
+			<key>NSMessage</key>
+			<string>metadata</string>
+			<key>NSPortName</key>
+			<string>Poufnik</string>
+			<key>NSRequiredContext</key>
+			<dict/>
+			<key>NSSendFileTypes</key>
+			<array>
+				<string>com.adobe.pdf</string>
+				<string>org.openxmlformats.wordprocessingml.document</string>
+				<string>org.openxmlformats.spreadsheetml.sheet</string>
+				<string>org.openxmlformats.presentationml.presentation</string>
+				<string>public.image</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

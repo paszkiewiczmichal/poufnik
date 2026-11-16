@@ -6,6 +6,8 @@ interface ReplacementModeSettingsProps {
   onChange: (mode: ReplacementMode) => void;
   profile?: AnonymizationProfile;
   onProfileChange?: (profile: AnonymizationProfile) => void;
+  maskFaces?: boolean;
+  onMaskFacesChange?: (enabled: boolean) => void;
 }
 
 /** Tokens or fictional data, for every new anonymization (window, batch, context menu). */
@@ -14,6 +16,8 @@ export function ReplacementModeSettings({
   onChange,
   profile = "standard",
   onProfileChange,
+  maskFaces = true,
+  onMaskFacesChange,
 }: ReplacementModeSettingsProps) {
   const profiles: { value: AnonymizationProfile; label: string; note: string }[] = [
     {
@@ -71,6 +75,22 @@ export function ReplacementModeSettings({
               </span>
             </label>
           ))}
+        </section>
+      ) : null}
+      {onMaskFacesChange ? (
+        <section className="settings-section">
+          <h3>{texts.replacementMode.facesHeading}</h3>
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={maskFaces}
+              onChange={(event) => onMaskFacesChange(event.target.checked)}
+            />
+            <span>
+              <strong>{texts.replacementMode.maskFaces}</strong>
+              <span className="checkbox-row__note">{texts.replacementMode.maskFacesNote}</span>
+            </span>
+          </label>
         </section>
       ) : null}
     </>

@@ -36,3 +36,18 @@ export function loadProfile(storage?: LocalStorageLike): AnonymizationProfile {
 export function saveProfile(profile: AnonymizationProfile, storage?: LocalStorageLike): void {
   (storage ?? window.localStorage).setItem(PROFILE_KEY, profile);
 }
+
+const MASK_FACES_KEY = "anonymizer.maskFaces.v1";
+
+/** Paint over faces on photos and scans (an image of a person is personal data). On by default. */
+export function loadMaskFaces(storage?: LocalStorageLike): boolean {
+  try {
+    return (storage ?? window.localStorage).getItem(MASK_FACES_KEY) !== "false";
+  } catch {
+    return true;
+  }
+}
+
+export function saveMaskFaces(enabled: boolean, storage?: LocalStorageLike): void {
+  (storage ?? window.localStorage).setItem(MASK_FACES_KEY, String(enabled));
+}

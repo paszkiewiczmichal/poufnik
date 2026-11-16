@@ -1,5 +1,5 @@
 import type { ReportRequest } from "../domain/report";
-import { loadProfile, loadReplacementMode } from "../tauri/replacementMode";
+import { loadMaskFaces, loadProfile, loadReplacementMode } from "../tauri/replacementMode";
 import type {
   AnalyzeResponse,
   AnonymizeResponse,
@@ -326,6 +326,8 @@ function inPlaceExportForm(
     new Blob([anonymizedText], { type: "text/plain;charset=utf-8" }),
     "anonymized_text.txt",
   );
+  // The "paint over faces" setting travels with every in-place export; the engine defaults to on.
+  form.append("mask_faces", String(loadMaskFaces()));
   return form;
 }
 

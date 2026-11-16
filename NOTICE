@@ -24,3 +24,22 @@ Third-party libraries under file-level copyleft
   in-place PDF anonymization, is licensed under the Mozilla Public License 2.0.
   Its source code is available at the address above and on PyPI. It bundles qpdf
   (https://github.com/qpdf/qpdf), licensed under the Apache License 2.0.
+
+Second OCR engine and its models
+================================
+
+Poufnik reads photos with Tesseract and with RapidOCR (https://github.com/RapidAI/RapidOCR,
+Apache License 2.0) run by ONNX Runtime (MIT License). The engine bundled with the app
+carries two model files, `PP-OCRv6_det_small.onnx` and `PP-OCRv6_rec_small.onnx`: the
+PP-OCRv6 small text detection and recognition models of PaddleOCR (Copyright Baidu and the
+PaddleOCR authors, Apache License 2.0), in the ONNX form published with RapidOCR 3.10.0,
+unmodified. Their SHA-256 checksums are checked before first use. The engine never
+downloads models and never contacts the network.
+
+Face detection
+==============
+
+Faces on photos and scans are found with OpenCV (https://opencv.org, Apache License 2.0)
+and the YuNet face detection model `face_detection_yunet_2023mar.onnx` from the OpenCV Zoo
+(https://github.com/opencv/opencv_zoo, MIT License), unmodified. Its SHA-256 checksum is
+checked before first use.

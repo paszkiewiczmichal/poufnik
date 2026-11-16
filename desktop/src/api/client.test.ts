@@ -265,6 +265,30 @@ describe("createAnonymizerApiClient", () => {
     expect(blob.notices).toEqual(["pictures_redacted"]);
   });
 
+  it("sends the face setting with every in-place export: on by default, off when chosen", async () => {
+    const fetcher = vi.fn(async () => new Response(new Blob(["x"])));
+    const client = createAnonymizerApiClient(endpoint, fetcher as unknown as typeof fetch);
+    const send = async () => {
+      const common = { file: new File(["x"], "a.bin"), offsetMap: [], anonymizedText: "" };
+      await client.exportDocxInPlace(common);
+      await client.exportInPlace({ ...common, kind: "image" });
+      await client.exportPdfInPlace({ ...common, ocr: true });
+    };
+
+    await send();
+    window.localStorage.setItem("anonymizer.maskFaces.v1", "false");
+    try {
+      await send();
+    } finally {
+      window.localStorage.removeItem("anonymizer.maskFaces.v1");
+    }
+
+    const forms = (fetcher.mock.calls as unknown as [string, RequestInit][]).map(
+      ([, init]) => (init.body as FormData).get("mask_faces"),
+    );
+    expect(forms).toEqual(["true", "true", "true", "false", "false", "false"]);
+  });
+
   it("returns the cleaned file with the codes of removed metadata", async () => {
     const fetcher = vi.fn(
       async () =>

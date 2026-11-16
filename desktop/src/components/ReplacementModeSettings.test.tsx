@@ -32,4 +32,21 @@ describe("ReplacementModeSettings", () => {
 
     expect(onProfileChange).toHaveBeenCalledWith("judgment");
   });
+
+  it("offers painting over faces, on by default, and reports the change", () => {
+    const onMaskFacesChange = vi.fn();
+    render(
+      <ReplacementModeSettings
+        mode="tokens"
+        onChange={vi.fn()}
+        onMaskFacesChange={onMaskFacesChange}
+      />,
+    );
+
+    const box = screen.getByRole("checkbox", { name: /Zamaluj twarze na zdjęciach i skanach/ });
+    expect(box).toBeChecked();
+    fireEvent.click(box);
+
+    expect(onMaskFacesChange).toHaveBeenCalledWith(false);
+  });
 });

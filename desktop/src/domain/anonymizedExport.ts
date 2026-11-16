@@ -27,8 +27,33 @@ export interface AnonymizedExport {
   notice: string | null;
 }
 
+/** The export notice plus a warning about scan pages from which no text was read. */
+function withUnreadPagesNotice<T extends AnonymizedExport>(
+  result: T,
+  document: ProcessedDocument | null,
+): T {
+  const pages = document?.unread_pages ?? [];
+  if (pages.length === 0) {
+    return result;
+  }
+  const warning = texts.generation.unreadPages(pages);
+  return { ...result, notice: result.notice ? `${result.notice} ${warning}` : warning };
+}
+
 /** Builds the anonymized file in the original layout when possible, simplified otherwise. */
 export async function buildAnonymizedExport(
+  client: AnonymizerApiClient,
+  source: AnonymizedExportSource,
+  format: ExportFormat,
+  platform: AnonymizedExportPlatform,
+): Promise<AnonymizedExport> {
+  return withUnreadPagesNotice(
+    await buildAnonymizedExportFile(client, source, format, platform),
+    source.document,
+  );
+}
+
+async function buildAnonymizedExportFile(
   client: AnonymizerApiClient,
   source: AnonymizedExportSource,
   format: ExportFormat,
@@ -82,7 +107,7 @@ export async function buildAnonymizedExport(
       })
       .catch(fallbackOnEngineRefusal);
     return pdf
-      ? { blob: pdf, notice: null }
+      ? { blob: pdf, notice: pictureNotice(pdf) }
       : exportSimplified(format, texts.generation.exportFaithfulFailed);
   }
   let notice: string | null = null;
@@ -124,7 +149,14 @@ const IMAGE_EXTENSION_BY_TYPE: Record<string, string> = {
 /** What the engine did to pictures inside an office file, if anything. */
 export function pictureNotice(blob: ExportedBlob): string | null {
   const notices = (blob.notices ?? [])
-    .map((code) => texts.generation.pictureNotices[code])
+    .map((code) => {
+      const faces = /^faces_masked:(\d+)$/.exec(code);
+      const second = /^second_engine_masks:(\d+)$/.exec(code);
+      if (second) return texts.generation.secondEngineMasks(Number(second[1]));
+      return faces
+        ? texts.generation.facesMasked(Number(faces[1]))
+        : texts.generation.pictureNotices[code];
+    })
     .filter((notice): notice is string => Boolean(notice));
   return notices.length > 0 ? notices.join(" ") : null;
 }
@@ -144,6 +176,13 @@ export interface OwnFormatExport extends AnonymizedExport {
  * anonymized text only is returned instead: DOCX for office files, PDF for pictures.
  */
 export async function buildOwnFormatExport(
+  client: AnonymizerApiClient,
+  source: AnonymizedExportSource,
+): Promise<OwnFormatExport> {
+  return withUnreadPagesNotice(await buildOwnFormatExportFile(client, source), source.document);
+}
+
+async function buildOwnFormatExportFile(
   client: AnonymizerApiClient,
   source: AnonymizedExportSource,
 ): Promise<OwnFormatExport> {

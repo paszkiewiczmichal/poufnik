@@ -511,6 +511,33 @@ export const texts = {
     exportPdfSandboxed:
       "Ta wersja Poufnika nie tworzy PDF przez Microsoft Word, więc PDF ma uproszczony układ. Aby uzyskać PDF wyglądający jak oryginał, wyeksportuj DOCX i w Wordzie wybierz Zapisz jako PDF.",
     noticesTitle: "Co Poufnik zmienił w pliku",
+    /** Strony skanu, na których coś widać, ale OCR nie odczytał z nich tekstu. */
+    unreadPages: (pages: number[]) => {
+      const shown = pages.slice(0, 10).map(String);
+      const rest = pages.length - shown.length;
+      const list =
+        rest > 0
+          ? `${shown.join(", ")} i ${rest} ${rest === 1 ? "innej" : "innych"}`
+          : shown.length > 1
+            ? `${shown.slice(0, -1).join(", ")} i ${shown[shown.length - 1]}`
+            : shown[0];
+      return pages.length === 1
+        ? `Strona ${list} wygląda na zapisaną, ale nie udało się z niej odczytać tekstu. Sprawdź ją ręcznie przed wysłaniem - dane na niej mogły nie zostać zamaskowane.`
+        : `Strony ${list} wyglądają na zapisane, ale nie udało się z nich odczytać tekstu. Sprawdź je ręcznie przed wysłaniem - dane na nich mogły nie zostać zamaskowane.`;
+    },
+    /** ``faces_masked:N`` - ile twarzy zamalowano na zdjęciach i skanach. */
+    facesMasked: (count: number) => {
+      const few = count % 10 >= 2 && count % 10 <= 4 && (count % 100 < 10 || count % 100 >= 20);
+      const noun = count === 1 ? "twarz" : few ? "twarze" : "twarzy";
+      return `Zamalowano ${count} ${noun} na zdjęciach lub skanach.`;
+    },
+    /** ``second_engine_masks:N`` - wartości odczytane tylko drugim silnikiem OCR, zamalowane bez wpisu w mapie. */
+    secondEngineMasks: (count: number) => {
+      const few = count % 10 >= 2 && count % 10 <= 4 && (count % 100 < 10 || count % 100 >= 20);
+      const phrase =
+        count === 1 ? "wartość odczytaną" : few ? "wartości odczytane" : "wartości odczytanych";
+      return `Dodatkowo zamalowano ${count} ${phrase} drugim silnikiem OCR.`;
+    },
     pictureNotices: {
       pictures_redacted: "Dane osobowe widoczne na obrazach w dokumencie zostały zamalowane.",
       pictures_replaced:
@@ -643,7 +670,7 @@ export const texts = {
     note: (encrypted: boolean) =>
       encrypted
         ? "Dzięki temu „Przywróć dane” samo znajdzie mapę dokumentu. Mapy są zaszyfrowane kluczem Twojego konta Windows i kasowane po 30 dniach. Mapy zapisane przez Ciebie do pliku zostają bez zmian."
-        : "Dzięki temu „Przywróć dane” samo znajdzie mapę dokumentu. Na Macu mapy są na razie zapisane bez szyfrowania, w danych aplikacji na tym komputerze, i kasowane po 30 dniach. Jeśli nie chcesz ich przechowywać, wyłącz tę opcję. Mapy zapisane przez Ciebie do pliku zostają bez zmian.",
+        : "Dzięki temu „Przywróć dane” samo znajdzie mapę dokumentu. Mapy są zaszyfrowane kluczem z Pęku kluczy macOS na tym komputerze i kasowane po 30 dniach. Mapy zapisane przez Ciebie do pliku zostają bez zmian.",
     deleteButton: "Usuń zapamiętane mapy",
     deleteConfirmButton: "Usuń",
     deleteConfirm:
@@ -668,6 +695,10 @@ export const texts = {
     profileJudgment: "Orzeczenie do publikacji (BIP, portal orzeczeń)",
     profileJudgmentNote:
       "Sąd, sędziowie, protokolant, prokurator, sygnatury i daty zostają; strony, świadkowie, pełnomocnicy i daty urodzenia są anonimizowane. W przeglądzie możesz to zmienić dla każdego wykrycia.",
+    facesHeading: "Zdjęcia i skany",
+    maskFaces: "Zamaluj twarze na zdjęciach i skanach",
+    maskFacesNote:
+      "Wizerunek osoby to dane osobowe. Twarze na zdjęciach, skanach i obrazach w dokumentach są zamalowywane szarym polem z oznaczeniem [TWARZ_1]. Wykrywanie działa na tym komputerze; twarz bardzo małą lub zasłoniętą może pominąć, więc sprawdź wynik.",
   },
   excludedCategories: {
     heading: "Kategorie do anonimizacji",

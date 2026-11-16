@@ -13,7 +13,8 @@
     "macOS": {
       "minimumSystemVersion": "15.8.1",
       "hardenedRuntime": false,
-      "entitlements": "Entitlements.mas.plist"
+      "entitlements": "Entitlements.mas.plist",
+      "infoPlist": "Info.plist"
     }
   },
   "plugins": {

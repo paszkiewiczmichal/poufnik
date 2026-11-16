@@ -53,6 +53,7 @@ interface DocumentWorkspaceProps {
   caseControls?: ReactNode;
   exportNotice?: string | null;
   documentNotices?: string[];
+  unreadPages?: number[];
   onLoadPrompts: () => void;
   onSelectPrompt: (id: string) => void;
   onCopyPrompt: (text: string) => void;
@@ -89,6 +90,7 @@ export function DocumentWorkspace({
   caseControls,
   exportNotice,
   documentNotices,
+  unreadPages,
   onLoadPrompts,
   onSelectPrompt,
   onCopyPrompt,
@@ -227,6 +229,7 @@ export function DocumentWorkspace({
           caseControls={caseControls}
           exportNotice={exportNotice}
           documentNotices={documentNotices}
+          unreadPages={unreadPages}
           onLoadPrompts={onLoadPrompts}
           onSelectPrompt={onSelectPrompt}
           onCopyPrompt={onCopyPrompt}

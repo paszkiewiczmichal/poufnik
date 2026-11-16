@@ -35,6 +35,8 @@ interface ResultViewProps {
   documentPreview?: ReactNode;
   exportNotice?: string | null;
   documentNotices?: string[];
+  /** Pages of a scan with visible content from which no text could be read. */
+  unreadPages?: number[];
   onLoadPrompts: () => void;
   onSelectPrompt: (id: string) => void;
   onCopyPrompt: (text: string) => void;
@@ -58,6 +60,7 @@ export function ResultView({
   documentPreview,
   exportNotice = null,
   documentNotices = [],
+  unreadPages = [],
   onLoadPrompts,
   onSelectPrompt,
   onCopyPrompt,
@@ -75,9 +78,12 @@ export function ResultView({
   const hasResult = Boolean(anonymizedText && replacementMap);
   const replacementCount = replacementMap?.entries.length ?? 0;
   const occurrenceCount = anonymization.offsetMap.length || replacementCount;
-  const visibleNotices = documentNotices
-    .map((code) => texts.generation.notices[code])
-    .filter((notice): notice is string => Boolean(notice));
+  const visibleNotices = [
+    ...documentNotices
+      .map((code) => texts.generation.notices[code])
+      .filter((notice): notice is string => Boolean(notice)),
+    ...(unreadPages.length > 0 ? [texts.generation.unreadPages(unreadPages)] : []),
+  ];
 
   const tabs: { id: ResultTab; label: string }[] = [
     ...(documentPreview ? [{ id: "document" as const, label: texts.generation.tabDocument }] : []),

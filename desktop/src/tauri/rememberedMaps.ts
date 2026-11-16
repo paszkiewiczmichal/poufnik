@@ -8,8 +8,9 @@ import type { ReplacementMap } from "../types";
 import type { LocalStorageLike } from "./customRules";
 
 // Maps written by every anonymization, kept so "Przywróć dane" can find them without asking.
-// They hold the original personal data, so they are encrypted at rest (Windows DPAPI, tied to
-// the current user; see src-tauri/src/map_protect.rs) and removed after 30 days.
+// They hold the original personal data, so they are encrypted at rest (Windows DPAPI, macOS
+// Keychain key; both tied to the current user, see src-tauri/src/map_protect.rs) and removed
+// after 30 days.
 // Maps the user saves explicitly (_poufnik_mapa.json) are a different thing and never touched here.
 const MAP_DIRECTORY = "menu-maps";
 const PROTECTED_SUFFIX = ".pmap";

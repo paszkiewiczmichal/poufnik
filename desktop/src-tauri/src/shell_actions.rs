@@ -66,12 +66,24 @@ pub fn parse_shell_action(args: &[String]) -> Option<ShellActionRequest> {
 /// Called by tauri-plugin-single-instance when Poufnik is started again while it runs.
 pub fn handle_second_instance(app: &AppHandle, args: &[String]) {
     match parse_shell_action(args) {
-        Some(request) => {
-            app.state::<ShellActionState>().push(request);
-            let _ = app.emit(SHELL_ACTION_EVENT, ());
-        }
+        Some(request) => queue_shell_action(app, request),
         None => show_main_window(app),
     }
+}
+
+/// Queues an action for the frontend (Explorer menu on Windows, Finder services on macOS).
+pub fn queue_shell_action(app: &AppHandle, request: ShellActionRequest) {
+    app.state::<ShellActionState>().push(request);
+    let _ = app.emit(SHELL_ACTION_EVENT, ());
+}
+
+/// A request from a menu outside the app, or `None` for an unknown action or no files.
+pub fn shell_action_request(action: &str, paths: Vec<String>) -> Option<ShellActionRequest> {
+    let paths: Vec<String> = paths.into_iter().filter(|path| !path.is_empty()).collect();
+    (ACTIONS.contains(&action) && !paths.is_empty()).then(|| ShellActionRequest {
+        action: action.to_string(),
+        paths,
+    })
 }
 
 pub fn show_main_window(app: &AppHandle) {
@@ -133,6 +145,19 @@ mod tests {
                 paths: vec![r"C:\Akta\umowa.pdf".into(), r"C:\Akta\pismo z spacją.docx".into()],
             })
         );
+    }
+
+    #[test]
+    fn finder_service_request_keeps_known_actions_with_files() {
+        assert_eq!(
+            shell_action_request("restore", vec!["/Users/a/odpowiedz.docx".into(), String::new()]),
+            Some(ShellActionRequest {
+                action: "restore".into(),
+                paths: vec!["/Users/a/odpowiedz.docx".into()],
+            })
+        );
+        assert_eq!(shell_action_request("restore", vec![String::new()]), None);
+        assert_eq!(shell_action_request("delete", vec!["/Users/a/x.pdf".into()]), None);
     }
 
     #[test]
