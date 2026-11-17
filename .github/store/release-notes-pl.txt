@@ -1,11 +1,12 @@
-Wersja 1.2.0
+Wersja 1.3.0
+- Dowód osobisty, paszport, prawo jazdy i karta pobytu na zdjęciu lub skanie są rozpoznawane według wzorów z Rejestru Dokumentów Publicznych, a ich pola zamalowywane według położenia na karcie.
 - Podgląd 1:1: oryginał i wynik obok siebie, tak jak wyglądają w Wordzie, PDF-ie, Excelu i PowerPoincie.
 - Menu kontekstowe w Eksploratorze dla wszystkich, bez konta: Anonimizuj, Wyciągnij tekst (OCR), Anonimizuj do Markdown (dla AI), Przywróć dane, Usuń metadane.
 - Wynik w tym samym formacie także dla Excela, PowerPointa, plików OpenOffice i LibreOffice, zdjęć oraz starych plików DOC i RTF.
-- Zdjęcia i skany czyta drugi silnik OCR. Twarze są zamalowywane (można wyłączyć), strefa MRZ dowodu i paszportu jest wykrywana, zdjęcia z telefonu powyżej 16 Mpx są czytane.
+- Zdjęcia i skany czytają dwa silniki OCR, Poufnik wybiera czystszy odczyt. Twarze są zamalowywane (można wyłączyć), strefa MRZ jest wykrywana.
 - Skany doklejone do PDF-a z tekstem są czytane i zamalowywane.
-- Przywracanie danych jako osobne narzędzie. Poufnik sam dobiera mapę zastąpień i ostrzega o oznaczeniach, których w niej nie ma.
+- Przywracanie danych jako osobne narzędzie. Poufnik sam dobiera mapę zastąpień.
 - Zapamiętane mapy są szyfrowane kluczem konta Windows i kasowane po 30 dniach.
-- Tryb danych fikcyjnych, raport z anonimizacji w PDF, mapa zastąpień chroniona hasłem, wspólne oznaczenia dla dokumentów jednej sprawy i tryb orzeczeń do publikacji.
+- Tryb danych fikcyjnych, raport z anonimizacji w PDF, mapa zastąpień chroniona hasłem i tryb orzeczeń do publikacji.
 - Skróty w każdym programie: Ctrl+Alt+Shift+P anonimizuje tekst w schowku, Ctrl+Alt+Shift+R przywraca dane.
-- Nowe rodzaje danych, m.in. prawo jazdy, działki, numery KSeF, klucze API i kwoty słownie. Mniej fałszywych trafień i dokładniejsze wykrywanie w tekście z błędami OCR.
+- Nowe rodzaje danych, m.in. działki, numery KSeF i kwoty słownie. Mniej fałszywych trafień, lepsze wykrywanie w tabelach z KRZ, e-Doręczeniach i tekście z błędami OCR.
