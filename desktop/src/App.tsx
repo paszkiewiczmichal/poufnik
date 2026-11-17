@@ -30,6 +30,7 @@ import { CustomRulesPanel } from "./components/CustomRulesPanel";
 import { DocumentWorkspace, type WorkspaceView } from "./components/DocumentWorkspace";
 import { EngineError } from "./components/EngineError";
 import { ExcludedCategoriesSettings } from "./components/ExcludedCategoriesSettings";
+import { FinderMenuSettings, IS_MACOS } from "./components/FinderMenuSettings";
 import { ReplacementModeSettings } from "./components/ReplacementModeSettings";
 import {
   loadMaskFaces,
@@ -2459,6 +2460,7 @@ function App() {
                   excluded={excludedCategories}
                   onChange={updateExcludedCategories}
                 />
+                {IS_MACOS && !IS_MAC_APP_STORE ? <FinderMenuSettings /> : null}
                 <section className="settings-section">
                   <h3>{texts.updates.sectionTitle}</h3>
                   {UPDATES_MANAGED_BY_STORE ? (

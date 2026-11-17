@@ -20,3 +20,6 @@ desktop/src-tauri/binaries/*
 .DS_Store
 Thumbs.db
 *.zip
+
+# Rozszerzenie Findera budowane przez desktop/src-tauri/macos/FinderSync/build.sh
+desktop/src-tauri/macos/build/

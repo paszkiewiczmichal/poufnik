@@ -704,6 +704,11 @@ export const texts = {
     heading: "Kategorie do anonimizacji",
     lead: "Odznaczone kategorie nie są anonimizowane w nowych dokumentach. Poufnik nadal je pokazuje w przeglądzie, ale bez zaznaczenia – w razie potrzeby możesz je zaznaczyć dla jednego dokumentu.",
   },
+  finderMenu: {
+    heading: "Menu w Finderze",
+    lead: "Po włączeniu rozszerzenia „Poufnik w Finderze” pozycje Poufnika pojawią się od razu w menu po kliknięciu prawym przyciskiem na pliku. Włączysz je w Ustawieniach systemowych, w części Ogólne, na liście rozszerzeń. Bez tego te same akcje są w podmenu „Usługi”.",
+    open: "Otwórz ustawienia rozszerzeń",
+  },
   settings: {
     title: "Ustawienia",
     advanced: "Zaawansowane",
