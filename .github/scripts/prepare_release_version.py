@@ -72,8 +72,10 @@ def update_json(path: Path, key: str, version: str) -> None:
 
 def replace_first_version(path: Path, version: str) -> None:
     content = path.read_text(encoding="utf-8")
-    updated = re.sub(r'(?m)^version = "[^"]+"', f'version = "{version}"', content, count=1)
-    if updated == content:
+    # A file that already carries the target version (the engine is bumped to 1.2.0 before
+    # the final v1.2.0 tag) is fine; only a file with no version line at all is an error.
+    updated, found = re.subn(r'(?m)^version = "[^"]+"', f'version = "{version}"', content, count=1)
+    if not found:
         raise SystemExit(f"Could not update version in {path}.")
     path.write_text(updated, encoding="utf-8")
 
