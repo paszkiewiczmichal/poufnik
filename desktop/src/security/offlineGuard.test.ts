@@ -56,7 +56,8 @@ describe("desktop offline guard", () => {
     const offenders: string[] = [];
     for (const filePath of sourceFiles(path.join(DESKTOP_ROOT, "src"))) {
       const relative = slash(path.relative(DESKTOP_ROOT, filePath));
-      if (relative.endsWith(".test.ts") || relative === "src/api/openapi.ts") {
+      // Test files (.test.ts and .test.tsx) are not part of the app.
+      if (/\.test\.tsx?$/.test(relative) || relative === "src/api/openapi.ts") {
         continue;
       }
       const contents = fs.readFileSync(filePath, "utf-8");
