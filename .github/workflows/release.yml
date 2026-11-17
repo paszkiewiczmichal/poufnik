@@ -869,6 +869,14 @@ jobs:
           path.write_text(json.dumps(config, indent=2) + "\n")
           PY
 
+      # Finder extension (Finder Sync): Poufnik's actions at the top of the Finder context menu
+      # instead of under "Usługi". build.sh signs the .appex with its own sandbox entitlements
+      # before Tauri bundles it, and adds it to bundle.macOS.files (DMG only, not the MAS job).
+      - name: Build Finder extension
+        run: |
+          version=$(python3 -c 'import json; print(json.load(open("desktop/src-tauri/tauri.conf.json"))["version"])')
+          bash desktop/src-tauri/macos/FinderSync/build.sh "$RELEASE_TARGET" "$version"
+
       # With APPLE_SIGNING_IDENTITY set (previous step) Tauri signs the app with the hardened
       # runtime and Entitlements.plist, and with APPLE_API_* it also notarizes it and tries
       # to staple it (see "Staple app inside the DMG"). Without them it ad-hoc signs, which
@@ -892,6 +900,24 @@ jobs:
           uploadUpdaterJson: true
           uploadUpdaterSignatures: true
           releaseAssetNamePattern: "[name]_[version]_[platform]_[arch][setup][ext]"
+
+      # The extension must stay sandboxed and keep its own signature inside the signed app:
+      # macOS refuses to load a Finder extension without the sandbox.
+      - name: Verify Finder extension in the app
+        run: |
+          app="desktop/src-tauri/target/${RELEASE_TARGET}/release/bundle/macos/Poufnik.app"
+          appex="$app/Contents/PlugIns/PoufnikFinder.appex"
+          test -x "$appex/Contents/MacOS/PoufnikFinder" || { echo "::error::PoufnikFinder.appex missing from Poufnik.app"; exit 1; }
+          codesign --verify --strict "$appex"
+          codesign -d --entitlements - --xml "$appex" | grep -q "com.apple.security.app-sandbox" \
+            || { echo "::error::PoufnikFinder.appex is not sandboxed"; exit 1; }
+          if [ -n "${APPLE_SIGNING_IDENTITY:-}" ]; then
+            codesign --verify --strict --deep "$app"
+            codesign -dvv "$appex" 2>&1 | grep -q "Authority=Developer ID Application" \
+              || { echo "::error::PoufnikFinder.appex is not signed with Developer ID"; exit 1; }
+          fi
+          plutil -extract NSExtension.NSExtensionPointIdentifier raw "$appex/Contents/Info.plist" | grep -qx "com.apple.FinderSync"
+          echo "Finder extension OK: $(plutil -extract CFBundleShortVersionString raw "$appex/Contents/Info.plist")"
 
       # Tauri staples the notarized app once, right after notarization, and ignores the
       # result, so when Apple's ticket service does not answer in time the app goes into the
