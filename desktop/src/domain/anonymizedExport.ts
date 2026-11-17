@@ -148,7 +148,9 @@ const IMAGE_EXTENSION_BY_TYPE: Record<string, string> = {
 /** The document's own format when Poufnik can save it anonymized in that format. */
 /** What the engine did to pictures inside an office file, if anything. */
 export function pictureNotice(blob: ExportedBlob): string | null {
-  const notices = (blob.notices ?? [])
+  const codes = blob.notices ?? [];
+  const notices = codes
+    .filter((code) => !code.startsWith("document_layout:"))
     .map((code) => {
       const faces = /^faces_masked:(\d+)$/.exec(code);
       const second = /^second_engine_masks:(\d+)$/.exec(code);
@@ -158,7 +160,23 @@ export function pictureNotice(blob: ExportedBlob): string | null {
         : texts.generation.pictureNotices[code];
     })
     .filter((notice): notice is string => Boolean(notice));
+  const kinds = documentKinds(codes);
+  if (kinds.length > 0) notices.push(texts.generation.documentLayouts(kinds));
   return notices.length > 0 ? notices.join(" ") : null;
+}
+
+/** Kinds of the recognised documents (``document_layout:dowod-osobisty-2021-awers``), once each. */
+function documentKinds(codes: string[]): string[] {
+  const kinds = codes
+    .filter((code) => code.startsWith("document_layout:"))
+    .map((code) => {
+      const layout = code.slice("document_layout:".length);
+      const prefix = Object.keys(texts.generation.documentKinds).find((key) =>
+        layout.startsWith(key),
+      );
+      return prefix ? texts.generation.documentKinds[prefix] : "dokument tożsamości";
+    });
+  return [...new Set(kinds)];
 }
 
 export function ownExportFormat(document: ProcessedDocument | null): string | null {

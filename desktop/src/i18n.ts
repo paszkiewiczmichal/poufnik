@@ -538,6 +538,15 @@ export const texts = {
         count === 1 ? "wartość odczytaną" : few ? "wartości odczytane" : "wartości odczytanych";
       return `Dodatkowo zamalowano ${count} ${phrase} drugim silnikiem OCR.`;
     },
+    /** ``document_layout:<wzór>`` - rozpoznane dokumenty, których pola zamalowano według wzoru. */
+    documentLayouts: (kinds: string[]) =>
+      `Rozpoznano ${kinds.join(", ")}: ${kinds.length === 1 ? "jego pola zamalowano" : "ich pola zamalowano"} według wzoru z Rejestru Dokumentów Publicznych.`,
+    documentKinds: {
+      "dowod-osobisty": "dowód osobisty",
+      paszport: "paszport",
+      "prawo-jazdy": "prawo jazdy",
+      "karta-pobytu": "kartę pobytu",
+    } as Record<string, string>,
     pictureNotices: {
       pictures_redacted: "Dane osobowe widoczne na obrazach w dokumencie zostały zamalowane.",
       pictures_replaced:

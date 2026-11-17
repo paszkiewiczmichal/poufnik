@@ -115,6 +115,20 @@ describe("pictureNotice", () => {
   });
 });
 
+describe("recognised identity documents", () => {
+  it("names each kind of recognised document once", () => {
+    const notice = (...codes: string[]) =>
+      pictureNotice(Object.assign(new Blob(["x"]), { notices: codes }));
+
+    expect(notice("document_layout:dowod-osobisty-2021-awers", "document_layout:dowod-osobisty-2021-rewers")).toBe(
+      "Rozpoznano dowód osobisty: jego pola zamalowano według wzoru z Rejestru Dokumentów Publicznych.",
+    );
+    expect(notice("faces_masked:1", "document_layout:paszport-2018-dane", "document_layout:prawo-jazdy-2019-awers")).toBe(
+      "Zamalowano 1 twarz na zdjęciach lub skanach. Rozpoznano paszport, prawo jazdy: ich pola zamalowano według wzoru z Rejestru Dokumentów Publicznych.",
+    );
+  });
+});
+
 describe("values read by the second OCR engine", () => {
   it("reports the painted values with the right Polish plural", () => {
     const notice = (code: string) => pictureNotice(Object.assign(new Blob(["x"]), { notices: [code] }));
