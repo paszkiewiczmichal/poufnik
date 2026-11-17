@@ -88,8 +88,12 @@ export interface AnonymizerApiClient {
   }): Promise<Blob>;
   /** The same file without metadata; content untouched. Codes say what was removed. */
   cleanMetadata(file: File): Promise<{ blob: Blob; removed: string[]; notices: string[] }>;
-  /** Puts the original values back into an anonymized DOCX, keeping its layout. */
-  restoreDocxInPlace(options: { file: File; replacementMap: ReplacementMap }): Promise<ExportedBlob>;
+  /** Puts the original values back into an anonymized DOCX (or XLSX), keeping its layout. */
+  restoreDocxInPlace(options: {
+    file: File;
+    replacementMap: ReplacementMap;
+    kind?: "docx" | "xlsx";
+  }): Promise<ExportedBlob>;
   /**
    * Anonymizes a spreadsheet, presentation, OpenDocument file or picture in place and returns
    * it in its own format (``kind`` = engine endpoint: xlsx, pptx, odt, ods, odp or image).
@@ -284,7 +288,7 @@ export function createAnonymizerApiClient(
         notices: codes("X-Poufnik-Notices"),
       };
     },
-    restoreDocxInPlace: ({ file, replacementMap }) => {
+    restoreDocxInPlace: ({ file, replacementMap, kind = "docx" }) => {
       // The map goes as a file part: plain multipart fields are capped at 1 MB.
       const form = new FormData();
       form.append("file", file, file.name);
@@ -293,7 +297,7 @@ export function createAnonymizerApiClient(
         new Blob([JSON.stringify(replacementMap)], { type: "application/json" }),
         "replacement_map.json",
       );
-      return requestBlob("/v1/restore/docx", { method: "POST", body: form });
+      return requestBlob(`/v1/restore/${kind}`, { method: "POST", body: form });
     },
     exportInPlace: ({ kind, file, offsetMap, anonymizedText }) =>
       requestBlob(`/v1/export/${kind}`, {

@@ -48,7 +48,7 @@ export type ShellActionOutcome =
   | { ok: true; outputPath: string; copied: boolean; notice: string | null }
   | { ok: false; reason: "no_map" | "ambiguous_map" | "unsupported" | "error"; message?: string };
 
-const RESTORABLE_EXTENSIONS = ["txt", "md", "docx", "pdf"];
+const RESTORABLE_EXTENSIONS = ["txt", "md", "docx", "xlsx", "pdf"];
 // The same list as the Explorer menu (desktop/shell-menu/src/lib.rs, hooks.nsh).
 export const CLEANABLE_EXTENSIONS = [
   "pdf",
@@ -247,6 +247,15 @@ export async function restoreFileContents(
       contents = await simpleExport("docx");
       notices.push(texts.shellActions.restoredSimplified);
     }
+  } else if (extension === "xlsx" && source.file) {
+    // No simpler fallback: a spreadsheet rebuilt from text would lose its cells.
+    const inPlace = await client.restoreDocxInPlace({
+      file: source.file,
+      replacementMap: source.map,
+      kind: "xlsx",
+    });
+    contents = inPlace;
+    engineWarnings.push(...(inPlace.warnings ?? []));
   } else if (extension === "pdf") {
     contents = await simpleExport("pdf");
     notices.push(texts.shellActions.restoredPdfSimplified);

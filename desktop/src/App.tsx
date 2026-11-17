@@ -611,6 +611,9 @@ function App() {
         return;
       }
 
+      // Show progress at once: waiting for the engine to start (tens of seconds on a fresh
+      // launch) looked like nothing happened and users dropped the file again.
+      setProcessing("parsing");
       let endpoint = uiState.endpoint;
       if (!endpoint) {
         try {
@@ -624,7 +627,6 @@ function App() {
       }
 
       const timers: number[] = [];
-      setProcessing("parsing");
       if (uiState.forceOcr) {
         timers.push(window.setTimeout(() => setProcessing("ocr"), 500));
         timers.push(window.setTimeout(() => setProcessing("detecting"), 1200));
@@ -1413,7 +1415,7 @@ function App() {
     setDeanonymizationResult,
   ]);
 
-  // "Przywróć dane w pliku": a DOCX/PDF/TXT/MD file that came back from an AI chat gets the
+  // "Przywróć dane w pliku": a DOCX/XLSX/PDF/TXT/MD file that came back from an AI chat gets the
   // original data back in its own format. The map is picked automatically (mapLinking.ts):
   // the one loaded by the user, then maps linked by file name, then by tokens; when several
   // fit with different data the user chooses.
@@ -2003,7 +2005,9 @@ function App() {
             <button
               className={navItemClass(screen === "flow" && !hasDocument, hasDocument)}
               type="button"
-              onClick={() => setScreen("flow")}
+              // With a document open, "Import" starts the next one, like "Nowy dokument"
+              // (it did nothing visible: the result stayed on screen).
+              onClick={hasDocument ? startNewDocument : () => setScreen("flow")}
             >
               <span className="nav-item__num" aria-hidden="true">
                 {hasDocument ? "✓" : "1"}

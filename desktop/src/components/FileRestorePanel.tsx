@@ -169,8 +169,17 @@ export function FileRestorePanel({
         <button className="secondary-button" type="button" disabled={busy} onClick={onChooseFile}>
           {buttonLabel}
         </button>
+        {onLoadMap ? (
+          <button className="secondary-button" type="button" disabled={busy} onClick={onLoadMap}>
+            {texts.deanonymization.loadMapShort}
+          </button>
+        ) : null}
       </div>
-      {mapRow}
+      {onLoadMap ? (
+        <p className="muted">
+          {mapLoaded ? texts.deanonymization.mapLoaded : texts.deanonymization.mapHint}
+        </p>
+      ) : null}
       {details}
     </section>
   );

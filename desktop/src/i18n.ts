@@ -620,15 +620,15 @@ export const texts = {
     toolTitle: "Przywracanie danych",
     toolDropTitle: "Przeciągnij plik z odpowiedzią AI albo kliknij, aby wybrać.",
     toolDropActive: "Upuść plik, aby przywrócić dane.",
-    toolFormats: "DOCX, PDF, TXT lub MD. Wynik zostanie zapisany w tym samym formacie.",
+    toolFormats: "DOCX, XLSX, PDF, TXT lub MD. Wynik zostanie zapisany w tym samym formacie.",
     fileTitle: "Masz plik z odpowiedzią AI?",
     fileLead:
-      "Wskaż plik DOCX, PDF, TXT lub MD. Poufnik sam dobierze mapę zastąpień po nazwie pliku i oznaczeniach w treści, a wynik zapisze w tym samym formacie.",
+      "Wskaż plik DOCX, XLSX, PDF, TXT lub MD. Poufnik sam dobierze mapę zastąpień po nazwie pliku i oznaczeniach w treści, a wynik zapisze w tym samym formacie.",
     fileButton: "Przywróć dane w pliku",
     fileWorking: "Przywracam dane w pliku...",
     fileSaved: (name: string) => `Zapisano: ${name}.`,
     fileCancelled: "Nie zapisano pliku.",
-    fileUnsupported: "Przywracać można pliki DOCX, PDF, TXT i MD.",
+    fileUnsupported: "Przywracać można pliki DOCX, XLSX, PDF, TXT i MD.",
     fileNoMap:
       "Nie znaleziono mapy zastąpień pasującej do tego pliku. Wczytaj mapę JSON zapisaną przy anonimizacji.",
     fileChoose:

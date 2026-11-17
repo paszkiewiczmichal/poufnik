@@ -257,6 +257,29 @@ describe("runShellAction", () => {
     expect(client.exportDocument).not.toHaveBeenCalled();
   });
 
+  it("restores an XLSX in place, so it stays a spreadsheet", async () => {
+    const { deps, written, client } = setup({
+      filename: "zestawienie_poufnik.xlsx",
+      format: "xlsx",
+      documentText: ANONYMIZED,
+      maps: [DOCUMENT_MAP],
+    });
+
+    const outcome = await runShellAction("restore", "C:\\Akta\\zestawienie_poufnik.xlsx", deps);
+
+    expect(outcome).toMatchObject({
+      ok: true,
+      outputPath: "C:\\Akta\\zestawienie_poufnik_przywrocone.xlsx",
+    });
+    expect(client.restoreDocxInPlace).toHaveBeenCalledWith({
+      file: expect.objectContaining({ name: "zestawienie_poufnik.xlsx" }),
+      replacementMap: DOCUMENT_MAP,
+      kind: "xlsx",
+    });
+    expect(client.exportDocument).not.toHaveBeenCalled();
+    expect(written.has("C:\\Akta\\zestawienie_poufnik_przywrocone.xlsx")).toBe(true);
+  });
+
   it("warns about tokens the engine left in a restored DOCX, mangled ones too", async () => {
     const restored = Object.assign(new Blob(["docx-restored"]), {
       warnings: ["Unknown anonymization token [OSOBA_7] at offset 3."],
