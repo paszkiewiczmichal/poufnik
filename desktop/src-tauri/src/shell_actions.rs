@@ -16,7 +16,7 @@ pub const SHELL_ACTION_EVENT: &str = "shell://action";
 /// Small window in the screen corner with the file name and a progress bar. Without it a
 /// menu action runs with no visible sign for several seconds and looks broken.
 pub const PROGRESS_WINDOW: &str = "progress";
-const PROGRESS_SIZE: (f64, f64) = (380.0, 128.0);
+const PROGRESS_SIZE: (f64, f64) = (380.0, 108.0);
 const PROGRESS_MARGIN: i32 = 16;
 
 const ACTIONS: [&str; 5] = ["anonymize", "ocr", "markdown", "restore", "metadata"];

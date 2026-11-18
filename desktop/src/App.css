@@ -3402,26 +3402,35 @@ td:first-child {
 }
 
 .shell-progress {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: var(--sp-3) var(--sp-4) var(--sp-4);
-  border-top: 3px solid var(--navy);
+  padding: var(--sp-4) var(--sp-5) var(--sp-4) var(--sp-4);
+  border: 1px solid var(--line);
   background: var(--surface);
 }
 
-.shell-progress--failed {
-  border-top-color: var(--danger);
+.shell-progress__body {
+  display: flex;
+  gap: var(--sp-3);
+  align-items: center;
+  min-height: 0;
 }
 
-.shell-progress__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.shell-progress__logo {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
+
+.shell-progress__text {
+  min-width: 0;
 }
 
 .shell-progress__brand {
-  color: var(--navy);
+  color: var(--muted);
   font-size: var(--fs-xs);
   font-weight: 600;
   letter-spacing: var(--ls-caps-wide);
@@ -3429,21 +3438,29 @@ td:first-child {
 }
 
 .shell-progress__close {
-  padding: 0 var(--sp-1);
+  position: absolute;
+  top: var(--sp-2);
+  right: var(--sp-2);
+  width: 22px;
+  height: 22px;
+  padding: 0;
   border: 0;
+  border-radius: var(--radius);
   background: none;
   color: var(--muted);
   font-size: var(--fs-md);
   line-height: 1;
+  opacity: 0.55;
   cursor: pointer;
 }
 
 .shell-progress__close:hover {
-  color: var(--ink);
+  background: var(--line);
+  opacity: 1;
 }
 
 .shell-progress__title {
-  margin: var(--sp-1) 0 0;
+  margin: 1px 0 0;
   color: var(--ink);
   font-size: var(--fs-md);
   font-weight: 600;
@@ -3451,27 +3468,29 @@ td:first-child {
 
 .shell-progress__detail {
   display: -webkit-box;
-  margin: 2px 0 0;
+  margin: 1px 0 0;
   overflow: hidden;
   color: var(--muted);
   font-size: var(--fs-sm);
   overflow-wrap: anywhere;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
 }
 
 .shell-progress__track {
-  height: 4px;
+  height: 3px;
   margin-top: auto;
-  border-radius: var(--radius);
+  margin-left: 60px;
+  border-radius: 3px;
   background: var(--line);
   overflow: hidden;
 }
 
 .shell-progress__fill {
   height: 100%;
+  border-radius: 3px;
   background: var(--navy);
-  transition: width 0.3s ease;
+  transition: width 0.4s ease;
 }
 
 .shell-progress--failed .shell-progress__fill {
@@ -3480,5 +3499,5 @@ td:first-child {
 
 .shell-progress__fill--moving {
   width: 35%;
-  animation: pf-indeterminate 1.6s ease-in-out infinite;
+  animation: pf-indeterminate 1.8s ease-in-out infinite;
 }
