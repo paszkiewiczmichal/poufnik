@@ -1,18 +1,42 @@
-"""One-off: inspect (and optionally commit) the pending Microsoft Store submission.
+"""One-off: prepare and commit the pending Microsoft Store submission for 1.3.0.
 
-MODE=check prints what the pending submission contains. MODE=commit also commits it,
-which sends it to certification, and waits for the package to be processed.
+MODE=check   prints what the pending submission contains.
+MODE=prepare puts the 1.3.0 package, the new Polish listing (texts, screenshots, logos,
+             16:9 art) and two trailers into the pending submission and uploads the files.
+MODE=commit  commits the submission, which sends it to certification.
 """
 
+import glob
 import json
 import os
+import subprocess
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
+import zipfile
 
 APP_ID = "9P6ZLK40V3LL"
 API = "https://manage.devcenter.microsoft.com/v1.0/my"
+ASSETS = ".github/store-assets"
+NEW_TITLE = "Poufnik – anonimizacja dokumentów"
+
+SCREENSHOTS = [
+    ("zrzut-1-przeglad.png", "Przejrzyj wykryte dane i zdecyduj, co zostaje"),
+    ("zrzut-2-wynik.png", "Dokument gotowy do wysłania do AI, z gotowymi poleceniami"),
+    ("zrzut-3-przywracanie.png", "Odpowiedź modelu wraca z prawdziwymi danymi"),
+    ("zrzut-4-pdf.png", "Zaczernienie w PDF usuwa dane z pliku, nie tylko je zasłania"),
+]
+OTHER_IMAGES = [
+    ("kafel-1x1-1080.png", "StoreLogoSquare"),
+    ("kafel-1x1-300.png", "Icon"),
+    ("super-hero-1920x1080.png", "PromotionalArt16x9"),
+]
+TRAILERS = [
+    ("zwiastun-1-anonimizacja-przed-ai.mp4", "zwiastun-1-miniatura.png", "Anonimizacja umowy przed wysłaniem do AI"),
+    ("zwiastun-2-skany-i-zdjecia.mp4", "zwiastun-2-miniatura.png", "Skan i zdjęcie dokumentu: OCR na Twoim komputerze"),
+]
 
 
 def token() -> str:
@@ -29,17 +53,26 @@ def token() -> str:
         return json.load(r)["access_token"]
 
 
-def call(tok: str, method: str, path: str) -> dict:
-    req = urllib.request.Request(f"{API}{path}", method=method, headers={"Authorization": f"Bearer {tok}"})
-    if method == "POST":
-        req.data = b""
-    with urllib.request.urlopen(req) as r:
-        raw = r.read()
-        return json.loads(raw) if raw else {}
+def call(tok: str, method: str, path: str, payload: dict | None = None) -> dict:
+    headers = {"Authorization": f"Bearer {tok}"}
+    data = None
+    if payload is not None:
+        data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        headers["Content-Type"] = "application/json; charset=utf-8"
+    elif method == "POST":
+        data = b""
+    req = urllib.request.Request(f"{API}{path}", data=data, method=method, headers=headers)
+    try:
+        with urllib.request.urlopen(req) as r:
+            raw = r.read()
+            return json.loads(raw) if raw else {}
+    except urllib.error.HTTPError as e:
+        print("HTTP", e.code, e.read().decode("utf-8", "replace")[:2000])
+        raise
 
 
 def summary(sub: dict) -> None:
-    print("status:", sub.get("status"), json.dumps(sub.get("statusDetails"), ensure_ascii=False))
+    print("status:", sub.get("status"), json.dumps(sub.get("statusDetails"), ensure_ascii=False)[:600])
     for p in sub.get("applicationPackages", []):
         print("package:", p.get("fileName"), p.get("fileStatus"), p.get("version"))
     for lang, listing in sub.get("listings", {}).items():
@@ -52,7 +85,83 @@ def summary(sub: dict) -> None:
         print("  releaseNotes:", (b.get("releaseNotes") or "")[:40].replace("\n", " "))
         for img in b.get("images", []):
             print("  image:", img.get("imageType"), img.get("fileName"), img.get("fileStatus"), (img.get("description") or "")[:40])
-    print("trailers:", len(sub.get("trailers") or []))
+    for t in sub.get("trailers") or []:
+        print("trailer:", t.get("videoFileName"), json.dumps(t.get("trailerAssets"), ensure_ascii=False)[:200])
+
+
+def prepare(tok: str, sid: str, sub: dict) -> None:
+    bundles = glob.glob("store-package/**/*.msixbundle", recursive=True)
+    if len(bundles) != 1:
+        raise SystemExit(f"Expected one .msixbundle, found {bundles}")
+    bundle = bundles[0]
+    bundle_name = os.path.basename(bundle)
+    print("bundle:", bundle_name, os.path.getsize(bundle))
+
+    packages = [p for p in sub["applicationPackages"] if p.get("version")]
+    for p in packages:
+        p["fileStatus"] = "PendingDelete"
+    packages.append({"fileName": bundle_name, "fileStatus": "PendingUpload"})
+    sub["applicationPackages"] = packages
+
+    texts = json.load(open(f"{ASSETS}/listing.json", encoding="utf-8"))
+    base = sub["listings"]["pl-pl"]["baseListing"]
+    base["title"] = NEW_TITLE
+    base["description"] = texts["desc"]
+    base["shortDescription"] = texts["short"]
+    base["features"] = texts["features"]
+    base["keywords"] = texts["keywords"]
+    base["releaseNotes"] = texts["notes"]
+    images = []
+    for img in base.get("images", []):
+        img["fileStatus"] = "PendingDelete"
+        images.append(img)
+    for name, caption in SCREENSHOTS:
+        images.append({"fileName": name, "fileStatus": "PendingUpload", "imageType": "Screenshot", "description": caption})
+    for name, kind in OTHER_IMAGES:
+        images.append({"fileName": name, "fileStatus": "PendingUpload", "imageType": kind})
+    base["images"] = images
+
+    sub["trailers"] = [
+        {
+            "videoFileName": video,
+            "trailerAssets": {"pl-pl": {"title": title, "imageList": [{"fileName": thumb, "description": ""}]}},
+        }
+        for video, thumb, title in TRAILERS
+    ]
+
+    updated = call(tok, "PUT", f"/applications/{APP_ID}/submissions/{sid}", sub)
+    upload_url = updated["fileUploadUrl"]
+
+    with zipfile.ZipFile("upload.zip", "w", zipfile.ZIP_STORED, allowZip64=True) as z:
+        z.write(bundle, bundle_name)
+        names = [n for n, _ in SCREENSHOTS] + [n for n, _ in OTHER_IMAGES]
+        names += [v for v, _, _ in TRAILERS] + [t for _, t, _ in TRAILERS]
+        for n in names:
+            z.write(f"{ASSETS}/{n}", n)
+    print("zip:", os.path.getsize("upload.zip"))
+    subprocess.run(
+        [
+            "curl", "--fail-with-body", "-sS", "-X", "PUT", "-T", "upload.zip",
+            "-H", "x-ms-blob-type: BlockBlob", "-H", "x-ms-version: 2021-08-06", upload_url,
+        ],
+        check=True,
+    )
+    print("upload done")
+    summary(call(tok, "GET", f"/applications/{APP_ID}/submissions/{sid}"))
+
+
+def commit(tok: str, sid: str) -> int:
+    print("Committing...")
+    call(tok, "POST", f"/applications/{APP_ID}/submissions/{sid}/commit")
+    st = {}
+    for _ in range(120):
+        time.sleep(20)
+        st = call(tok, "GET", f"/applications/{APP_ID}/submissions/{sid}/status")
+        print("status:", st.get("status"), json.dumps(st.get("statusDetails"), ensure_ascii=False)[:600])
+        if st.get("status") != "CommitStarted":
+            break
+    summary(call(tok, "GET", f"/applications/{APP_ID}/submissions/{sid}"))
+    return 1 if st.get("status") in ("CommitFailed", "CommitStarted") else 0
 
 
 def main() -> int:
@@ -66,19 +175,12 @@ def main() -> int:
     print("pending submission:", sid)
     sub = call(tok, "GET", f"/applications/{APP_ID}/submissions/{sid}")
     summary(sub)
-    if os.environ.get("MODE") != "commit":
-        return 0
-    print("Committing...")
-    call(tok, "POST", f"/applications/{APP_ID}/submissions/{sid}/commit")
-    for _ in range(90):
-        time.sleep(20)
-        st = call(tok, "GET", f"/applications/{APP_ID}/submissions/{sid}/status")
-        print("status:", st.get("status"), json.dumps(st.get("statusDetails"), ensure_ascii=False)[:400])
-        if st.get("status") not in ("CommitStarted",):
-            break
-    final = call(tok, "GET", f"/applications/{APP_ID}/submissions/{sid}")
-    summary(final)
-    return 0 if final.get("status") not in ("CommitFailed",) else 1
+    mode = os.environ.get("MODE", "check")
+    if mode == "prepare":
+        prepare(tok, sid, sub)
+    elif mode == "commit":
+        return commit(tok, sid)
+    return 0
 
 
 if __name__ == "__main__":
