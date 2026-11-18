@@ -82,6 +82,8 @@ const mocks = vi.hoisted(() => {
       takeShellActions: vi.fn(),
       finishShellActions: vi.fn(),
       listenToShellActions: vi.fn(),
+      emitShellProgress: vi.fn(),
+      listenToProgressReady: vi.fn(),
       notify: vi.fn(),
       waitForEngine: vi.fn(),
       writeOutputFile: vi.fn(),
@@ -285,6 +287,8 @@ describe("App engine health", () => {
     mocks.shell.takeShellActions.mockResolvedValue([]);
     mocks.shell.finishShellActions.mockResolvedValue(undefined);
     mocks.shell.listenToShellActions.mockResolvedValue(() => undefined);
+    mocks.shell.emitShellProgress.mockResolvedValue(undefined);
+    mocks.shell.listenToProgressReady.mockResolvedValue(() => undefined);
     mocks.shell.notify.mockResolvedValue(undefined);
     mocks.shell.waitForEngine.mockResolvedValue(endpoint);
     mocks.shell.writeOutputFile.mockResolvedValue(undefined);
@@ -371,9 +375,27 @@ describe("App engine health", () => {
     expect(outputPath).toMatch(/^C:\\Akta\\.+_poufnik\.md$/);
     expect(contents).toBe("Jan Kowalski");
     expect(mocks.copyText).toHaveBeenCalledWith("Jan Kowalski");
-    await waitFor(() => expect(mocks.shell.finishShellActions).toHaveBeenCalled());
+    // The progress window names the file, then shows the result before Poufnik closes.
+    expect(mocks.shell.emitShellProgress).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "markdown", file: "notatka.txt", total: 1 }),
+    );
+    await waitFor(() =>
+      expect(mocks.shell.emitShellProgress).toHaveBeenCalledWith(
+        expect.objectContaining({
+          finished: true,
+          done: 1,
+          failed: 0,
+          message: expect.stringContaining("Markdown skopiowany do schowka"),
+        }),
+      ),
+    );
+    expect(mocks.shell.finishShellActions).not.toHaveBeenCalled();
+    expect(mocks.shell.notify).not.toHaveBeenCalled();
+    await waitFor(() => expect(mocks.shell.finishShellActions).toHaveBeenCalled(), {
+      timeout: 6000,
+    });
     expect(mocks.loginToAccounts).not.toHaveBeenCalled();
-  });
+  }, 10_000);
 
   it("restores an AI answer file from the start screen after the user picks the right map", async () => {
     const answer = new File(["[OSOBA_1] mieszka przy [ADRES_1]."], "odpowiedz.txt", {

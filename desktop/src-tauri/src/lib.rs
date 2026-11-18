@@ -552,7 +552,10 @@ pub fn run() {
                 // context menu works in the background and never shows it.
                 let args: Vec<String> = std::env::args().collect();
                 match shell_actions::parse_shell_action(&args) {
-                    Some(request) => app.state::<shell_actions::ShellActionState>().push(request),
+                    Some(request) => {
+                        app.state::<shell_actions::ShellActionState>().push(request);
+                        shell_actions::show_progress_window(app.handle());
+                    }
                     None => shell_actions::show_main_window(app.handle()),
                 }
                 #[cfg(all(target_os = "macos", not(feature = "mas")))]

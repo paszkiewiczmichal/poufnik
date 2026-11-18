@@ -7,10 +7,17 @@
 use std::sync::Mutex;
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{
+    AppHandle, Emitter, Manager, PhysicalPosition, State, WebviewUrl, WebviewWindowBuilder,
+};
 
 pub const SHELL_ACTION_FLAG: &str = "--poufnik-action";
 pub const SHELL_ACTION_EVENT: &str = "shell://action";
+/// Small window in the screen corner with the file name and a progress bar. Without it a
+/// menu action runs with no visible sign for several seconds and looks broken.
+pub const PROGRESS_WINDOW: &str = "progress";
+const PROGRESS_SIZE: (f64, f64) = (380.0, 128.0);
+const PROGRESS_MARGIN: i32 = 16;
 
 const ACTIONS: [&str; 5] = ["anonymize", "ocr", "markdown", "restore", "metadata"];
 
@@ -74,7 +81,52 @@ pub fn handle_second_instance(app: &AppHandle, args: &[String]) {
 /// Queues an action for the frontend (Explorer menu on Windows, Finder services on macOS).
 pub fn queue_shell_action(app: &AppHandle, request: ShellActionRequest) {
     app.state::<ShellActionState>().push(request);
+    // Not built inline: creating a webview inside this synchronous callback can deadlock on
+    // Windows.
+    let handle = app.clone();
+    tauri::async_runtime::spawn(async move { show_progress_window(&handle) });
     let _ = app.emit(SHELL_ACTION_EVENT, ());
+}
+
+/// Shows the progress window, creating it on first use, in the bottom right corner of the
+/// screen (top right on macOS, where notifications appear). It never takes the focus.
+pub fn show_progress_window(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window(PROGRESS_WINDOW) {
+        let _ = window.show();
+        return;
+    }
+    let window = match WebviewWindowBuilder::new(
+        app,
+        PROGRESS_WINDOW,
+        WebviewUrl::App("index.html".into()),
+    )
+    .title("Poufnik")
+    .inner_size(PROGRESS_SIZE.0, PROGRESS_SIZE.1)
+    .resizable(false)
+    .maximizable(false)
+    .minimizable(false)
+    .decorations(false)
+    .shadow(true)
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .focused(false)
+    .visible(false)
+    .build()
+    {
+        Ok(window) => window,
+        Err(_) => return,
+    };
+    if let (Ok(Some(monitor)), Ok(size)) = (window.primary_monitor(), window.outer_size()) {
+        let area = monitor.work_area();
+        let x = area.position.x + area.size.width as i32 - size.width as i32 - PROGRESS_MARGIN;
+        let y = if cfg!(target_os = "macos") {
+            area.position.y + PROGRESS_MARGIN
+        } else {
+            area.position.y + area.size.height as i32 - size.height as i32 - PROGRESS_MARGIN
+        };
+        let _ = window.set_position(PhysicalPosition::new(x, y));
+    }
+    let _ = window.show();
 }
 
 /// A request from a menu outside the app, or `None` for an unknown action or no files.
@@ -106,6 +158,9 @@ pub fn finish_shell_actions(app: AppHandle, state: State<'_, ShellActionState>) 
     if !state.pending.lock().map(|p| p.is_empty()).unwrap_or(true) {
         let _ = app.emit(SHELL_ACTION_EVENT, ());
         return;
+    }
+    if let Some(progress) = app.get_webview_window(PROGRESS_WINDOW) {
+        let _ = progress.destroy();
     }
     let visible = app
         .get_webview_window("main")

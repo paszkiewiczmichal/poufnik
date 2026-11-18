@@ -3392,3 +3392,93 @@ td:first-child {
   gap: var(--sp-2);
   max-width: 420px;
 }
+
+/* ---- Okienko postępu akcji z menu Eksploratora (osobne okno "progress") ---- */
+
+.progress-window body {
+  background: var(--surface);
+  overflow: hidden;
+  user-select: none;
+}
+
+.shell-progress {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: var(--sp-3) var(--sp-4) var(--sp-4);
+  border-top: 3px solid var(--navy);
+  background: var(--surface);
+}
+
+.shell-progress--failed {
+  border-top-color: var(--danger);
+}
+
+.shell-progress__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.shell-progress__brand {
+  color: var(--navy);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: var(--ls-caps-wide);
+  text-transform: uppercase;
+}
+
+.shell-progress__close {
+  padding: 0 var(--sp-1);
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: var(--fs-md);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.shell-progress__close:hover {
+  color: var(--ink);
+}
+
+.shell-progress__title {
+  margin: var(--sp-1) 0 0;
+  color: var(--ink);
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+
+.shell-progress__detail {
+  display: -webkit-box;
+  margin: 2px 0 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.shell-progress__track {
+  height: 4px;
+  margin-top: auto;
+  border-radius: var(--radius);
+  background: var(--line);
+  overflow: hidden;
+}
+
+.shell-progress__fill {
+  height: 100%;
+  background: var(--navy);
+  transition: width 0.3s ease;
+}
+
+.shell-progress--failed .shell-progress__fill {
+  background: var(--danger);
+}
+
+.shell-progress__fill--moving {
+  width: 35%;
+  animation: pf-indeterminate 1.6s ease-in-out infinite;
+}

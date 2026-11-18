@@ -65,6 +65,11 @@ import {
   runShellAction,
   type ShellActionOutcome,
 } from "./domain/shellActions";
+import {
+  finishedMessage,
+  STARTING_PROGRESS,
+  type ShellProgress,
+} from "./domain/shellProgress";
 import { chooseReplacementMap, parseReplacementMap, type MapCandidate } from "./domain/mapLinking";
 import { decryptMap, encryptMap, isEncryptedMap } from "./domain/mapCrypto";
 import { originalPreviewKind, previewKind } from "./domain/preview";
@@ -141,6 +146,8 @@ import {
   removeExpiredMaps,
   saveRememberMaps,
   takeShellActions,
+  emitShellProgress,
+  listenToProgressReady,
   waitForEngine,
   writeOutputFile,
 } from "./tauri/shellActions";
@@ -754,22 +761,53 @@ function App() {
   // user's settings; each finished file is reported by a notification. It waits only until
   // the saved session is read, so an account's custom rules apply.
   const shellQueueRunning = useRef(false);
+  const shellProgress = useRef<ShellProgress>(STARTING_PROGRESS);
   const runShellQueue = useCallback(async () => {
     if (shellQueueRunning.current || authState.status === "loading") {
       return;
     }
     shellQueueRunning.current = true;
+    let progress = STARTING_PROGRESS;
+    let lastMessage: string | null = null;
+    let lastFailure: string | null = null;
+    const publish = (next: ShellProgress) => {
+      progress = next;
+      shellProgress.current = next;
+      void emitShellProgress(next);
+    };
     try {
       for (;;) {
         const requests = await takeShellActions();
         if (requests.length === 0) {
-          break;
+          if (progress.total === 0 || progress.finished) {
+            break;
+          }
+          // Show the result for a moment, then look again: more files may have come meanwhile.
+          publish({
+            ...progress,
+            file: null,
+            finished: true,
+            message: finishedMessage(progress.total, progress.failed, lastMessage, lastFailure),
+          });
+          await new Promise((resolve) =>
+            window.setTimeout(resolve, progress.failed > 0 ? 9000 : 4500),
+          );
+          continue;
         }
+        if (progress.finished) {
+          progress = STARTING_PROGRESS;
+          lastMessage = null;
+          lastFailure = null;
+        }
+        const files = requests.reduce((count, request) => count + request.paths.length, 0);
+        publish({ ...progress, action: requests[0].action, total: progress.total + files });
         let endpoint: EngineEndpoint;
         try {
           endpoint = await waitForEngine();
         } catch (error) {
-          await notify(texts.shellActions.title, toUserMessage(error));
+          lastFailure = toUserMessage(error);
+          await notify(texts.shellActions.title, lastFailure);
+          publish({ ...progress, done: progress.done + files, failed: progress.failed + files });
           continue;
         }
         const deps = {
@@ -793,6 +831,7 @@ function App() {
         for (const request of requests) {
           for (const path of request.paths) {
             const name = filenameOf(path);
+            publish({ ...progress, action: request.action, file: name });
             let outcome: ShellActionOutcome;
             // Restore and metadata check their own file types; the rest need a document.
             const ownTypes = request.action === "restore" || request.action === "metadata";
@@ -805,7 +844,17 @@ function App() {
                 outcome = { ok: false, reason: "error", message: toUserMessage(error) };
               }
             }
-            await notify(texts.shellActions.title, shellOutcomeMessage(request.action, name, outcome));
+            lastMessage = shellOutcomeMessage(request.action, name, outcome);
+            if (!outcome.ok) {
+              lastFailure = lastMessage;
+              // Also in the notification centre: the window closes after a few seconds.
+              await notify(texts.shellActions.title, lastMessage);
+            }
+            publish({
+              ...progress,
+              done: progress.done + 1,
+              failed: progress.failed + (outcome.ok ? 0 : 1),
+            });
           }
         }
       }
@@ -817,8 +866,19 @@ function App() {
 
   useEffect(() => {
     let unlisten: (() => void) | null = null;
+    let unlistenReady: (() => void) | null = null;
     let active = true;
     void runShellQueue();
+    // A progress window that loads after the first update asks for the current state.
+    listenToProgressReady(() => void emitShellProgress(shellProgress.current))
+      .then((dispose) => {
+        if (active) {
+          unlistenReady = dispose;
+        } else {
+          dispose();
+        }
+      })
+      .catch(() => undefined);
     listenToShellActions(() => void runShellQueue())
       .then((dispose) => {
         if (active) {
@@ -831,6 +891,7 @@ function App() {
     return () => {
       active = false;
       unlisten?.();
+      unlistenReady?.();
     };
   }, [runShellQueue]);
 

@@ -322,6 +322,22 @@ export const texts = {
   },
   shellActions: {
     title: "Poufnik",
+    progress: {
+      starting: "Uruchamiam Poufnika...",
+      working: {
+        anonymize: "Anonimizuję",
+        ocr: "Odczytuję tekst (OCR)",
+        markdown: "Przygotowuję Markdown dla AI",
+        restore: "Przywracam dane",
+        metadata: "Usuwam metadane",
+      } as Record<string, string>,
+      counter: (current: number, total: number) => `${current} z ${total}`,
+      done: "Gotowe",
+      problem: "Wystąpił problem",
+      allDone: (count: number) => `Zapisano ${plural(count, "plik", "pliki", "plików")}.`,
+      partlyDone: (ok: number, total: number) => `Przetworzono ${ok} z ${total}.`,
+      close: "Zamknij",
+    },
     anonymized: (name: string) => `Zanonimizowano. Zapisano: ${name}`,
     ocr: (name: string) => `Tekst skopiowany do schowka i zapisany: ${name}`,
     markdown: (name: string) => `Markdown skopiowany do schowka i zapisany: ${name}`,
