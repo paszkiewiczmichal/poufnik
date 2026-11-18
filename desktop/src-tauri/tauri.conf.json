@@ -38,9 +38,11 @@
   "bundle": {
     "active": true,
     "targets": ["nsis"],
+    "publisher": "Kancelaria Radcy Prawnego Michał Paszkiewicz",
     "windows": {
       "nsis": {
-        "installerHooks": "./windows/hooks.nsh"
+        "installerHooks": "./windows/hooks.nsh",
+        "template": "./windows/installer.nsi"
       }
     },
     "createUpdaterArtifacts": true,
