@@ -1,0 +1,23 @@
+name: Store submission (one-off)
+
+# Temporary, on its own branch: inspects the pending Microsoft Store submission and, with
+# MODE=commit, sends it to certification (approved by the owner in chat on 2026-11-19).
+on:
+  push:
+    branches:
+      - sklep-zgloszenie-1.3.0
+
+permissions:
+  contents: read
+
+jobs:
+  store-submission:
+    runs-on: ubuntu-latest
+    env:
+      MODE: check
+      TENANT_ID: ${{ secrets.PARTNER_CENTER_TENANT_ID }}
+      CLIENT_ID: ${{ secrets.PARTNER_CENTER_CLIENT_ID }}
+      CLIENT_SECRET: ${{ secrets.PARTNER_CENTER_CLIENT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 .github/scripts/store_submission.py
