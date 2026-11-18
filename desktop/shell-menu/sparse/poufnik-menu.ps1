@@ -33,7 +33,10 @@ try {
     Write-Output "Windows 10: classic menu only."
     exit 2
   }
-  if (Get-AppxPackage -Name $storePackageName) {
+  # Store versions before 1.2.0 (up to 1.0.22) have no menu: with one of those installed the
+  # GitHub version still registers its own, otherwise the user gets no menu at all.
+  $store = Get-AppxPackage -Name $storePackageName
+  if ($store -and [version]$store.Version -ge [version]"1.2.0.0") {
     Write-Output "The Microsoft Store version of Poufnik is installed and has its own menu."
     exit 3
   }
