@@ -105,16 +105,19 @@ def prepare(tok: str, sid: str, sub: dict) -> None:
     sub["applicationPackages"] = packages
 
     texts = json.load(open(f"{ASSETS}/listing.json", encoding="utf-8"))
+    for listing in sub["listings"].values():
+        listing["baseListing"]["title"] = NEW_TITLE
     base = sub["listings"]["pl-pl"]["baseListing"]
-    base["title"] = NEW_TITLE
     base["description"] = texts["desc"]
     base["shortDescription"] = texts["short"]
     base["features"] = texts["features"]
     base["keywords"] = texts["keywords"]
     base["releaseNotes"] = texts["notes"]
     images = []
+    replaced = {"Screenshot"} | {kind for _, kind in OTHER_IMAGES}
     for img in base.get("images", []):
-        img["fileStatus"] = "PendingDelete"
+        if img.get("imageType") in replaced:
+            img["fileStatus"] = "PendingDelete"
         images.append(img)
     for name, caption in SCREENSHOTS:
         images.append({"fileName": name, "fileStatus": "PendingUpload", "imageType": "Screenshot", "description": caption})
@@ -179,6 +182,25 @@ def retry(tok: str, sid: str, sub: dict) -> None:
     summary(call(tok, "GET", f"/applications/{APP_ID}/submissions/{sid}"))
 
 
+FAILED_SUBMISSION = "1152921505702443733"
+
+
+def create(tok: str, app: dict) -> tuple[str, dict]:
+    """Delete the submission that failed on the trailers and start a new one."""
+    pending = app.get("pendingApplicationSubmission")
+    if pending:
+        sid = pending["id"]
+        st = call(tok, "GET", f"/applications/{APP_ID}/submissions/{sid}/status")
+        print("pending:", sid, st.get("status"))
+        if sid != FAILED_SUBMISSION or st.get("status") != "CommitFailed":
+            raise SystemExit("Pending submission is not the failed one, not deleting it.")
+        call(tok, "DELETE", f"/applications/{APP_ID}/submissions/{sid}")
+        print("deleted:", sid)
+    sub = call(tok, "POST", f"/applications/{APP_ID}/submissions")
+    print("created:", sub["id"])
+    return sub["id"], sub
+
+
 def commit(tok: str, sid: str) -> int:
     print("Committing...")
     call(tok, "POST", f"/applications/{APP_ID}/submissions/{sid}/commit")
@@ -196,6 +218,10 @@ def commit(tok: str, sid: str) -> int:
 def main() -> int:
     tok = token()
     app = call(tok, "GET", f"/applications/{APP_ID}")
+    if os.environ.get("MODE") == "create":
+        sid, sub = create(tok, app)
+        prepare(tok, sid, sub)
+        return 0
     pending = app.get("pendingApplicationSubmission")
     if not pending:
         print("No pending submission.")
