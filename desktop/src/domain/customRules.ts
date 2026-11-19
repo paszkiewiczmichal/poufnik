@@ -1,7 +1,9 @@
-import type { CustomRegexRule, CustomRegexRulePayload } from "../types";
+import type { CustomRegexRule, CustomRegexRulePayload, EntityCategory } from "../types";
+import { tokenPrefix } from "./entities";
+import { manualPhrasePattern } from "./manualPattern";
 
-export const MAX_CUSTOM_RULES = 25;
-export const MAX_CUSTOM_RULE_PATTERN_LENGTH = 256;
+export const MAX_CUSTOM_RULES = 100;
+export const MAX_CUSTOM_RULE_PATTERN_LENGTH = 512;
 
 export interface CustomRuleDraft {
   name: string;
@@ -62,7 +64,44 @@ export function enabledCustomRulePayloads(
       name: rule.name,
       pattern: rule.pattern,
       label: rule.label,
+      ...(rule.category ? { category: rule.category } : {}),
     }));
+}
+
+export type ManualRuleOutcome =
+  | { status: "added"; rules: CustomRegexRule[]; rule: CustomRegexRule }
+  | { status: "exists" }
+  | { status: "limit" }
+  | { status: "too_long" };
+
+/**
+ * Saves a phrase marked by hand as a custom rule, so every next document has it marked
+ * too, in its case forms. Falls back to the exact form when the inflected pattern is too
+ * long for the engine.
+ */
+export function addManualRule(
+  rules: CustomRegexRule[],
+  text: string,
+  category: EntityCategory,
+): ManualRuleOutcome {
+  const name = text.trim().replace(/\s+/g, " ");
+  const pattern = [manualPhrasePattern(name), manualPhrasePattern(name, false)].find(
+    (candidate) => candidate.length <= MAX_CUSTOM_RULE_PATTERN_LENGTH,
+  );
+  if (!pattern) {
+    return { status: "too_long" };
+  }
+  if (rules.some((rule) => rule.pattern === pattern)) {
+    return { status: "exists" };
+  }
+  if (rules.length >= MAX_CUSTOM_RULES) {
+    return { status: "limit" };
+  }
+  const rule = {
+    ...createCustomRule({ name, pattern, label: tokenPrefix(category) }),
+    category,
+  };
+  return { status: "added", rules: [...rules, rule], rule };
 }
 
 export function createCustomRule(draft: CustomRuleDraft): CustomRegexRule {

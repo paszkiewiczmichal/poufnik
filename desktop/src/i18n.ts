@@ -252,6 +252,12 @@ export const texts = {
     add: "Dodaj regułę",
     delete: "Usuń",
     matchCount: (count: number) => `Trafienia w tekście testowym: ${count}`,
+    manualSaved: (name: string) =>
+      `„${name}” zapisane we własnych regułach. Zaznaczy się też w kolejnych dokumentach, także w innej formie, np. „Kowalskiego” zamiast „Kowalski”.`,
+    manualLimit: (max: number) =>
+      `Nie zapisano we własnych regułach: limit to ${max} reguł. Usuń niepotrzebne w Ustawieniach, w sekcji „Własne reguły wykrywania”. W tym dokumencie zaznaczenie działa.`,
+    manualTooLong:
+      "To zaznaczenie jest za długie, żeby zapisać je jako regułę. W tym dokumencie zaznaczenie działa.",
   },
   start: {
     step: "Krok 1 z 3",

@@ -8,6 +8,7 @@ import type {
   AnonymizationState,
   DeanonymizationState,
   DetectedEntity,
+  EntityCategory,
   PromptState,
   ReplacementMap,
 } from "../types";
@@ -69,6 +70,47 @@ describe("DocumentWorkspace public institutions", () => {
   });
 });
 
+describe("DocumentWorkspace manual marks", () => {
+  afterEach(() => {
+    cleanup();
+    window.getSelection()?.removeAllRanges();
+    useAppStore.setState(useAppStore.getInitialState(), true);
+  });
+
+  it("hands a phrase marked by hand to be saved as a custom rule", () => {
+    const onManualEntityAdded = vi.fn();
+    const { container } = renderWorkspace("early_bird", { onManualEntityAdded });
+    const paper = container.querySelector(".document-paper") as HTMLElement;
+    const walker = document.createTreeWalker(paper, NodeFilter.SHOW_TEXT);
+    let node = walker.nextNode();
+    while (node && !node.textContent?.includes("ma PESEL")) {
+      node = walker.nextNode();
+    }
+    expect(node).not.toBeNull();
+    const at = node!.textContent!.indexOf("ma");
+    const range = document.createRange();
+    range.setStart(node!, at);
+    range.setEnd(node!, at + 2);
+    range.getBoundingClientRect = () => new DOMRect(0, 0, 10, 10);
+    window.getSelection()!.removeAllRanges();
+    window.getSelection()!.addRange(range);
+
+    fireEvent.mouseUp(paper);
+    fireEvent.click(screen.getByRole("button", { name: texts.corrections.add }));
+
+    expect(onManualEntityAdded).toHaveBeenCalledWith("ma", "CUSTOM");
+  });
+
+  it("shows whether the mark was saved as a rule", () => {
+    renderWorkspace("early_bird", {
+      view: "document",
+      manualRuleNotice: { text: "„Kowalski” zapisane", warning: false },
+    });
+
+    expect(screen.getByRole("status")).toHaveTextContent("„Kowalski” zapisane");
+  });
+});
+
 interface RenderWorkspaceOptions {
   anonymization?: AnonymizationState;
   documentText?: string;
@@ -79,6 +121,8 @@ interface RenderWorkspaceOptions {
   onViewChange?: (view: WorkspaceView) => void;
   onNewDocument?: () => void;
   onAnonymize?: () => void;
+  onManualEntityAdded?: (text: string, category: EntityCategory) => void;
+  manualRuleNotice?: { text: string; warning: boolean } | null;
 }
 
 function renderWorkspace(tier: "basic" | "early_bird", options: RenderWorkspaceOptions = {}) {
@@ -145,6 +189,8 @@ function renderWorkspace(tier: "basic" | "early_bird", options: RenderWorkspaceO
       onCopyDeanonymizedResult={vi.fn()}
       onRegister={vi.fn()}
       canRedetect
+      onManualEntityAdded={options.onManualEntityAdded}
+      manualRuleNotice={options.manualRuleNotice}
     />,
   );
 }

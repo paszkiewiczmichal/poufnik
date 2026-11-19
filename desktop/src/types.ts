@@ -136,12 +136,15 @@ export interface CustomRegexRule {
   pattern: string;
   label: string;
   enabled: boolean;
+  // Set for a rule saved from a manual mark: matches come back in this category.
+  category?: EntityCategory;
 }
 
 export interface CustomRegexRulePayload {
   name: string;
   pattern: string;
   label: string;
+  category?: EntityCategory;
 }
 
 export type BatchQueueStatus = "queued" | "processing" | "done" | "error";

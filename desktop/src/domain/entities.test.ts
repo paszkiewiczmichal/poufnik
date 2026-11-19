@@ -249,6 +249,21 @@ describe("propagateManualEntity", () => {
     expect(copies.map((copy) => copy.start)).toEqual([15, 43, 61]);
   });
 
+  it("marks the other case forms of a marked name with the same token", () => {
+    const doc = "Pozew Kowalskiego. Kowalski wnosi. Kowalczyk nie.";
+    const marked = createManualEntity({
+      documentText: doc,
+      range: { start: 6, end: 17 },
+      category: "PERSON",
+    });
+
+    const copies = propagateManualEntity(doc, marked, []);
+
+    expect(copies.map((copy) => copy.text)).toEqual(["Kowalski"]);
+    expect(copies[0].canonical_text).toBe("Kowalskiego");
+    expect(copies[0].entity_group_id).toBe(marked.entity_group_id);
+  });
+
   it("does nothing for a single character", () => {
     const short = createManualEntity({
       documentText: "a b a",

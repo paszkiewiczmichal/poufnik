@@ -1428,6 +1428,14 @@ button:disabled {
   flex: 1;
 }
 
+.workspace__note {
+  margin: 0;
+  padding: 10px var(--sp-6);
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: var(--fs-base);
+}
+
 .workspace__alert {
   margin: 0;
   padding: 10px var(--sp-6);

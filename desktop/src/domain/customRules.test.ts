@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  addManualRule,
   createCustomRule,
   customRuleMatches,
   enabledCustomRulePayloads,
@@ -109,5 +110,63 @@ describe("createCustomRule", () => {
     expect(rule.pattern).toBe("ABC");
     expect(rule.enabled).toBe(true);
     expect(rule.id).toMatch(/^custom-rule-/);
+  });
+});
+
+describe("addManualRule", () => {
+  it("saves a marked phrase as an enabled rule that keeps its category and case forms", () => {
+    const outcome = addManualRule([], "  Jan   Kowalski ", "PERSON");
+
+    expect(outcome.status).toBe("added");
+    if (outcome.status !== "added") return;
+    expect(outcome.rule).toMatchObject({
+      name: "Jan Kowalski",
+      label: "OSOBA",
+      category: "PERSON",
+      enabled: true,
+    });
+    expect(outcome.rules).toEqual([outcome.rule]);
+    expect(customRuleMatches(outcome.rule.pattern, "Pismo do Jana Kowalskiego.")).toEqual([
+      "Jana Kowalskiego",
+    ]);
+    expect(enabledCustomRulePayloads(outcome.rules)).toEqual([
+      {
+        name: "Jan Kowalski",
+        label: "OSOBA",
+        pattern: outcome.rule.pattern,
+        category: "PERSON",
+      },
+    ]);
+  });
+
+  it("does not save the same name twice, even marked in another case form", () => {
+    const first = addManualRule([], "Kowalski", "PERSON");
+    if (first.status !== "added") throw new Error("not added");
+
+    expect(addManualRule(first.rules, "Kowalskiego", "PERSON")).toEqual({ status: "exists" });
+  });
+
+  it("refuses to go past the rule limit instead of dropping older rules", () => {
+    const full = Array.from({ length: MAX_CUSTOM_RULES }, (_, index) =>
+      createCustomRule({ name: `R${index}`, label: "R", pattern: `R${index}` }),
+    );
+
+    expect(addManualRule(full, "Kowalski", "PERSON")).toEqual({ status: "limit" });
+  });
+
+  it("falls back to the exact phrase when the inflected pattern is too long", () => {
+    const phrase = "Alfa Beta Gamma Delta Epsilon";
+    const outcome = addManualRule([], phrase, "COMPANY");
+
+    expect(outcome.status).toBe("added");
+    if (outcome.status !== "added") return;
+    expect(outcome.rule.pattern.length).toBeLessThanOrEqual(MAX_CUSTOM_RULE_PATTERN_LENGTH);
+    expect(customRuleMatches(outcome.rule.pattern, `${phrase}, Alfy Bety Gammy Delty Epsilonu`)).toEqual([
+      phrase,
+    ]);
+  });
+
+  it("reports a phrase too long to save even in its exact form", () => {
+    expect(addManualRule([], "Słowo ".repeat(60), "CUSTOM")).toEqual({ status: "too_long" });
   });
 });

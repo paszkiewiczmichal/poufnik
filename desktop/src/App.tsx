@@ -47,7 +47,11 @@ import {
   processBatchQueue,
   type BatchItemPatch,
 } from "./domain/batchProcessing";
-import { enabledCustomRulePayloads } from "./domain/customRules";
+import {
+  addManualRule,
+  enabledCustomRulePayloads,
+  MAX_CUSTOM_RULES,
+} from "./domain/customRules";
 import { poufnikFileName } from "./domain/batchExport";
 import {
   buildAnonymizedExport,
@@ -446,6 +450,31 @@ function App() {
     setCustomRulesState(rules);
     saveCustomRegexRules(rules);
   }, []);
+
+  // A phrase marked by hand is saved as a custom rule (an Early Bird feature), so the
+  // next documents have it marked too.
+  const [manualRuleNotice, setManualRuleNotice] = useState<{
+    text: string;
+    warning: boolean;
+  } | null>(null);
+  useEffect(() => setManualRuleNotice(null), [document]);
+  const saveManualRule = useCallback(
+    (text: string, category: EntityCategory) => {
+      if (productTier !== "early_bird") {
+        return;
+      }
+      const outcome = addManualRule(customRules, text, category);
+      if (outcome.status === "added") {
+        updateCustomRules(outcome.rules);
+        setManualRuleNotice({ text: texts.customRules.manualSaved(outcome.rule.name), warning: false });
+      } else if (outcome.status === "limit") {
+        setManualRuleNotice({ text: texts.customRules.manualLimit(MAX_CUSTOM_RULES), warning: true });
+      } else if (outcome.status === "too_long") {
+        setManualRuleNotice({ text: texts.customRules.manualTooLong, warning: true });
+      }
+    },
+    [customRules, productTier, updateCustomRules],
+  );
 
   const updateExcludedCategories = useCallback((categories: EntityCategory[]) => {
     setExcludedCategoriesState(categories);
@@ -2270,6 +2299,8 @@ function App() {
                   tier={productTier}
                   onRegister={openRegistration}
                   canRedetect={Boolean(uiState.selectedFile)}
+                  onManualEntityAdded={saveManualRule}
+                  manualRuleNotice={manualRuleNotice}
                 />
               ) : (
                 <StartScreen

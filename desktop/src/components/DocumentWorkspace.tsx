@@ -62,6 +62,8 @@ interface DocumentWorkspaceProps {
   onCopyDeanonymizedResult: () => void;
   onRegister: () => void;
   canRedetect: boolean;
+  onManualEntityAdded?: (text: string, category: EntityCategory) => void;
+  manualRuleNotice?: { text: string; warning: boolean } | null;
 }
 
 export function DocumentWorkspace({
@@ -99,6 +101,8 @@ export function DocumentWorkspace({
   onCopyDeanonymizedResult,
   onRegister,
   canRedetect,
+  onManualEntityAdded,
+  manualRuleNotice = null,
 }: DocumentWorkspaceProps) {
   const [focusEntityId, setFocusEntityId] = useState<string | null>(null);
   const [activeEntityId, setActiveEntityId] = useState<string | null>(null);
@@ -288,6 +292,11 @@ export function DocumentWorkspace({
           groups={entityGroups}
           onAdd={(category, groupId) => {
             addManualEntity(manualSelection.range, category, groupId);
+            const group = groupId ? entityGroups.find((item) => item.id === groupId) : null;
+            onManualEntityAdded?.(
+              document.text.slice(manualSelection.range.start, manualSelection.range.end),
+              group?.category ?? category,
+            );
             setManualSelection(null);
             window.getSelection()?.removeAllRanges();
           }}
@@ -295,6 +304,14 @@ export function DocumentWorkspace({
         />
       )}
 
+      {manualRuleNotice && view !== "result" && (
+        <p
+          className={manualRuleNotice.warning ? "workspace__alert" : "workspace__note"}
+          role="status"
+        >
+          {manualRuleNotice.text}
+        </p>
+      )}
       {anonymization.status === "error" && anonymization.error && view !== "result" && (
         <p className="workspace__alert" role="alert">
           {anonymization.error}
