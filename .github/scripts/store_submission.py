@@ -151,6 +151,34 @@ def prepare(tok: str, sid: str, sub: dict) -> None:
     summary(call(tok, "GET", f"/applications/{APP_ID}/submissions/{sid}"))
 
 
+def retry(tok: str, sid: str, sub: dict) -> None:
+    """After a failed commit: keep the processed package, re-send the listing files."""
+    sub["trailers"] = [
+        {
+            "videoFileName": video,
+            "trailerAssets": {"pl-pl": {"title": title, "imageList": [{"fileName": thumb, "description": ""}]}},
+        }
+        for video, thumb, title in TRAILERS
+    ]
+    updated = call(tok, "PUT", f"/applications/{APP_ID}/submissions/{sid}", sub)
+    upload_url = updated["fileUploadUrl"]
+    with zipfile.ZipFile("upload.zip", "w", zipfile.ZIP_STORED) as z:
+        names = [n for n, _ in SCREENSHOTS] + [n for n, _ in OTHER_IMAGES]
+        names += [v for v, _, _ in TRAILERS] + [t for _, t, _ in TRAILERS]
+        for n in names:
+            z.write(f"{ASSETS}/{n}", n)
+    print("zip:", os.path.getsize("upload.zip"))
+    subprocess.run(
+        [
+            "curl", "--fail-with-body", "-sS", "-X", "PUT", "-T", "upload.zip",
+            "-H", "x-ms-blob-type: BlockBlob", "-H", "x-ms-version: 2021-08-06", upload_url,
+        ],
+        check=True,
+    )
+    print("upload done")
+    summary(call(tok, "GET", f"/applications/{APP_ID}/submissions/{sid}"))
+
+
 def commit(tok: str, sid: str) -> int:
     print("Committing...")
     call(tok, "POST", f"/applications/{APP_ID}/submissions/{sid}/commit")
@@ -180,6 +208,9 @@ def main() -> int:
     if mode == "prepare":
         prepare(tok, sid, sub)
     elif mode == "commit":
+        return commit(tok, sid)
+    elif mode == "retry":
+        retry(tok, sid, sub)
         return commit(tok, sid)
     return 0
 

@@ -16,7 +16,7 @@ jobs:
   store-submission:
     runs-on: ubuntu-latest
     env:
-      MODE: commit
+      MODE: retry
       TENANT_ID: ${{ secrets.PARTNER_CENTER_TENANT_ID }}
       CLIENT_ID: ${{ secrets.PARTNER_CENTER_CLIENT_ID }}
       CLIENT_SECRET: ${{ secrets.PARTNER_CENTER_CLIENT_SECRET }}
@@ -31,5 +31,15 @@ jobs:
           path: store-package
           run-id: 44414173071
           github-token: ${{ github.token }}
+
+      - name: Add a silent audio track to the trailers (the Store rejects video without audio)
+        if: env.MODE == 'retry'
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+          for f in .github/store-assets/zwiastun-*.mp4; do
+            ffmpeg -y -loglevel error -i "$f" -f lavfi -i anullsrc=channel_layout=stereo:sample_rate=48000               -map 0:v:0 -map 1:a:0 -c:v copy -c:a aac -b:a 128k -shortest -movflags +faststart "$f.tmp.mp4"
+            mv "$f.tmp.mp4" "$f"
+            ffprobe -v error -show_entries stream=codec_type,codec_name,width,height,channels -of compact "$f"
+          done
 
       - run: python3 .github/scripts/store_submission.py
