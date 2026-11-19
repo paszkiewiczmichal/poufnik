@@ -458,6 +458,9 @@ export const texts = {
     merge: "Połącz",
     addSensitive: "Dodaj własne zaznaczenie",
     addHint: "Fragment zostanie zastąpiony oznaczeniem, tak jak dane wykryte automatycznie.",
+    remember: "Zapamiętaj we własnych regułach",
+    rememberNote:
+      "Będzie oznaczane też w kolejnych dokumentach, w każdej formie. Regułę usuniesz w Ustawieniach.",
     add: "Dodaj zaznaczenie",
     cancel: "Anuluj",
     done: "Gotowe",

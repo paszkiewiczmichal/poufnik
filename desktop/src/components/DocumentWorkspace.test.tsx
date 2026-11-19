@@ -80,25 +80,30 @@ describe("DocumentWorkspace manual marks", () => {
   it("hands a phrase marked by hand to be saved as a custom rule", () => {
     const onManualEntityAdded = vi.fn();
     const { container } = renderWorkspace("early_bird", { onManualEntityAdded });
-    const paper = container.querySelector(".document-paper") as HTMLElement;
-    const walker = document.createTreeWalker(paper, NodeFilter.SHOW_TEXT);
-    let node = walker.nextNode();
-    while (node && !node.textContent?.includes("ma PESEL")) {
-      node = walker.nextNode();
-    }
-    expect(node).not.toBeNull();
-    const at = node!.textContent!.indexOf("ma");
-    const range = document.createRange();
-    range.setStart(node!, at);
-    range.setEnd(node!, at + 2);
-    range.getBoundingClientRect = () => new DOMRect(0, 0, 10, 10);
-    window.getSelection()!.removeAllRanges();
-    window.getSelection()!.addRange(range);
+    selectText(container, "ma");
 
-    fireEvent.mouseUp(paper);
     fireEvent.click(screen.getByRole("button", { name: texts.corrections.add }));
 
     expect(onManualEntityAdded).toHaveBeenCalledWith("ma", "CUSTOM");
+  });
+
+  it("does not save the phrase when the user unticks remembering it", () => {
+    const onManualEntityAdded = vi.fn();
+    const { container } = renderWorkspace("early_bird", { onManualEntityAdded });
+    selectText(container, "ma");
+
+    fireEvent.click(screen.getByRole("checkbox", { name: new RegExp(texts.corrections.remember) }));
+    fireEvent.click(screen.getByRole("button", { name: texts.corrections.add }));
+
+    expect(onManualEntityAdded).not.toHaveBeenCalled();
+  });
+
+  it("does not offer remembering without Early Bird", () => {
+    const { container } = renderWorkspace("basic", { onManualEntityAdded: vi.fn() });
+    selectText(container, "ma");
+
+    expect(screen.getByRole("button", { name: texts.corrections.add })).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: new RegExp(texts.corrections.remember) })).toBeNull();
   });
 
   it("shows whether the mark was saved as a rule", () => {
@@ -110,6 +115,24 @@ describe("DocumentWorkspace manual marks", () => {
     expect(screen.getByRole("status")).toHaveTextContent("„Kowalski” zapisane");
   });
 });
+
+function selectText(container: HTMLElement, phrase: string) {
+  const paper = container.querySelector(".document-paper") as HTMLElement;
+  const walker = document.createTreeWalker(paper, NodeFilter.SHOW_TEXT);
+  let node = walker.nextNode();
+  while (node && !node.textContent?.includes(phrase)) {
+    node = walker.nextNode();
+  }
+  expect(node).not.toBeNull();
+  const at = node!.textContent!.indexOf(phrase);
+  const range = document.createRange();
+  range.setStart(node!, at);
+  range.setEnd(node!, at + phrase.length);
+  range.getBoundingClientRect = () => new DOMRect(0, 0, 10, 10);
+  window.getSelection()!.removeAllRanges();
+  window.getSelection()!.addRange(range);
+  fireEvent.mouseUp(paper);
+}
 
 interface RenderWorkspaceOptions {
   anonymization?: AnonymizationState;

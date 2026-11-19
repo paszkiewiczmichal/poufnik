@@ -70,7 +70,32 @@ describe("ManualEntityPopover", () => {
 
     fireEvent.click(screen.getByRole("button", { name: texts.corrections.add }));
 
-    expect(handlers.onAdd).toHaveBeenCalledWith("CUSTOM", null);
+    expect(handlers.onAdd).toHaveBeenCalledWith("CUSTOM", null, false);
+  });
+
+  it("offers to remember the phrase for the next documents, ticked by default", () => {
+    const handlers = renderPopover({ canRemember: true });
+    const checkbox = screen.getByRole("checkbox", { name: new RegExp(texts.corrections.remember) });
+
+    expect(checkbox).toBeChecked();
+    fireEvent.click(screen.getByRole("button", { name: texts.corrections.add }));
+
+    expect(handlers.onAdd).toHaveBeenCalledWith("CUSTOM", null, true);
+  });
+
+  it("does not remember the phrase when the box is unticked", () => {
+    const handlers = renderPopover({ canRemember: true });
+
+    fireEvent.click(screen.getByRole("checkbox", { name: new RegExp(texts.corrections.remember) }));
+    fireEvent.click(screen.getByRole("button", { name: texts.corrections.add }));
+
+    expect(handlers.onAdd).toHaveBeenCalledWith("CUSTOM", null, false);
+  });
+
+  it("hides the option where custom rules are not available", () => {
+    renderPopover();
+
+    expect(screen.queryByRole("checkbox")).toBeNull();
   });
 
   it("resets the selected group whenever the category changes", () => {
@@ -84,7 +109,7 @@ describe("ManualEntityPopover", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: texts.corrections.add }));
 
-    expect(handlers.onAdd).toHaveBeenCalledWith("COMPANY", "value:COMPANY:Kancelaria XYZ");
+    expect(handlers.onAdd).toHaveBeenCalledWith("COMPANY", "value:COMPANY:Kancelaria XYZ", false);
 
     handlers.onAdd.mockClear();
     fireEvent.change(screen.getByLabelText(texts.corrections.category), {
@@ -92,7 +117,7 @@ describe("ManualEntityPopover", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: texts.corrections.add }));
 
-    expect(handlers.onAdd).toHaveBeenCalledWith("PERSON", null);
+    expect(handlers.onAdd).toHaveBeenCalledWith("PERSON", null, false);
   });
 
   it("only offers groups matching the currently selected category", () => {

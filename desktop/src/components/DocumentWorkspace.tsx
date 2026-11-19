@@ -290,13 +290,16 @@ export function DocumentWorkspace({
         <ManualEntityPopover
           selection={manualSelection}
           groups={entityGroups}
-          onAdd={(category, groupId) => {
+          canRemember={tier === "early_bird" && Boolean(onManualEntityAdded)}
+          onAdd={(category, groupId, remember) => {
             addManualEntity(manualSelection.range, category, groupId);
             const group = groupId ? entityGroups.find((item) => item.id === groupId) : null;
-            onManualEntityAdded?.(
-              document.text.slice(manualSelection.range.start, manualSelection.range.end),
-              group?.category ?? category,
-            );
+            if (remember) {
+              onManualEntityAdded?.(
+                document.text.slice(manualSelection.range.start, manualSelection.range.end),
+                group?.category ?? category,
+              );
+            }
             setManualSelection(null);
             window.getSelection()?.removeAllRanges();
           }}

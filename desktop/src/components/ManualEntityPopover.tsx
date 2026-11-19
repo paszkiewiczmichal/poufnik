@@ -11,8 +11,10 @@ import type {
 interface ManualEntityPopoverProps {
   selection: DocumentTextSelection;
   groups: EntityGroupSummary[];
-  onAdd: (category: EntityCategory, groupId: string | null) => void;
+  onAdd: (category: EntityCategory, groupId: string | null, remember: boolean) => void;
   onClose: () => void;
+  // Offer to save the phrase as a custom rule for the next documents (Early Bird).
+  canRemember?: boolean;
 }
 
 export function ManualEntityPopover({
@@ -20,9 +22,11 @@ export function ManualEntityPopover({
   groups,
   onAdd,
   onClose,
+  canRemember = false,
 }: ManualEntityPopoverProps) {
   const [category, setCategory] = useState<EntityCategory>("CUSTOM");
   const [groupId, setGroupId] = useState("");
+  const [remember, setRemember] = useState(true);
   const categoryGroups = useMemo(
     () => groups.filter((group) => group.category === category),
     [category, groups],
@@ -86,6 +90,20 @@ export function ManualEntityPopover({
           </select>
         </label>
 
+        {canRemember && (
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={remember}
+              onChange={(event) => setRemember(event.target.checked)}
+            />
+            <span>
+              {texts.corrections.remember}
+              <span className="checkbox-row__note">{texts.corrections.rememberNote}</span>
+            </span>
+          </label>
+        )}
+
         <div className="popover__actions">
           <button className="ghost-button ghost-button--compact" type="button" onClick={onClose}>
             {texts.corrections.cancel}
@@ -93,7 +111,7 @@ export function ManualEntityPopover({
           <button
             className="primary-button"
             type="button"
-            onClick={() => onAdd(category, groupId || null)}
+            onClick={() => onAdd(category, groupId || null, canRemember && remember)}
           >
             {texts.corrections.add}
           </button>
