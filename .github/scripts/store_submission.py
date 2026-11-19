@@ -61,6 +61,7 @@ def call(tok: str, method: str, path: str, payload: dict | None = None) -> dict:
         headers["Content-Type"] = "application/json; charset=utf-8"
     elif method == "POST":
         data = b""
+        headers["Content-Type"] = "application/json"
     req = urllib.request.Request(f"{API}{path}", data=data, method=method, headers=headers)
     try:
         with urllib.request.urlopen(req) as r:
