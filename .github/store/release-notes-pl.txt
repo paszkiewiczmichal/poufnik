@@ -1,4 +1,5 @@
-Wersja 1.3.1
+Wersja 1.3.2
+- Dokumenty po angielsku i dwujęzyczne: Poufnik rozpoznaje język każdego akapitu i wykrywa po angielsku osoby, firmy (Ltd, Inc, LLP, GmbH), daty, kwoty, adresy i telefony. Dokumenty po polsku działają jak dotąd.
 - Słowo zaznaczone ręcznie jest oznaczane w całym dokumencie, także w innej formie („Kowalski”, „Kowalskiego”, „Kowalską”) i pisane wielkimi literami.
 - Zaznaczenie można zapamiętać we własnych regułach: kolejne dokumenty mają je oznaczone same.
 - Naprawiony błąd zapisu, gdy dwa zaznaczenia nachodziły na siebie.
