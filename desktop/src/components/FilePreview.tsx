@@ -158,7 +158,9 @@ function fitDocxPages(container: HTMLElement) {
     return;
   }
   const available = container.clientWidth - 24;
-  wrapper.style.zoom = String(Math.min(1, available / page.offsetWidth));
+  // Never larger than the real page, unless the user zoomed the preview in.
+  const userZoom = Number(getComputedStyle(container).getPropertyValue("--preview-zoom")) || 1;
+  wrapper.style.zoom = String(Math.min(Math.max(1, userZoom), available / page.offsetWidth));
 }
 
 async function renderPdf(file: Blob, container: HTMLElement, cancelled: () => boolean) {

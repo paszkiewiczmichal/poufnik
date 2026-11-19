@@ -1,5 +1,8 @@
 Wersja 1.3.2
-- Dokumenty po angielsku i dwujęzyczne: Poufnik rozpoznaje język każdego akapitu i wykrywa po angielsku osoby, firmy (Ltd, Inc, LLP, GmbH), daty, kwoty, adresy i telefony. Dokumenty po polsku działają jak dotąd.
-- Słowo zaznaczone ręcznie jest oznaczane w całym dokumencie, także w innej formie („Kowalski”, „Kowalskiego”, „Kowalską”) i pisane wielkimi literami.
+- Dokumenty po angielsku i dwujęzyczne: Poufnik rozpoznaje język każdego akapitu i wykrywa po angielsku osoby, firmy (Ltd, Inc, LLP, GmbH), numery spółek z Companies House, daty, kwoty, adresy i telefony. Dokumenty po polsku działają jak dotąd.
+- Nazwa zaznaczona ręcznie jest oznaczana w całym dokumencie, także w innej formie („Kowalski”, „Kowalskiego”, „Kowalską”) i pisana wielkimi literami.
 - Zaznaczenie można zapamiętać we własnych regułach: kolejne dokumenty mają je oznaczone same.
+- Podgląd „Przed / Po” można powiększyć przyciskami albo kółkiem myszy z klawiszem Ctrl.
+- Formularze pisane wielkimi literami (np. e-Doręczenia): miejscowość, gmina, powiat i ulica są oznaczane jako adres, a etykiety pól i skróty nie są już brane za nazwiska.
+- Okienka zaznaczania i poprawiania mieszczą się w oknie także przy jego krawędzi.
 - Naprawiony błąd zapisu, gdy dwa zaznaczenia nachodziły na siebie.

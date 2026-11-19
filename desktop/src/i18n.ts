@@ -427,6 +427,10 @@ export const texts = {
     morePages: (count: number) => `Pozostałe strony (${count}) są w zapisanym pliku.`,
     converting: "Przygotowuję podgląd w programie biurowym...",
     needsOffice: "Podgląd wymaga Microsoft Office albo LibreOffice.",
+    zoom: "Powiększenie podglądu",
+    zoomIn: "Powiększ (Ctrl + kółko myszy)",
+    zoomOut: "Pomniejsz",
+    zoomFit: "Dopasuj do szerokości",
   },
   compare: {
     title: "Porównanie oryginału i wyniku",
@@ -460,7 +464,7 @@ export const texts = {
     addHint: "Fragment zostanie zastąpiony oznaczeniem, tak jak dane wykryte automatycznie.",
     remember: "Zapamiętaj we własnych regułach",
     rememberNote:
-      "Będzie oznaczane też w kolejnych dokumentach, w każdej formie. Regułę usuniesz w Ustawieniach.",
+      "Będzie oznaczane też w kolejnych dokumentach, a nazwy pisane wielką literą także w innej formie („Kowalskiego”). Regułę usuniesz w Ustawieniach.",
     add: "Dodaj zaznaczenie",
     cancel: "Anuluj",
     done: "Gotowe",

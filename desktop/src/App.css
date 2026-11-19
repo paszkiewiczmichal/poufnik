@@ -3354,6 +3354,24 @@ td:first-child {
   margin: 0;
 }
 
+/* Zoom of both panes: the pages grow wider than the pane and it scrolls both ways. */
+.preview-zoom {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  align-self: flex-end;
+}
+
+.preview-zoom__value {
+  min-width: 3.5em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.file-preview__pages {
+  width: calc(var(--preview-zoom, 1) * 100%);
+}
+
 .file-preview__page,
 .file-preview__image {
   display: block;
