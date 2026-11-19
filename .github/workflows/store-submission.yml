@@ -16,7 +16,7 @@ jobs:
   store-submission:
     runs-on: ubuntu-latest
     env:
-      MODE: create
+      MODE: commit
       TENANT_ID: ${{ secrets.PARTNER_CENTER_TENANT_ID }}
       CLIENT_ID: ${{ secrets.PARTNER_CENTER_CLIENT_ID }}
       CLIENT_SECRET: ${{ secrets.PARTNER_CENTER_CLIENT_SECRET }}
