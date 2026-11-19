@@ -186,7 +186,7 @@ export function createAnonymizerApiClient(
 
   return {
     health: () => requestJson("/v1/health"),
-    analyze: (text, customRules = [], language = "pl") =>
+    analyze: (text, customRules = [], language = "auto") =>
       requestJson<AnalyzeResponse>("/v1/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -201,7 +201,7 @@ export function createAnonymizerApiClient(
       const form = new FormData();
       form.append("file", file, file.name);
       form.append("force_ocr", String(options.forceOcr));
-      form.append("language", options.language ?? "pl");
+      form.append("language", options.language ?? "auto");
       if (loadReplacementMode() === "pseudonyms") {
         form.append("mode", "pseudonyms");
       }
@@ -214,7 +214,7 @@ export function createAnonymizerApiClient(
         body: form,
       });
     },
-    anonymize: (text, entities, language = "pl", caseMap = null) =>
+    anonymize: (text, entities, language = "auto", caseMap = null) =>
       requestJson<AnonymizeResponse>("/v1/anonymize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -226,7 +226,7 @@ export function createAnonymizerApiClient(
           ...modeField(),
         }),
       }),
-    anonymizeApiEntities: (text, entities, language = "pl", caseMap = null) =>
+    anonymizeApiEntities: (text, entities, language = "auto", caseMap = null) =>
       requestJson<AnonymizeResponse>("/v1/anonymize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

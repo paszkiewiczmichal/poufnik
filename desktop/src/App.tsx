@@ -691,7 +691,7 @@ function App() {
           const inCase = await client.anonymizeApiEntities(
             response.document.text,
             response.entities,
-            "pl",
+            "auto",
             caseMap,
           );
           response = {
@@ -1005,7 +1005,7 @@ function App() {
             const inCase = await client.anonymizeApiEntities(
               processed.document.text,
               processed.entities,
-              "pl",
+              "auto",
               sharedMap,
             );
             sharedMap = inCase.replacement_map;
@@ -1092,7 +1092,7 @@ function App() {
     setAnonymizationLoading();
     try {
       const client = createAnonymizerApiClient(endpoint);
-      const result = await client.anonymize(document.text, entities, "pl", caseMap);
+      const result = await client.anonymize(document.text, entities, "auto", caseMap);
       if (caseMap) {
         setCaseMap(result.replacement_map);
       }
@@ -1681,7 +1681,7 @@ function App() {
         const result = await createAnonymizerApiClient(endpoint).anonymize(
           document.text,
           entities,
-          "pl",
+          "auto",
           map,
         );
         setAnonymizationResult(result.anonymized_text, result.replacement_map, result.offset_map ?? []);

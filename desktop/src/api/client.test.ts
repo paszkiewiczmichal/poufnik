@@ -45,7 +45,7 @@ describe("createAnonymizerApiClient", () => {
     const calls = fetcher.mock.calls as unknown as [string, RequestInit][];
     const body = calls[0][1].body as FormData;
     expect(body.get("force_ocr")).toBe("true");
-    expect(body.get("language")).toBe("pl");
+    expect(body.get("language")).toBe("auto");
     expect(body.get("file")).toBeInstanceOf(File);
   });
 
@@ -115,7 +115,7 @@ describe("createAnonymizerApiClient", () => {
     expect(calls[0][0]).toBe("http://127.0.0.1:8710/v1/analyze");
     expect(JSON.parse(calls[0][1].body as string)).toEqual({
       text: "Sygnatura ABC-XYZ-77",
-      language: "pl",
+      language: "auto",
       custom_rules: [
         { name: "Sygnatura", label: "Sygnatura", pattern: "ABC-[A-Z]{3}-\\d{2}" },
       ],
@@ -343,7 +343,7 @@ describe("createAnonymizerApiClient", () => {
     const calls = fetcher.mock.calls as unknown as [string, RequestInit][];
     expect(JSON.parse(calls[0][1].body as string)).toEqual({
       text: "Jan Kowalski",
-      language: "pl",
+      language: "auto",
       entities: [
         { start: 0, end: 12, text: "Jan Kowalski", category: "PERSON", confidence: 0.9, validation: "not_applicable" },
       ],

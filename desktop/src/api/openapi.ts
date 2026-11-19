@@ -342,6 +342,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/restore/xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore Xlsx Endpoint
+         * @description Put the original values back into an anonymized XLSX, keeping its layout.
+         *
+         *     Like ``/v1/restore/docx``: every token known to ``replacement_map`` is replaced in
+         *     the cell, comment or text box it is in; unknown tokens stay and are reported.
+         */
+        post: operations["restore_xlsx_endpoint_v1_restore_xlsx_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/metadata/clean": {
         parameters: {
             query?: never;
@@ -444,9 +467,10 @@ export interface components {
             text: string;
             /**
              * Language
-             * @default pl
+             * @default auto
+             * @enum {string}
              */
-            language: string;
+            language: "auto" | "pl" | "en";
             /**
              * Profile
              * @default standard
@@ -455,7 +479,7 @@ export interface components {
             profile: "standard" | "judgment";
             /**
              * Custom Rules
-             * @description Optional local custom regex rules. At most 25 rules are accepted; each pattern/regex value is limited to 256 characters and must compile. Matches are returned as CUSTOM entities with source=regex.
+             * @description Optional local custom regex rules. At most 100 rules are accepted; each pattern/regex value is limited to 512 characters and must compile. Matches are returned with source=regex as CUSTOM entities, or in the rule's optional category (a phrase the user marked by hand).
              */
             custom_rules?: {
                 [key: string]: unknown;
@@ -472,9 +496,10 @@ export interface components {
             text: string;
             /**
              * Language
-             * @default pl
+             * @default auto
+             * @enum {string}
              */
-            language: string;
+            language: "auto" | "pl" | "en";
             /** Entities */
             entities?: components["schemas"]["DetectedEntity"][] | null;
             case_map?: components["schemas"]["ReplacementMap"] | null;
@@ -625,9 +650,10 @@ export interface components {
             force_ocr: boolean;
             /**
              * Language
-             * @default pl
+             * @default auto
+             * @enum {string}
              */
-            language: string;
+            language: "auto" | "pl" | "en";
             /**
              * Mode
              * @default tokens
@@ -643,6 +669,13 @@ export interface components {
         };
         /** Body_restore_docx_endpoint_v1_restore_docx_post */
         Body_restore_docx_endpoint_v1_restore_docx_post: {
+            /** File */
+            file: string;
+            /** Replacement Map */
+            replacement_map: string;
+        };
+        /** Body_restore_xlsx_endpoint_v1_restore_xlsx_post */
+        Body_restore_xlsx_endpoint_v1_restore_xlsx_post: {
             /** File */
             file: string;
             /** Replacement Map */
@@ -1773,6 +1806,68 @@ export interface operations {
         requestBody: {
             content: {
                 "multipart/form-data": components["schemas"]["Body_restore_docx_endpoint_v1_restore_docx_post"];
+            };
+        };
+        responses: {
+            /** @description The DOCX with the original values put back. */
+            200: {
+                headers: {
+                    /** @description Present when the restore had warnings (e.g. tokens the map does not know, left in place): a JSON array of messages, percent-encoded (at most 50 messages). */
+                    "X-Poufnik-Warnings"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": string;
+                };
+            };
+            /** @description Bad request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Request payload exceeds the configured limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Validation error. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemResponse"];
+                };
+            };
+        };
+    };
+    restore_xlsx_endpoint_v1_restore_xlsx_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_restore_xlsx_endpoint_v1_restore_xlsx_post"];
             };
         };
         responses: {
