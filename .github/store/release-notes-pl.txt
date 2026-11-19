@@ -1,5 +1,5 @@
 Wersja 1.3.2
-- Dokumenty po angielsku i dwujęzyczne: Poufnik rozpoznaje język każdego akapitu i wykrywa po angielsku osoby, firmy (Ltd, Inc, LLP, GmbH), numery spółek z Companies House, daty, kwoty, adresy i telefony. Dokumenty po polsku działają jak dotąd.
+- Dokumenty po angielsku i dwujęzyczne, także w tabeli z polskim tekstem obok angielskiego: Poufnik rozpoznaje język każdego akapitu i komórki tabeli i wykrywa po angielsku osoby, firmy (Ltd, Inc, LLP, GmbH), numery spółek z Companies House, daty, kwoty, adresy i telefony. Dokumenty po polsku działają jak dotąd.
 - Nazwa zaznaczona ręcznie jest oznaczana w całym dokumencie, także w innej formie („Kowalski”, „Kowalskiego”, „Kowalską”) i pisana wielkimi literami.
 - Zaznaczenie można zapamiętać we własnych regułach: kolejne dokumenty mają je oznaczone same.
 - Podgląd „Przed / Po” można powiększyć przyciskami albo kółkiem myszy z klawiszem Ctrl.
