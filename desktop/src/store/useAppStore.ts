@@ -5,6 +5,7 @@ import {
   deriveEntityGroups,
   groupId,
   normalizeEntitiesForUi,
+  propagateManualEntity,
 } from "../domain/entities";
 import type {
   AnonymizationState,
@@ -294,13 +295,40 @@ export const useAppStore = create<AppStore>((set) => ({
       const group = groupIdValue
         ? state.entityGroups.find((item) => item.id === groupIdValue)
         : null;
+      // Two masked spans may not overlap (the engine refuses to anonymize them). A selection
+      // inside an already masked span adds nothing there; one that crosses masked spans
+      // swallows them, so nothing that was hidden becomes readable.
+      const overlapping = state.entities.filter(
+        (item) =>
+          item.status !== "rejected" &&
+          item.start < range.end &&
+          range.start < item.end,
+      );
+      const covered = overlapping.some(
+        (item) => item.start <= range.start && range.end <= item.end,
+      );
+      const kept = covered
+        ? state.entities
+        : state.entities.filter((item) => !overlapping.includes(item));
       const entity = createManualEntity({
         documentText: state.document.text,
-        range,
+        range: covered
+          ? range
+          : {
+              start: Math.min(
+                range.start,
+                ...overlapping.map((item) => item.start),
+              ),
+              end: Math.max(range.end, ...overlapping.map((item) => item.end)),
+            },
         category,
         group,
       });
-      return withEntities(state, [...state.entities, entity]);
+      const copies = propagateManualEntity(state.document.text, entity, kept);
+      return withEntities(
+        state,
+        covered ? [...kept, ...copies] : [...kept, entity, ...copies],
+      );
     }),
   setEntityGroupStatus: (groupIdValue, status) =>
     set((state) =>

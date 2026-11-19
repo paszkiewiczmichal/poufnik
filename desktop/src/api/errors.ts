@@ -6,6 +6,9 @@ export function toUserMessage(error: unknown): string {
     if (error.status === 413 || error.title === "Payload Too Large") {
       return texts.errors.payloadTooLarge;
     }
+    if (error.detail.includes("Overlapping entity spans")) {
+      return texts.errors.overlappingEntities;
+    }
     if (error.detail.includes("Tesseract executable was not found")) {
       return texts.errors.tesseractNotFound;
     }

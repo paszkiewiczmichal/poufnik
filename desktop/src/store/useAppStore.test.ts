@@ -380,6 +380,77 @@ describe("addManualEntity", () => {
     expect(state.entityGroups.some((group) => group.canonicalText === "Warszawie")).toBe(true);
   });
 
+  it("marks the other occurrences of the same word in one group", () => {
+    loadDocument();
+    const document = useAppStore.getState().document!;
+    useAppStore.setState({
+      document: { ...document, text: `${DOCUMENT_TEXT}. Biuro w Warszawie.` },
+    });
+
+    useAppStore.getState().addManualEntity({ start: 36, end: 45 }, "ADDRESS");
+
+    const manual = useAppStore
+      .getState()
+      .entities.filter((entity) => entity.source === "manual");
+    expect(manual.map((entity) => [entity.start, entity.text])).toEqual([
+      [36, "Warszawie"],
+      [55, "Warszawie"],
+    ]);
+    expect(manual[1].entity_group_id).toBe(manual[0].entity_group_id);
+    expect(
+      useAppStore
+        .getState()
+        .entityGroups.find((group) => group.id === manual[0].entity_group_id)
+        ?.acceptedCount,
+    ).toBe(2);
+  });
+
+  it("adds nothing over a selection inside an already masked span, so spans never overlap", () => {
+    loadDocument();
+    const before = useAppStore.getState().entities;
+
+    useAppStore.getState().addManualEntity({ start: 4, end: 12 }, "CUSTOM");
+
+    expect(useAppStore.getState().entities).toEqual(before);
+  });
+
+  it("still marks other occurrences when the selected one is already masked", () => {
+    loadDocument();
+    const document = useAppStore.getState().document!;
+    useAppStore.setState({
+      document: { ...document, text: `${DOCUMENT_TEXT}. Kowalski podpisał.` },
+    });
+
+    useAppStore.getState().addManualEntity({ start: 4, end: 12 }, "CUSTOM");
+
+    const manual = useAppStore
+      .getState()
+      .entities.filter((entity) => entity.source === "manual");
+    expect(manual.map((entity) => [entity.start, entity.text])).toEqual([
+      [47, "Kowalski"],
+    ]);
+  });
+
+  it("swallows masked spans the selection crosses, keeping everything hidden", () => {
+    loadDocument();
+
+    useAppStore.getState().addManualEntity({ start: 4, end: 14 }, "CUSTOM");
+
+    const entities = useAppStore.getState().entities;
+    expect(
+      entities.map((entity) => [entity.start, entity.end, entity.source]),
+    ).toEqual([
+      [15, 25, "regex"],
+      [0, 14, "manual"],
+    ]);
+    const accepted = entities.filter((entity) => entity.status !== "rejected");
+    for (const a of accepted) {
+      for (const b of accepted) {
+        expect(a === b || a.end <= b.start || b.end <= a.start).toBe(true);
+      }
+    }
+  });
+
   it("attaches the manual entity to an existing group when a groupId is given", () => {
     loadDocument();
     const [, groupB] = useAppStore.getState().entityGroups;

@@ -39,6 +39,16 @@ describe("toUserMessage", () => {
     ).toBe(texts.errors.tesseractNotFound);
   });
 
+  it("explains overlapping marks in Polish instead of the engine's span numbers", () => {
+    expect(
+      toUserMessage(
+        apiError({
+          detail: "Overlapping entity spans cannot be anonymized safely: 1396:1416 and 1413:1416",
+        }),
+      ),
+    ).toBe(texts.errors.overlappingEntities);
+  });
+
   it("returns the ApiError detail verbatim for an ordinary failure", () => {
     expect(toUserMessage(apiError({ detail: "Nieprawidłowy format pliku." }))).toBe(
       "Nieprawidłowy format pliku.",

@@ -370,6 +370,8 @@ export const texts = {
     noEngine: "Lokalny silnik nie jest jeszcze gotowy.",
     tesseractNotFound:
       "Nie znaleziono Tesseract OCR. Zainstaluj Tesseract 5 z pakietami języka polskiego i angielskiego albo ustaw ANONYMIZER_TESSERACT_PATH.",
+    overlappingEntities:
+      "Dwa zaznaczenia nachodzą na siebie w tym samym fragmencie tekstu. Kliknij krótsze z nich i wybierz „Odznacz”, a potem spróbuj ponownie.",
     payloadTooLarge: "Plik jest za duży. Limit to 50 MB.",
     legacyNeedsOffice: (format: string) =>
       `Plik ${format} Poufnik otwiera przez Microsoft Word albo LibreOffice, a żadnego z nich nie ma na tym komputerze. Zapisz plik jako DOCX i spróbuj ponownie.`,

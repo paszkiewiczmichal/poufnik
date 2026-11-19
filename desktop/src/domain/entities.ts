@@ -113,6 +113,56 @@ export function createManualEntity(args: {
   };
 }
 
+/**
+ * Copies a manual entity onto every other whole-word occurrence of its text (also written
+ * in capitals), skipping places already covered by another entity. One unmasked mention
+ * would reveal what the token stands for, so a word marked once is marked everywhere.
+ */
+export function propagateManualEntity(
+  documentText: string,
+  manual: DetectedEntity,
+  existing: DetectedEntity[],
+): DetectedEntity[] {
+  const text = manual.text.trim();
+  if (text.length < 2) {
+    return [];
+  }
+  const variants = Array.from(new Set([text, text.toUpperCase()])).sort(
+    (a, b) => b.length - a.length,
+  );
+  const escaped = variants.map((variant) =>
+    variant.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+  );
+  const pattern = new RegExp(
+    `(?<![\\p{L}\\p{N}_])(?:${escaped.join("|")})(?![\\p{L}\\p{N}_])`,
+    "gu",
+  );
+  const taken = [...existing, manual].map(
+    (entity) => [entity.start, entity.end] as const,
+  );
+  const added: DetectedEntity[] = [];
+  for (const match of documentText.matchAll(pattern)) {
+    const start = match.index;
+    const end = start + match[0].length;
+    if (
+      taken.some(
+        ([takenStart, takenEnd]) => start < takenEnd && takenStart < end,
+      )
+    ) {
+      continue;
+    }
+    taken.push([start, end]);
+    added.push({
+      ...manual,
+      id: `manual-${start}-${end}-${manual.category}`,
+      start,
+      end,
+      text: match[0],
+    });
+  }
+  return added;
+}
+
 export function groupId(category: EntityCategory, canonicalText: string): string {
   return `value:${category}:${canonicalText}`;
 }

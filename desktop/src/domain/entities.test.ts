@@ -9,6 +9,7 @@ import {
   groupId,
   nextStatusForGroup,
   normalizeEntitiesForUi,
+  propagateManualEntity,
   rejectExcludedCategories,
   tokenPrefix,
 } from "./entities";
@@ -209,5 +210,52 @@ describe("rejectExcludedCategories", () => {
 
     expect(result.map((entity) => entity.status)).toEqual([undefined, "rejected"]);
     expect(entities[1].status).toBeUndefined(); // the input is not modified
+  });
+});
+
+describe("propagateManualEntity", () => {
+  const text =
+    "Umowa z Ząbek. ZĄBEK płaci, Ząbkowski nie. Ząbek: Jan Ząbek. Ząbek";
+  const manual = createManualEntity({
+    documentText: text,
+    range: { start: 8, end: 13 },
+    category: "CUSTOM",
+  });
+
+  it("marks every other whole-word occurrence, also in capitals, in the same group", () => {
+    const copies = propagateManualEntity(text, manual, []);
+
+    expect(copies.map((copy) => [copy.start, copy.text])).toEqual([
+      [15, "ZĄBEK"],
+      [43, "Ząbek"],
+      [54, "Ząbek"],
+      [61, "Ząbek"],
+    ]);
+    for (const copy of copies) {
+      expect(text.slice(copy.start, copy.end)).toBe(copy.text);
+      expect(copy.entity_group_id).toBe(manual.entity_group_id);
+      expect(copy.canonical_text).toBe("Ząbek");
+      expect(copy.source).toBe("manual");
+      expect(copy.status).toBe("accepted");
+    }
+    expect(new Set(copies.map((copy) => copy.id)).size).toBe(copies.length);
+  });
+
+  it("skips places already covered by another entity", () => {
+    const person = entity({ start: 50, end: 59, text: "Jan Ząbek" });
+
+    const copies = propagateManualEntity(text, manual, [person]);
+
+    expect(copies.map((copy) => copy.start)).toEqual([15, 43, 61]);
+  });
+
+  it("does nothing for a single character", () => {
+    const short = createManualEntity({
+      documentText: "a b a",
+      range: { start: 0, end: 1 },
+      category: "CUSTOM",
+    });
+
+    expect(propagateManualEntity("a b a", short, [])).toEqual([]);
   });
 });
