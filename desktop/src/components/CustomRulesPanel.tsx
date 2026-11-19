@@ -54,9 +54,8 @@ export function CustomRulesPanel({ rules, onChange }: CustomRulesPanelProps) {
             </label>
             <div className="custom-rule-item__body">
               <strong>{rule.name}</strong>
-              <code>
-                {rule.label} · {rule.pattern}
-              </code>
+              {/* A rule saved from a hand-marked word has a generated pattern: show only its label. */}
+              <code>{rule.category ? rule.label : `${rule.label} · ${rule.pattern}`}</code>
             </div>
             <button
               className="ghost-button ghost-button--compact"

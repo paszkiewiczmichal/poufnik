@@ -92,7 +92,11 @@ describe("DocumentView", () => {
     expect(handlers.onEntityClick).toHaveBeenCalledTimes(1);
     const [entity, position] = handlers.onEntityClick.mock.calls[0];
     expect(entity.id).toBe("person-1");
-    expect(position).toEqual({ x: expect.any(Number), y: expect.any(Number) });
+    expect(position).toEqual({
+      x: expect.any(Number),
+      y: expect.any(Number),
+      anchorTop: expect.any(Number),
+    });
   });
 
   it("calls onEntityClick on Enter and Space key presses", () => {

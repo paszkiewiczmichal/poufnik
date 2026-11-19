@@ -53,6 +53,11 @@ describe("manualPhrasePattern", () => {
     expect(matches("Jan", "Jan, Jana, Janem, Janusz")).toEqual(["Jan", "Jana", "Janem"]);
   });
 
+  it("keeps a lowercase word exact also in capitals", () => {
+    expect(matches("wpisów", "wpisów, wpisu, WPISÓW, WPISU")).toEqual(["wpisów", "WPISÓW"]);
+    expect(manualPhrasePattern("wpisów")).not.toContain("IEGO");
+  });
+
   it("without inflection matches only the exact phrase and its capitals", () => {
     expect(matches("Kowalski", "Kowalski, Kowalskiego, KOWALSKI", false)).toEqual([
       "Kowalski",

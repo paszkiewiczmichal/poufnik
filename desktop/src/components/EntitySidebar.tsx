@@ -163,7 +163,11 @@ function EntityGroupCard({
 
   const openCorrection = (event: MouseEvent<HTMLButtonElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
-    onCorrectEntity(group.firstEntityId, { x: rect.right, y: rect.bottom + 8 });
+    onCorrectEntity(group.firstEntityId, {
+      x: rect.right,
+      y: rect.bottom + 8,
+      anchorTop: rect.top,
+    });
   };
 
   return (

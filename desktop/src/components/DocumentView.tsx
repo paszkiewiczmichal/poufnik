@@ -140,7 +140,7 @@ export function DocumentView({
     onTextSelection({
       range: documentRange,
       text: document.text.slice(documentRange.start, documentRange.end),
-      position: { x: rect.left, y: rect.bottom + 8 },
+      position: { x: rect.left, y: rect.bottom + 8, anchorTop: rect.top },
     });
   }
 }
@@ -166,7 +166,7 @@ function renderSegments(
     const rejected = segment.entity.status === "rejected";
     const openPopover = (element: HTMLElement) => {
       const rect = element.getBoundingClientRect();
-      onEntityClick(segment.entity, { x: rect.left, y: rect.bottom + 8 });
+      onEntityClick(segment.entity, { x: rect.left, y: rect.bottom + 8, anchorTop: rect.top });
     };
     return (
       <mark

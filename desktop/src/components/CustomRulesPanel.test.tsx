@@ -38,6 +38,17 @@ describe("CustomRulesPanel", () => {
     expect(screen.getByText("SYGNATURA_WEW · AKT-\\d+")).toBeInTheDocument();
   });
 
+  it("hides the generated pattern of a rule saved from a hand-marked word", () => {
+    const pattern = "(?<![\\p{L}\\p{N}_])(?:wpisów|WPISÓW)(?![\\p{L}\\p{N}_])";
+    renderPanel({
+      rules: [makeRule({ name: "wpisów", label: "DANE", pattern, category: "CUSTOM" })],
+    });
+
+    expect(screen.getByText("wpisów")).toBeInTheDocument();
+    expect(screen.getByText("DANE")).toBeInTheDocument();
+    expect(screen.queryByText(pattern, { exact: false })).not.toBeInTheDocument();
+  });
+
   it("toggles a rule's enabled flag via its checkbox", () => {
     const onChange = renderPanel({ rules: [makeRule({ enabled: true })] });
 

@@ -40,17 +40,19 @@ export function escapeRegex(value: string): string {
  * `inflect`, the case forms of every capitalised word ("Viterry Polskiej").
  */
 export function manualPhrasePattern(text: string, inflect = true): string {
-  const phrase = text.trim();
-  const variants = Array.from(new Set([phrase, phrase.toUpperCase()]));
-  const body = variants.map((variant) => variantPattern(variant, inflect)).join("|");
+  const words = text.trim().split(/\s+/);
+  // Decided on the marked form, so "wpisów" stays exact also as "WPISÓW".
+  const inflected = words.map((word) => inflect && INFLECTABLE_WORD.test(word));
+  const upper = words.map((word) => word.toUpperCase());
+  const variants = [words, upper].map((variant) => variantPattern(variant, inflected));
+  const body = Array.from(new Set(variants)).join("|");
   return `${BEFORE}(?:${body})${AFTER}`;
 }
 
-function variantPattern(phrase: string, inflect: boolean): string {
-  return phrase
-    .split(/\s+/)
-    .map((word) =>
-      inflect && INFLECTABLE_WORD.test(word)
+function variantPattern(words: string[], inflected: boolean[]): string {
+  return words
+    .map((word, index) =>
+      inflected[index]
         ? escapeRegex(stem(word)) + endingsGroup(word === word.toUpperCase())
         : escapeRegex(word),
     )

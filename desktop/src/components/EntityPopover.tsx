@@ -3,6 +3,7 @@ import { useState } from "react";
 import { ENTITY_CATEGORY_ORDER } from "../domain/categories";
 import { texts } from "../i18n";
 import type { DetectedEntity, EntityCategory, EntityGroupSummary, PopoverPosition } from "../types";
+import { usePopoverPlacement } from "./popoverPlacement";
 
 interface EntityPopoverProps {
   entity: DetectedEntity;
@@ -32,13 +33,15 @@ export function EntityPopover({
   const groupsForCategory = groups.filter((item) => item.category === entity.category);
   const mergeCandidates = groupsForCategory.filter((item) => item.id !== entity.entity_group_id);
   const rejected = entity.status === "rejected";
+  const placement = usePopoverPlacement(position);
 
   return (
     <div
+      ref={placement.ref}
       className="popover"
       role="dialog"
       aria-label={texts.corrections.popoverTitle}
-      style={{ left: position.x, top: position.y }}
+      style={placement.style}
       onMouseDown={(event) => event.stopPropagation()}
       onKeyDown={(event) => {
         if (event.key === "Escape") {

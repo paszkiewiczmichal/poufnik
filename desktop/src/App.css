@@ -2971,6 +2971,8 @@ td:first-child {
   position: fixed;
   z-index: 60;
   width: min(330px, calc(100vw - 24px));
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
   border: 1px solid var(--line-input);
   border-radius: var(--radius);
   background: var(--surface);

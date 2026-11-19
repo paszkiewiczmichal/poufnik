@@ -7,6 +7,7 @@ import type {
   EntityCategory,
   EntityGroupSummary,
 } from "../types";
+import { usePopoverPlacement } from "./popoverPlacement";
 
 interface ManualEntityPopoverProps {
   selection: DocumentTextSelection;
@@ -31,13 +32,15 @@ export function ManualEntityPopover({
     () => groups.filter((group) => group.category === category),
     [category, groups],
   );
+  const placement = usePopoverPlacement(selection.position);
 
   return (
     <div
+      ref={placement.ref}
       className="popover"
       role="dialog"
       aria-label={texts.corrections.addSensitive}
-      style={{ left: selection.position.x, top: selection.position.y }}
+      style={placement.style}
       onMouseDown={(event) => event.stopPropagation()}
       onKeyDown={(event) => {
         if (event.key === "Escape") {

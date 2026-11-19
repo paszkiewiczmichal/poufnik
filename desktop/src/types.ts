@@ -192,6 +192,8 @@ export interface DocumentSelectionRange {
 export interface PopoverPosition {
   x: number;
   y: number;
+  // Top edge of the clicked element, so the popover can open above it near the bottom.
+  anchorTop?: number;
 }
 
 export interface DocumentTextSelection {
