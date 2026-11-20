@@ -222,6 +222,7 @@ def main() -> int:
         sid, sub = create(tok, app)
         prepare(tok, sid, sub)
         return 0
+    print("last published:", json.dumps(app.get("lastPublishedApplicationSubmission")))
     pending = app.get("pendingApplicationSubmission")
     if not pending:
         print("No pending submission.")
